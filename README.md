@@ -60,6 +60,40 @@ and the last 30 days. This comes from `data/backtest/*.csv`
 breakout activity in the `digest_days` window, since it's independent of
 that lookback.
 
+## Backtest model: is a trigger a real breakout or a fake one?
+
+The descriptive backtest context above (seen-before counts, sector share)
+doesn't say whether a scanner's trigger actually led anywhere - it has no
+price data. `.github/workflows/train_model.yml` (manual only, Actions tab →
+"Chartink backtest model training" → Run workflow) fills that gap:
+
+1. `scripts/fetch_price_outcomes.py` fetches historical NSE prices from
+   Yahoo Finance for every symbol in `backtest_hits`, and labels each
+   historical trigger a **real breakout** if price closed at least **+3%**
+   above the trigger-day close within **5 trading days**, otherwise a
+   **fake trigger** (hold). Stored in a `backtest_outcomes` table.
+2. `scripts/train_report.py` builds, **separately per scanner** (they're
+   different strategies, not pooled):
+   - overall win rate, with a 95% confidence interval
+   - win rate by sector and by market-cap tier (min sample size enforced)
+   - a logistic regression (sector + market-cap tier → probability of a
+     real breakout), validated on a time-ordered holdout to avoid
+     lookahead bias
+   - writes the full tables to `reports/model_report.md` and a compact
+     summary to Telegram
+
+Read the "Methodology" section at the top of `reports/model_report.md`
+before trusting any number in it — small sample sizes, survivorship bias
+(delisted symbols just get skipped), and categorical-only features (no
+price/volume patterns) all limit how much weight these results should
+carry. The win-rate tables are more defensible than the logistic
+regression's coefficients given how little data each scanner has.
+
+This only needs re-running when you get a fresh backtest export from
+Chartink (re-import it first per the section above) or want updated price
+outcomes for symbols that have had more time to play out since the last
+run.
+
 ## Setup
 
 1. **Create a Telegram bot** (skip if you chose "no notifications" — you can
