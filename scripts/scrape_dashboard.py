@@ -59,11 +59,14 @@ _EXTRACT_JS = """
         break;
       }
     }
-    let headers = Array.from(table.querySelectorAll('thead th, thead td'))
-      .map(c => c.innerText.trim());
+    // th.innerText often includes a hidden "Sort table by X in ascending
+    // order" accessibility label after the visible text - keep only the
+    // first line.
+    const cellLabel = (c) => c.innerText.trim().split('\n')[0].trim();
+    let headers = Array.from(table.querySelectorAll('thead th, thead td')).map(cellLabel);
     if (headers.length === 0) {
       const firstRow = table.querySelector('tr');
-      if (firstRow) headers = Array.from(firstRow.children).map(c => c.innerText.trim());
+      if (firstRow) headers = Array.from(firstRow.children).map(cellLabel);
     }
     let bodyRows = Array.from(table.querySelectorAll('tbody tr'));
     if (bodyRows.length === 0) {
@@ -109,7 +112,11 @@ def _rows_to_dicts(headers: list[str], raw_rows: list[list[str]]) -> list[dict[s
     for raw in raw_rows:
         if not raw:
             continue
-        row = {headers[i]: raw[i] for i in range(min(len(headers), len(raw)))}
+        row = {
+            headers[i]: raw[i]
+            for i in range(min(len(headers), len(raw)))
+            if i != symbol_idx
+        }
         symbol = raw[symbol_idx] if symbol_idx < len(raw) else raw[0]
         row["_symbol"] = symbol.strip().upper()
         out.append(row)

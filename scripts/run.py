@@ -25,7 +25,7 @@ def main() -> int:
     conn = db.connect()
     run_id = db.create_run(conn)
 
-    new_breakouts: list[tuple[str, str]] = []
+    new_breakouts: list[tuple[str, dict]] = []
 
     for scan in scans:
         print(f"Scanner '{scan.scanner_name}': {len(scan.rows)} rows")
@@ -41,8 +41,9 @@ def main() -> int:
         new_symbols = set(curr_by_symbol) - prev_symbols
 
         for symbol in sorted(new_symbols):
-            db.record_breakout(conn, run_id, scan.scanner_name, symbol, curr_by_symbol[symbol])
-            new_breakouts.append((scan.scanner_name, symbol))
+            row = curr_by_symbol[symbol]
+            db.record_breakout(conn, run_id, scan.scanner_name, symbol, row)
+            new_breakouts.append((scan.scanner_name, row))
             print(f"  breakout: {symbol}")
 
     conn.commit()
