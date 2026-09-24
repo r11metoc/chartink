@@ -44,6 +44,13 @@ set to `true` and optionally `digest_days` (default `7`) for the lookback
 window. There's no fixed schedule for this — it's on-demand only, run it
 whenever you want a report.
 
+Every digest entry also shows whether the current price is above, at, or
+below the price recorded when that breakout triggered (✅ / ➖ / 🔻). This is
+a mechanical comparison against the last known price for that symbol on
+that scanner — not a recommendation — and it's only as fresh as the last
+time the symbol actually appeared in the scan; if it's since dropped out
+entirely, the "current" price shown is stale.
+
 ## Setup
 
 1. **Create a Telegram bot** (skip if you chose "no notifications" — you can

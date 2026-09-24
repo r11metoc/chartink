@@ -65,6 +65,8 @@ def main() -> int:
         since = (datetime.now(timezone.utc) - timedelta(days=digest_days)).isoformat()
         digest_conn = db.connect()
         entries = db.breakouts_since(digest_conn, since)
+        for entry in entries:
+            entry["_current_row"] = db.latest_row(digest_conn, entry["scanner_name"], entry["symbol"])
         digest_conn.close()
         send_telegram_message(format_digest_message(entries, digest_days))
 

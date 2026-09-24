@@ -115,6 +115,20 @@ def record_breakout(conn: sqlite3.Connection, run_id: int, scanner_name: str, sy
     )
 
 
+def latest_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict | None:
+    """Most recently scraped row for this symbol on this scanner - used as
+    'current price' for comparing against a stored breakout's trigger price.
+    Only as fresh as the last time this symbol actually appeared in the scan;
+    if it has since dropped out entirely, this is stale, not live."""
+    cur = conn.execute(
+        "SELECT row_json FROM results WHERE scanner_name = ? AND symbol = ? "
+        "ORDER BY run_id DESC LIMIT 1",
+        (scanner_name, symbol),
+    )
+    row = cur.fetchone()
+    return json.loads(row[0]) if row else None
+
+
 def breakouts_since(conn: sqlite3.Connection, since_iso: str) -> list[dict]:
     cur = conn.execute(
         "SELECT scanner_name, symbol, kind, detected_at, row_json FROM breakouts "

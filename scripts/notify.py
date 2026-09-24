@@ -7,6 +7,7 @@ import os
 import requests
 
 _KIND_ICON = {"fresh": "🚀", "retest": "🔁"}
+_META_KEYS = ("_symbol", "_current_row", "scanner_name", "kind", "detected_at")
 
 
 def send_telegram_message(text: str) -> None:
@@ -40,8 +41,31 @@ def _as_float(value) -> float | None:
         return None
 
 
+def _price_status(row: dict) -> str:
+    """Compare this row's price (when the breakout triggered) against the
+    most recently known price for the same symbol/scanner. Purely mechanical
+    - not a recommendation, just whether price is currently above, at, or
+    below the level that triggered the scan."""
+    current_row = row.get("_current_row")
+    if not current_row:
+        return ""
+    headers = [k for k in row.keys() if k not in _META_KEYS]
+    price_key = _find_column(headers, "price")
+    if not price_key:
+        return ""
+    triggered = _as_float(row.get(price_key))
+    current = _as_float(current_row.get(price_key))
+    if triggered is None or current is None:
+        return ""
+    if current > triggered:
+        return f"  ✅ above trigger (₹{row[price_key]} → ₹{current_row[price_key]})"
+    if current < triggered:
+        return f"  🔻 below trigger (₹{row[price_key]} → ₹{current_row[price_key]})"
+    return f"  ➖ at trigger (₹{row[price_key]})"
+
+
 def _format_symbol_line(row: dict, prefix: str = "") -> str:
-    headers = [k for k in row.keys() if k not in ("_symbol", "scanner_name", "kind", "detected_at")]
+    headers = [k for k in row.keys() if k not in _META_KEYS]
     pct_key = _find_column(headers, "%")
     price_key = _find_column(headers, "price")
     vol_key = _find_column(headers, "vol")
@@ -73,7 +97,7 @@ def _format_rows(rows: list[dict]) -> list[str]:
     if not rows:
         return ["  (no symbols)"]
 
-    headers = [k for k in rows[0].keys() if k not in ("_symbol", "scanner_name", "kind", "detected_at")]
+    headers = [k for k in rows[0].keys() if k not in _META_KEYS]
     pct_key = _find_column(headers, "%")
     ordered = sorted(rows, key=lambda r: _as_float(r.get(pct_key)) or 0, reverse=True) if pct_key else rows
 
@@ -90,7 +114,7 @@ def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
     lines = ["<b>New Chartink breakouts</b>"]
     for scanner_name, kind_rows in by_scanner.items():
         lines.append(f"\n<b>{scanner_name}</b>")
-        headers = [k for k in kind_rows[0][1].keys() if k not in ("_symbol", "scanner_name", "kind", "detected_at")]
+        headers = [k for k in kind_rows[0][1].keys() if k not in _META_KEYS]
         pct_key = _find_column(headers, "%")
         ordered = sorted(kind_rows, key=lambda kr: _as_float(kr[1].get(pct_key)) or 0, reverse=True) if pct_key else kind_rows
         for kind, row in ordered:
@@ -115,27 +139,29 @@ def format_digest_message(entries: list[dict], days: int) -> str:
 
     lines = [f"<b>📊 Chartink digest</b> (last {days} days)"]
 
-    scanners_by_symbol: dict[str, list[str]] = {}
+    by_symbol: dict[str, list[dict]] = {}
     for e in entries:
-        scanners_by_symbol.setdefault(e["symbol"], []).append(e["scanner_name"])
+        by_symbol.setdefault(e["symbol"], []).append(e)
 
-    recurring = {s: scs for s, scs in scanners_by_symbol.items() if len(scs) > 1}
+    recurring = {s: es for s, es in by_symbol.items() if len(es) > 1}
     if recurring:
         lines.append("\n<b>⭐ Top recurring symbols</b>")
-        for symbol, scanners in sorted(recurring.items(), key=lambda kv: len(kv[1]), reverse=True):
+        for symbol, es in sorted(recurring.items(), key=lambda kv: len(kv[1]), reverse=True):
+            scanners = [e["scanner_name"] for e in es]
             summary = ", ".join(f"{name} x{scanners.count(name)}" for name in dict.fromkeys(scanners))
-            lines.append(f"  <b>{symbol}</b> — {len(scanners)}x ({summary})")
+            earliest = min(es, key=lambda e: e["detected_at"])
+            lines.append(f"  <b>{symbol}</b> — {len(es)}x ({summary})" + _price_status(earliest))
 
     retests = [e for e in entries if e["kind"] == "retest"]
     if retests:
         lines.append("\n<b>🔁 Retest candidates</b> (re-triggered after a gap)")
         for e in retests:
-            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
+            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip() + _price_status(e))
 
     fresh = [e for e in entries if e["kind"] == "fresh"]
     if fresh:
         lines.append("\n<b>🚀 Fresh breakouts</b> (first time seen)")
         for e in fresh:
-            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
+            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip() + _price_status(e))
 
     return "\n".join(lines)
