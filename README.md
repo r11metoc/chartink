@@ -48,9 +48,32 @@ against yet), so no breakout alert fires until the second run onward.
    `chartink-debug-dump` artifact with the full page HTML and a screenshot,
    so you can confirm the three scanners were detected and split correctly.
 
+## Scanner names
+
+The dashboard doesn't expose a heading/title next to each widget's table
+that can be detected generically, so the three scanners are matched by
+**position**: the 1st, 2nd and 3rd non-empty table found on the page are
+named, in order:
+
+1. `63_30_daily`
+2. `Bullish_Scanner`
+3. `Wkly_upswing`
+
+This is set in `DEFAULT_SCANNER_NAMES` in `scripts/scrape_dashboard.py`, or
+can be overridden per-run with a `CHARTINK_SCANNER_NAMES` env var
+(comma-separated, no spaces needed). If the dashboard's scanners are ever
+reordered, renamed, or a fourth one is added, update that list — a mismatch
+between the number of tables found and the number of configured names logs
+a warning and falls back to generic `Scanner N` labels rather than silently
+mislabeling data.
+
+Renaming a scanner effectively starts its breakout tracking over (the new
+name has no prior run to diff against), so expect one baseline-seeding run
+with no alert right after a name change.
+
 ## If the scraper doesn't split your three scanners correctly
 
-The table/title detection in `scripts/scrape_dashboard.py` was written
+The table/column detection in `scripts/scrape_dashboard.py` was written
 without being able to load the live page directly (this environment's
 network policy blocks chartink.com), so it uses generic heuristics rather
 than Chartink-specific CSS selectors. If a debug run shows it merging

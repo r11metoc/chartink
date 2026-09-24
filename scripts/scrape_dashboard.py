@@ -24,6 +24,21 @@ from playwright.sync_api import sync_playwright
 
 DEBUG_DIR = Path(__file__).resolve().parent.parent / "debug"
 
+# The dashboard's own headings/titles for each widget aren't detectable
+# generically from the DOM (confirmed against a live run), so the three
+# scanners are identified by position instead: 1st, 2nd, 3rd non-empty
+# table on the page, in the order given by the dashboard owner. Override
+# with the CHARTINK_SCANNER_NAMES env var (comma-separated) if the
+# dashboard's scanners are ever reordered or added to.
+DEFAULT_SCANNER_NAMES = ["63_30_daily", "Bullish_Scanner", "Wkly_upswing"]
+
+
+def _scanner_names() -> list[str]:
+    override = os.environ.get("CHARTINK_SCANNER_NAMES")
+    if override:
+        return [n.strip() for n in override.split(",") if n.strip()]
+    return DEFAULT_SCANNER_NAMES
+
 # Runs in the page context. Walks every <table>, climbs a few ancestor
 # levels looking for a heading-like element to use as the widget/scanner
 # title, and pulls out header + body cell text.
@@ -136,6 +151,17 @@ def scrape_dashboard(url: str, debug: bool = False) -> list[ScanResult]:
         if not rows:
             continue
         results.append(ScanResult(scanner_name=t["title"], rows=rows))
+
+    names = _scanner_names()
+    if len(results) == len(names):
+        for result, name in zip(results, names):
+            result.scanner_name = name
+    else:
+        print(
+            f"Found {len(results)} non-empty table(s) but {len(names)} configured scanner "
+            "name(s) - keeping auto-detected titles. Set CHARTINK_SCANNER_NAMES if the "
+            "dashboard's scanners changed."
+        )
     return results
 
 
