@@ -20,9 +20,12 @@ scanners (i.e. a fresh breakout).
   - `runs` — one row per scrape
   - `results` — every symbol seen in every run, per scanner
   - `breakouts` — symbols that were *not* present in a scanner's previous
-    run but *are* present now
+    run but *are* present now, tagged `kind`:
+    - `fresh` — never seen on this scanner before
+    - `retest` — seen before, dropped out for at least one run, and back
+      again (the scan's own condition re-triggering at the same level)
 - `scripts/notify.py` sends a Telegram message listing new breakouts,
-  grouped by scanner.
+  grouped by scanner, with a 🚀 (fresh) or 🔁 (retest) marker per symbol.
 - The workflow commits `data/chartink.db` back to the repo after each run,
   so you get full git history of every scan.
 
@@ -33,6 +36,62 @@ To get the current scan results in Telegram on demand (not just new
 breakouts), go to the Actions tab → "Chartink breakout scan" → Run workflow
 → set `snapshot` to `true`. This sends every symbol currently in each
 scanner as a single message, independent of what's changed since the last
+run.
+
+To get a digest of recent activity (top recurring symbols across scanners,
+retest candidates, fresh breakouts), run the same workflow with `digest`
+set to `true` and optionally `digest_days` (default `7`) for the lookback
+window. There's no fixed schedule for this — it's on-demand only, run it
+whenever you want a report.
+
+Every digest entry also shows a **BUY**/**HOLD** label per this fixed rule,
+evaluated separately for each scanner: BUY only if the current known price
+is above the price recorded when that breakout triggered, HOLD otherwise
+(covers both "unchanged" and "below"). This is a mechanical comparison of
+two stored numbers per the user's own stated rule, not an independent
+recommendation, and it's only as fresh as the last time the symbol actually
+appeared in that scanner's results — if it's since dropped out entirely,
+the "current" price shown is stale.
+
+The digest also always includes a **🏭 Sectors in focus** section, broken
+out per scanner: the top 5 sectors by backtest-hit count in the last 7 days
+and the last 30 days. This comes from `data/backtest/*.csv`
+(`backtest_hits` table) and shows up even when there's been no live
+breakout activity in the `digest_days` window, since it's independent of
+that lookback.
+
+## Backtest model: is a trigger a real breakout or a fake one?
+
+The descriptive backtest context above (seen-before counts, sector share)
+doesn't say whether a scanner's trigger actually led anywhere - it has no
+price data. `.github/workflows/train_model.yml` (manual only, Actions tab →
+"Chartink backtest model training" → Run workflow) fills that gap:
+
+1. `scripts/fetch_price_outcomes.py` fetches historical NSE prices from
+   Yahoo Finance for every symbol in `backtest_hits`, and labels each
+   historical trigger a **real breakout** if price closed at least **+3%**
+   above the trigger-day close within **5 trading days**, otherwise a
+   **fake trigger** (hold). Stored in a `backtest_outcomes` table.
+2. `scripts/train_report.py` builds, **separately per scanner** (they're
+   different strategies, not pooled):
+   - overall win rate, with a 95% confidence interval
+   - win rate by sector and by market-cap tier (min sample size enforced)
+   - a logistic regression (sector + market-cap tier → probability of a
+     real breakout), validated on a time-ordered holdout to avoid
+     lookahead bias
+   - writes the full tables to `reports/model_report.md` and a compact
+     summary to Telegram
+
+Read the "Methodology" section at the top of `reports/model_report.md`
+before trusting any number in it — small sample sizes, survivorship bias
+(delisted symbols just get skipped), and categorical-only features (no
+price/volume patterns) all limit how much weight these results should
+carry. The win-rate tables are more defensible than the logistic
+regression's coefficients given how little data each scanner has.
+
+This only needs re-running when you get a fresh backtest export from
+Chartink (re-import it first per the section above) or want updated price
+outcomes for symbols that have had more time to play out since the last
 run.
 
 ## Setup
@@ -61,9 +120,17 @@ that can be detected generically, so the three scanners are matched by
 **position**: the 1st, 2nd and 3rd non-empty table found on the page are
 named, in order:
 
-1. `63_30_daily`
-2. `Bullish_Scanner`
-3. `Wkly_upswing`
+1. `Wkly_upswing`
+2. `63_30_daily`
+3. `Bullish_Scanner`
+
+This order was verified against Chartink's own backtest CSV exports
+(`data/backtest/`) by cross-checking the live scrape's results for today
+against each scanner's most recent backtest entry — the original order
+(guessed from the order the scanners were listed in) turned out to be
+completely scrambled, so every symbol/price was always correct but was
+attributed to the wrong scanner name until this was caught and the
+existing database's `scanner_name` values were corrected retroactively.
 
 This is set in `DEFAULT_SCANNER_NAMES` in `scripts/scrape_dashboard.py`, or
 can be overridden per-run with a `CHARTINK_SCANNER_NAMES` env var
@@ -86,6 +153,36 @@ than Chartink-specific CSS selectors. If a debug run shows it merging
 scanners, missing one, or picking the wrong column as the symbol, share the
 `chartink-debug-dump` artifact contents and the selectors can be tightened
 in `_EXTRACT_JS` and `_pick_symbol_index`.
+
+## Backtest-based descriptive context
+
+`data/backtest/*.csv` holds Chartink's own backtest exports (one per
+scanner: Date, Symbol, Marketcapname, Sector — no price or return data).
+`scripts/import_backtest.py` loads them into a `backtest_hits` table:
+
+```bash
+python scripts/import_backtest.py            # imports data/backtest/*.csv
+python scripts/import_backtest.py some/dir    # or a custom directory
+```
+
+It's safe to re-run — duplicate (scanner, date, symbol) rows are skipped.
+To refresh, export a new backtest CSV from Chartink, drop it into
+`data/backtest/<scanner_name>.csv` (filename must match the scanner name),
+and re-run the import.
+
+Every breakout and digest entry now shows, when available:
+- **📚 seen Nx before, last DATE** — how many times this exact symbol has
+  triggered this scanner historically (exact match, high confidence)
+- **sector ~X% of history** — how common this symbol's sector is among the
+  scanner's historical hits (approximate — matched by loose substring
+  comparison since the live scan's "Industry" labels don't exactly match
+  the backtest's "Sector" labels)
+
+This is **descriptive pattern-counting, not a return prediction** — the
+backtest data has no outcome (win/loss, % gain) attached to any historical
+hit, so there's nothing here that estimates whether a breakout will be
+profitable. It only tells you how often this scanner has liked this
+symbol/sector before.
 
 ## Querying the data yourself
 
