@@ -12,6 +12,10 @@ on:
         description: "Dump page HTML/screenshot as an artifact"
         type: boolean
         default: false
+      snapshot:
+        description: "Send current scan results to Telegram, regardless of breakouts"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -40,6 +44,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CHARTINK_DEBUG_DUMP: ${{ inputs.debug && '1' || '0' }}
+          CHARTINK_SEND_SNAPSHOT: ${{ inputs.snapshot && '1' || '0' }}
         working-directory: scripts
         run: python run.py
 

@@ -6,7 +6,7 @@ import os
 import sys
 
 import db
-from notify import format_breakout_message, send_telegram_message
+from notify import format_breakout_message, format_snapshot_message, send_telegram_message
 from scrape_dashboard import scrape_dashboard
 
 DEFAULT_URL = "https://chartink.com/dashboard/45863"
@@ -15,6 +15,7 @@ DEFAULT_URL = "https://chartink.com/dashboard/45863"
 def main() -> int:
     url = os.environ.get("CHARTINK_DASHBOARD_URL", DEFAULT_URL)
     debug = os.environ.get("CHARTINK_DEBUG_DUMP") == "1"
+    send_snapshot = os.environ.get("CHARTINK_SEND_SNAPSHOT") == "1"
 
     scans = scrape_dashboard(url, debug=debug)
     if not scans:
@@ -51,6 +52,9 @@ def main() -> int:
         send_telegram_message(format_breakout_message(new_breakouts))
     else:
         print("No new breakouts this run.")
+
+    if send_snapshot:
+        send_telegram_message(format_snapshot_message(scans))
 
     return 0
 

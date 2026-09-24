@@ -29,6 +29,12 @@ scanners (i.e. a fresh breakout).
 The first run for each scanner just seeds the baseline (nothing to compare
 against yet), so no breakout alert fires until the second run onward.
 
+To get the current scan results in Telegram on demand (not just new
+breakouts), go to the Actions tab → "Chartink breakout scan" → Run workflow
+→ set `snapshot` to `true`. This sends every symbol currently in each
+scanner as a single message, independent of what's changed since the last
+run.
+
 ## Setup
 
 1. **Create a Telegram bot** (skip if you chose "no notifications" — you can

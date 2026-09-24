@@ -1,4 +1,4 @@
-"""Send a Telegram message summarizing newly detected breakouts."""
+"""Send Telegram messages summarizing scan results."""
 
 from __future__ import annotations
 
@@ -33,4 +33,19 @@ def format_breakout_message(breakouts: list[tuple[str, str]]) -> str:
         lines.append(f"\n<b>{scanner_name}</b>")
         for s in symbols:
             lines.append(f"  • {s}")
+    return "\n".join(lines)
+
+
+def format_snapshot_message(scans: list) -> str:
+    """Full current scan results, regardless of what's new vs. the last run."""
+    lines = ["<b>Chartink scan snapshot</b>"]
+    for scan in scans:
+        lines.append(f"\n<b>{scan.scanner_name}</b> ({len(scan.rows)})")
+        if not scan.rows:
+            lines.append("  (no symbols)")
+            continue
+        for row in scan.rows:
+            symbol = row.get("_symbol", "?")
+            details = ", ".join(f"{k}: {v}" for k, v in row.items() if k != "_symbol" and v)
+            lines.append(f"  • <b>{symbol}</b> — {details}" if details else f"  • {symbol}")
     return "\n".join(lines)
