@@ -13,11 +13,11 @@ on:
         type: boolean
         default: false
       snap:
-        description: "Send current scan results to Telegram, regardless of breakouts"
+        description: "Send current scan results + buy/hold list to Telegram (always on for scheduled runs; this only matters for manual runs)"
         type: boolean
         default: false
       digest:
-        description: "Send a digest of recent breakouts (top recurring symbols, retest candidates) to Telegram"
+        description: "Send a digest of recent breakouts to Telegram (always on for scheduled runs; this only matters for manual runs)"
         type: boolean
         default: false
       days:
@@ -52,8 +52,8 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CHARTINK_DEBUG_DUMP: ${{ inputs.debug && '1' || '0' }}
-          CHARTINK_SEND_SNAPSHOT: ${{ inputs.snap && '1' || '0' }}
-          CHARTINK_SEND_DIGEST: ${{ inputs.digest && '1' || '0' }}
+          CHARTINK_SEND_SNAPSHOT: ${{ (github.event_name == 'schedule' || inputs.snap) && '1' || '0' }}
+          CHARTINK_SEND_DIGEST: ${{ (github.event_name == 'schedule' || inputs.digest) && '1' || '0' }}
           CHARTINK_DIGEST_DAYS: ${{ inputs.days || '7' }}
         working-directory: scripts
         run: python run.py
