@@ -12,7 +12,7 @@ on:
         description: "Dump page HTML/screenshot as an artifact"
         type: boolean
         default: false
-      snapshot:
+      snap:
         description: "Send current scan results to Telegram, regardless of breakouts"
         type: boolean
         default: false
@@ -20,7 +20,7 @@ on:
         description: "Send a digest of recent breakouts (top recurring symbols, retest candidates) to Telegram"
         type: boolean
         default: false
-      digest_days:
+      days:
         description: "Lookback window in days for the digest"
         type: string
         default: "7"
@@ -52,9 +52,9 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CHARTINK_DEBUG_DUMP: ${{ inputs.debug && '1' || '0' }}
-          CHARTINK_SEND_SNAPSHOT: ${{ inputs.snapshot && '1' || '0' }}
+          CHARTINK_SEND_SNAPSHOT: ${{ inputs.snap && '1' || '0' }}
           CHARTINK_SEND_DIGEST: ${{ inputs.digest && '1' || '0' }}
-          CHARTINK_DIGEST_DAYS: ${{ inputs.digest_days || '7' }}
+          CHARTINK_DIGEST_DAYS: ${{ inputs.days || '7' }}
         working-directory: scripts
         run: python run.py
 
