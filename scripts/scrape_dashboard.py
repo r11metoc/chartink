@@ -62,7 +62,7 @@ _EXTRACT_JS = """
     // th.innerText often includes a hidden "Sort table by X in ascending
     // order" accessibility label after the visible text - keep only the
     // first line.
-    const cellLabel = (c) => c.innerText.trim().split('\n')[0].trim();
+    const cellLabel = (c) => c.innerText.trim().split('\\n')[0].trim();
     let headers = Array.from(table.querySelectorAll('thead th, thead td')).map(cellLabel);
     if (headers.length === 0) {
       const firstRow = table.querySelector('tr');
