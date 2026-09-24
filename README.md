@@ -34,9 +34,20 @@ against yet), so no breakout alert fires until the second run onward.
 
 To get the current scan results in Telegram on demand (not just new
 breakouts), go to the Actions tab → "Chartink breakout scan" → Run workflow
-→ set `snap` to `true`. This sends every symbol currently in each
-scanner as a single message, independent of what's changed since the last
-run.
+→ set `snap` to `true`. This sends two messages: the raw current results
+for every scanner, and a **🎯 Buy / Hold list** that splits every symbol
+currently on each scanner into:
+
+- **BUY** — current price is above the price it had the first time it
+  ever triggered that scanner (or, if it triggered again after dropping
+  out, above that retest's price)
+- **HOLD** — at or below that trigger price
+
+This works even for symbols that have been sitting on a scanner
+continuously since before formal breakout tracking started, since the
+trigger price falls back to the earliest known price for that symbol on
+that scanner. A symbol showing up for the very first time this run will
+always start in HOLD (nothing to compare against yet but itself).
 
 To get a digest of recent activity (top recurring symbols across scanners,
 retest candidates, fresh breakouts), run the same workflow with `digest`

@@ -133,6 +133,39 @@ def has_appeared_before(conn: sqlite3.Connection, scanner_name: str, symbol: str
     return cur.fetchone() is not None
 
 
+def latest_breakout_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict | None:
+    cur = conn.execute(
+        "SELECT row_json FROM breakouts WHERE scanner_name = ? AND symbol = ? "
+        "ORDER BY detected_at DESC LIMIT 1",
+        (scanner_name, symbol),
+    )
+    row = cur.fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def first_seen_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict | None:
+    cur = conn.execute(
+        "SELECT row_json FROM results WHERE scanner_name = ? AND symbol = ? "
+        "ORDER BY run_id ASC LIMIT 1",
+        (scanner_name, symbol),
+    )
+    row = cur.fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def trigger_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict | None:
+    """Best-known 'trigger price' row for a currently-active symbol: the
+    most recent breakout event if one was ever recorded for it (correctly
+    captures a retest's re-entry price), otherwise the earliest known
+    results row for this scanner+symbol (covers symbols that have been on
+    the scan since before formal breakout tracking started, e.g. a
+    baseline-seeding run)."""
+    row = latest_breakout_row(conn, scanner_name, symbol)
+    if row is not None:
+        return row
+    return first_seen_row(conn, scanner_name, symbol)
+
+
 def record_breakout(conn: sqlite3.Connection, run_id: int, scanner_name: str, symbol: str, row: dict, kind: str = "fresh") -> None:
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
