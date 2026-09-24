@@ -177,6 +177,21 @@ def backtest_sector_share(conn: sqlite3.Connection, scanner_name: str, sector: s
     return (matches, total)
 
 
+def distinct_backtest_scanners(conn: sqlite3.Connection) -> list[str]:
+    cur = conn.execute("SELECT DISTINCT scanner_name FROM backtest_hits ORDER BY scanner_name")
+    return [r[0] for r in cur.fetchall()]
+
+
+def sector_counts_since(conn: sqlite3.Connection, scanner_name: str, since_date: str, limit: int = 5) -> list[tuple[str, int]]:
+    """Top sectors by backtest hit count for this scanner since since_date (ISO date)."""
+    cur = conn.execute(
+        "SELECT sector, COUNT(*) AS n FROM backtest_hits "
+        "WHERE scanner_name = ? AND hit_date >= ? GROUP BY sector ORDER BY n DESC LIMIT ?",
+        (scanner_name, since_date, limit),
+    )
+    return [(r[0], r[1]) for r in cur.fetchall()]
+
+
 def breakouts_since(conn: sqlite3.Connection, since_iso: str) -> list[dict]:
     cur = conn.execute(
         "SELECT scanner_name, symbol, kind, detected_at, row_json FROM breakouts "

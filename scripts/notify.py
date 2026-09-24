@@ -42,10 +42,10 @@ def _as_float(value) -> float | None:
 
 
 def _price_status(row: dict) -> str:
-    """Compare this row's price (when the breakout triggered) against the
-    most recently known price for the same symbol/scanner. Purely mechanical
-    - not a recommendation, just whether price is currently above, at, or
-    below the level that triggered the scan."""
+    """Mechanical rule, evaluated per scanner: BUY only if the current known
+    price is above the price recorded when the breakout triggered, otherwise
+    HOLD. This is the user's own stated rule applied to stored numbers, not
+    an independent recommendation."""
     current_row = row.get("_current_row")
     if not current_row:
         return ""
@@ -58,10 +58,8 @@ def _price_status(row: dict) -> str:
     if triggered is None or current is None:
         return ""
     if current > triggered:
-        return f"  ✅ above trigger (₹{row[price_key]} → ₹{current_row[price_key]})"
-    if current < triggered:
-        return f"  🔻 below trigger (₹{row[price_key]} → ₹{current_row[price_key]})"
-    return f"  ➖ at trigger (₹{row[price_key]})"
+        return f"  🟢 BUY (₹{row[price_key]} → ₹{current_row[price_key]})"
+    return f"  ⏸ HOLD (₹{row[price_key]} → ₹{current_row[price_key]})"
 
 
 def _backtest_context(row: dict) -> str:
@@ -148,13 +146,16 @@ def format_snapshot_message(scans: list) -> str:
     return "\n".join(lines)
 
 
-def format_digest_message(entries: list[dict], days: int) -> str:
+def format_digest_message(entries: list[dict], days: int, sector_focus: dict | None = None) -> str:
     """entries: breakout rows from db.breakouts_since(), each with
-    scanner_name/symbol/kind/detected_at plus the scan's own columns."""
-    if not entries:
-        return f"<b>📊 Chartink digest</b> (last {days} days)\n\nNo breakouts recorded in this window."
-
+    scanner_name/symbol/kind/detected_at plus the scan's own columns.
+    sector_focus: {scanner_name: {"weekly": [(sector, count), ...], "monthly": [...]}}
+    from Chartink's backtest history, shown per scanner regardless of
+    whether there were any live breakouts in this window."""
     lines = [f"<b>📊 Chartink digest</b> (last {days} days)"]
+
+    if not entries:
+        lines.append("\nNo breakouts recorded in this window.")
 
     by_symbol: dict[str, list[dict]] = {}
     for e in entries:
@@ -180,5 +181,16 @@ def format_digest_message(entries: list[dict], days: int) -> str:
         lines.append("\n<b>🚀 Fresh breakouts</b> (first time seen)")
         for e in fresh:
             lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
+
+    if sector_focus:
+        lines.append("\n<b>🏭 Sectors in focus</b> (from Chartink backtest history, per scanner)")
+        for scanner_name, windows in sector_focus.items():
+            lines.append(f"\n  <b>{scanner_name}</b>")
+            weekly = windows.get("weekly") or []
+            monthly = windows.get("monthly") or []
+            weekly_str = ", ".join(f"{s} ({c})" for s, c in weekly) if weekly else "no hits"
+            monthly_str = ", ".join(f"{s} ({c})" for s, c in monthly) if monthly else "no hits"
+            lines.append(f"    Weekly top 5: {weekly_str}")
+            lines.append(f"    Monthly top 5: {monthly_str}")
 
     return "\n".join(lines)

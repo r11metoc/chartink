@@ -80,8 +80,19 @@ def main() -> int:
         entries = db.breakouts_since(digest_conn, since)
         for entry in entries:
             entry["_current_row"] = db.latest_row(digest_conn, entry["scanner_name"], entry["symbol"])
+
+        today = datetime.now(timezone.utc).date()
+        weekly_since = (today - timedelta(days=7)).isoformat()
+        monthly_since = (today - timedelta(days=30)).isoformat()
+        sector_focus = {}
+        for scanner_name in db.distinct_backtest_scanners(digest_conn):
+            sector_focus[scanner_name] = {
+                "weekly": db.sector_counts_since(digest_conn, scanner_name, weekly_since),
+                "monthly": db.sector_counts_since(digest_conn, scanner_name, monthly_since),
+            }
+
         digest_conn.close()
-        send_telegram_message(format_digest_message(entries, digest_days))
+        send_telegram_message(format_digest_message(entries, digest_days, sector_focus))
 
     return 0
 

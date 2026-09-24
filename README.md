@@ -44,12 +44,21 @@ set to `true` and optionally `digest_days` (default `7`) for the lookback
 window. There's no fixed schedule for this — it's on-demand only, run it
 whenever you want a report.
 
-Every digest entry also shows whether the current price is above, at, or
-below the price recorded when that breakout triggered (✅ / ➖ / 🔻). This is
-a mechanical comparison against the last known price for that symbol on
-that scanner — not a recommendation — and it's only as fresh as the last
-time the symbol actually appeared in the scan; if it's since dropped out
-entirely, the "current" price shown is stale.
+Every digest entry also shows a **BUY**/**HOLD** label per this fixed rule,
+evaluated separately for each scanner: BUY only if the current known price
+is above the price recorded when that breakout triggered, HOLD otherwise
+(covers both "unchanged" and "below"). This is a mechanical comparison of
+two stored numbers per the user's own stated rule, not an independent
+recommendation, and it's only as fresh as the last time the symbol actually
+appeared in that scanner's results — if it's since dropped out entirely,
+the "current" price shown is stale.
+
+The digest also always includes a **🏭 Sectors in focus** section, broken
+out per scanner: the top 5 sectors by backtest-hit count in the last 7 days
+and the last 30 days. This comes from `data/backtest/*.csv`
+(`backtest_hits` table) and shows up even when there's been no live
+breakout activity in the `digest_days` window, since it's independent of
+that lookback.
 
 ## Setup
 
