@@ -7,7 +7,7 @@ import os
 import requests
 
 _KIND_ICON = {"fresh": "🚀", "retest": "🔁"}
-_META_KEYS = ("_symbol", "_current_row", "scanner_name", "kind", "detected_at")
+_META_KEYS = ("_symbol", "_current_row", "_backtest_hits", "_sector_share", "scanner_name", "kind", "detected_at")
 
 
 def send_telegram_message(text: str) -> None:
@@ -64,6 +64,22 @@ def _price_status(row: dict) -> str:
     return f"  ➖ at trigger (₹{row[price_key]})"
 
 
+def _backtest_context(row: dict) -> str:
+    """Descriptive-only context from Chartink's own backtest export: how
+    often this exact symbol has triggered this scanner before, and roughly
+    how common its sector is among the scanner's historical hits. Not a
+    return prediction - the backtest data has no price/outcome history."""
+    parts = []
+    hits = row.get("_backtest_hits")
+    if hits:
+        parts.append(f"seen {len(hits)}x before, last {hits[-1]}")
+    share = row.get("_sector_share")
+    if share and share[1]:
+        matches, total = share
+        parts.append(f"sector ~{round(100 * matches / total)}% of history")
+    return f"\n      📚 {' · '.join(parts)}" if parts else ""
+
+
 def _format_symbol_line(row: dict, prefix: str = "") -> str:
     headers = [k for k in row.keys() if k not in _META_KEYS]
     pct_key = _find_column(headers, "%")
@@ -88,7 +104,8 @@ def _format_symbol_line(row: dict, prefix: str = "") -> str:
 
     details = "  ·  ".join(bits)
     label = f"{prefix}{arrow} <b>{symbol}</b>"
-    return f"  {label}  {details}" if details else f"  {label}"
+    base = f"  {label}  {details}" if details else f"  {label}"
+    return base + _price_status(row) + _backtest_context(row)
 
 
 def _format_rows(rows: list[dict]) -> list[str]:
@@ -156,12 +173,12 @@ def format_digest_message(entries: list[dict], days: int) -> str:
     if retests:
         lines.append("\n<b>🔁 Retest candidates</b> (re-triggered after a gap)")
         for e in retests:
-            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip() + _price_status(e))
+            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
 
     fresh = [e for e in entries if e["kind"] == "fresh"]
     if fresh:
         lines.append("\n<b>🚀 Fresh breakouts</b> (first time seen)")
         for e in fresh:
-            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip() + _price_status(e))
+            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
 
     return "\n".join(lines)

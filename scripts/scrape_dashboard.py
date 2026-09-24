@@ -25,12 +25,14 @@ from playwright.sync_api import sync_playwright
 DEBUG_DIR = Path(__file__).resolve().parent.parent / "debug"
 
 # The dashboard's own headings/titles for each widget aren't detectable
-# generically from the DOM (confirmed against a live run), so the three
-# scanners are identified by position instead: 1st, 2nd, 3rd non-empty
-# table on the page, in the order given by the dashboard owner. Override
-# with the CHARTINK_SCANNER_NAMES env var (comma-separated) if the
-# dashboard's scanners are ever reordered or added to.
-DEFAULT_SCANNER_NAMES = ["63_30_daily", "Bullish_Scanner", "Wkly_upswing"]
+# generically from the DOM, so the three scanners are identified by
+# position instead: 1st, 2nd, 3rd non-empty table on the page. This order
+# was cross-checked against Chartink's own backtest exports (matching
+# today's live results against each scanner's most recent backtest date) -
+# it is NOT the order the scanners were originally described in, which was
+# wrong. Override with the CHARTINK_SCANNER_NAMES env var (comma-separated)
+# if the dashboard's widget order ever changes.
+DEFAULT_SCANNER_NAMES = ["Wkly_upswing", "63_30_daily", "Bullish_Scanner"]
 
 
 def _scanner_names() -> list[str]:

@@ -41,6 +41,17 @@ CREATE TABLE IF NOT EXISTS breakouts (
     row_json TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_breakouts_detected_at ON breakouts(detected_at);
+
+CREATE TABLE IF NOT EXISTS backtest_hits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scanner_name TEXT NOT NULL,
+    hit_date TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    marketcap TEXT NOT NULL,
+    sector TEXT NOT NULL,
+    UNIQUE(scanner_name, hit_date, symbol)
+);
+CREATE INDEX IF NOT EXISTS idx_backtest_scanner_symbol ON backtest_hits(scanner_name, symbol);
 """
 
 
@@ -127,6 +138,43 @@ def latest_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict
     )
     row = cur.fetchone()
     return json.loads(row[0]) if row else None
+
+
+def import_backtest_hit(conn: sqlite3.Connection, scanner_name: str, hit_date: str, symbol: str, marketcap: str, sector: str) -> bool:
+    """Returns True if a new row was inserted (False if it already existed)."""
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO backtest_hits (scanner_name, hit_date, symbol, marketcap, sector) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (scanner_name, hit_date, symbol, marketcap, sector),
+    )
+    return cur.rowcount > 0
+
+
+def backtest_history(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> list[str]:
+    """All historical backtest dates this exact symbol triggered on this scanner."""
+    cur = conn.execute(
+        "SELECT hit_date FROM backtest_hits WHERE scanner_name = ? AND symbol = ? ORDER BY hit_date",
+        (scanner_name, symbol),
+    )
+    return [r[0] for r in cur.fetchall()]
+
+
+def backtest_sector_share(conn: sqlite3.Connection, scanner_name: str, sector: str) -> tuple[int, int] | None:
+    """(hits for this sector, total hits) for this scanner, matching sector
+    case-insensitively and loosely (either string contains the other) since
+    live scan 'Industry' labels don't exactly match backtest 'Sector' labels."""
+    total = conn.execute(
+        "SELECT COUNT(*) FROM backtest_hits WHERE scanner_name = ?", (scanner_name,)
+    ).fetchone()[0]
+    if total == 0 or not sector:
+        return None
+    sector_low = sector.lower()
+    cur = conn.execute("SELECT sector FROM backtest_hits WHERE scanner_name = ?", (scanner_name,))
+    matches = sum(
+        1 for (s,) in cur.fetchall()
+        if s and (s.lower() in sector_low or sector_low in s.lower())
+    )
+    return (matches, total)
 
 
 def breakouts_since(conn: sqlite3.Connection, since_iso: str) -> list[dict]:

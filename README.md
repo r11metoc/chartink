@@ -77,9 +77,17 @@ that can be detected generically, so the three scanners are matched by
 **position**: the 1st, 2nd and 3rd non-empty table found on the page are
 named, in order:
 
-1. `63_30_daily`
-2. `Bullish_Scanner`
-3. `Wkly_upswing`
+1. `Wkly_upswing`
+2. `63_30_daily`
+3. `Bullish_Scanner`
+
+This order was verified against Chartink's own backtest CSV exports
+(`data/backtest/`) by cross-checking the live scrape's results for today
+against each scanner's most recent backtest entry — the original order
+(guessed from the order the scanners were listed in) turned out to be
+completely scrambled, so every symbol/price was always correct but was
+attributed to the wrong scanner name until this was caught and the
+existing database's `scanner_name` values were corrected retroactively.
 
 This is set in `DEFAULT_SCANNER_NAMES` in `scripts/scrape_dashboard.py`, or
 can be overridden per-run with a `CHARTINK_SCANNER_NAMES` env var
@@ -102,6 +110,36 @@ than Chartink-specific CSS selectors. If a debug run shows it merging
 scanners, missing one, or picking the wrong column as the symbol, share the
 `chartink-debug-dump` artifact contents and the selectors can be tightened
 in `_EXTRACT_JS` and `_pick_symbol_index`.
+
+## Backtest-based descriptive context
+
+`data/backtest/*.csv` holds Chartink's own backtest exports (one per
+scanner: Date, Symbol, Marketcapname, Sector — no price or return data).
+`scripts/import_backtest.py` loads them into a `backtest_hits` table:
+
+```bash
+python scripts/import_backtest.py            # imports data/backtest/*.csv
+python scripts/import_backtest.py some/dir    # or a custom directory
+```
+
+It's safe to re-run — duplicate (scanner, date, symbol) rows are skipped.
+To refresh, export a new backtest CSV from Chartink, drop it into
+`data/backtest/<scanner_name>.csv` (filename must match the scanner name),
+and re-run the import.
+
+Every breakout and digest entry now shows, when available:
+- **📚 seen Nx before, last DATE** — how many times this exact symbol has
+  triggered this scanner historically (exact match, high confidence)
+- **sector ~X% of history** — how common this symbol's sector is among the
+  scanner's historical hits (approximate — matched by loose substring
+  comparison since the live scan's "Industry" labels don't exactly match
+  the backtest's "Sector" labels)
+
+This is **descriptive pattern-counting, not a return prediction** — the
+backtest data has no outcome (win/loss, % gain) attached to any historical
+hit, so there's nothing here that estimates whether a breakout will be
+profitable. It only tells you how often this scanner has liked this
+symbol/sector before.
 
 ## Querying the data yourself
 

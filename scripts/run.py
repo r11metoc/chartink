@@ -13,6 +13,13 @@ from scrape_dashboard import scrape_dashboard
 DEFAULT_URL = "https://chartink.com/dashboard/45863"
 
 
+def _industry_of(row: dict) -> str | None:
+    for k, v in row.items():
+        if "industry" in k.lower() and v:
+            return v
+    return None
+
+
 def main() -> int:
     url = os.environ.get("CHARTINK_DASHBOARD_URL", DEFAULT_URL)
     debug = os.environ.get("CHARTINK_DEBUG_DUMP") == "1"
@@ -46,6 +53,12 @@ def main() -> int:
         for symbol in sorted(new_symbols):
             row = curr_by_symbol[symbol]
             kind = "retest" if db.has_appeared_before(conn, scan.scanner_name, symbol, run_id) else "fresh"
+
+            row["_backtest_hits"] = db.backtest_history(conn, scan.scanner_name, symbol)
+            industry = _industry_of(row)
+            if industry:
+                row["_sector_share"] = db.backtest_sector_share(conn, scan.scanner_name, industry)
+
             db.record_breakout(conn, run_id, scan.scanner_name, symbol, row, kind=kind)
             new_breakouts.append((scan.scanner_name, kind, row))
             print(f"  {kind}: {symbol}")
