@@ -41,23 +41,36 @@ def _as_float(value) -> float | None:
         return None
 
 
+def _price_delta(row: dict) -> float | None:
+    """current price minus trigger price, or None if either is unknown.
+    'row' holds the trigger-time values; row['_current_row'] holds the
+    current ones."""
+    current_row = row.get("_current_row")
+    if not current_row:
+        return None
+    headers = [k for k in row.keys() if k not in _META_KEYS]
+    price_key = _find_column(headers, "price")
+    if not price_key:
+        return None
+    triggered = _as_float(row.get(price_key))
+    current = _as_float(current_row.get(price_key))
+    if triggered is None or current is None:
+        return None
+    return current - triggered
+
+
 def _price_status(row: dict) -> str:
     """Mechanical rule, evaluated per scanner: BUY only if the current known
     price is above the price recorded when the breakout triggered, otherwise
     HOLD. This is the user's own stated rule applied to stored numbers, not
     an independent recommendation."""
-    current_row = row.get("_current_row")
-    if not current_row:
+    delta = _price_delta(row)
+    if delta is None:
         return ""
     headers = [k for k in row.keys() if k not in _META_KEYS]
     price_key = _find_column(headers, "price")
-    if not price_key:
-        return ""
-    triggered = _as_float(row.get(price_key))
-    current = _as_float(current_row.get(price_key))
-    if triggered is None or current is None:
-        return ""
-    if current > triggered:
+    current_row = row["_current_row"]
+    if delta > 0:
         return f"  🟢 BUY (₹{row[price_key]} → ₹{current_row[price_key]})"
     return f"  ⏸ HOLD (₹{row[price_key]} → ₹{current_row[price_key]})"
 
@@ -192,5 +205,41 @@ def format_digest_message(entries: list[dict], days: int, sector_focus: dict | N
             monthly_str = ", ".join(f"{s} ({c})" for s, c in monthly) if monthly else "no hits"
             lines.append(f"    Weekly top 5: {weekly_str}")
             lines.append(f"    Monthly top 5: {monthly_str}")
+
+    return "\n".join(lines)
+
+
+def format_buy_hold_message(scans: list, trigger_lookup: dict) -> str:
+    """Every symbol currently on each scanner, split into a BUY list
+    (current price above the price it had when it first triggered that
+    scanner) and a HOLD list (at or below). trigger_lookup maps
+    (scanner_name, symbol) -> trigger row dict or None if unknown."""
+    lines = ["<b>🎯 Buy / Hold list</b> (current price vs. trigger price, per scanner)"]
+
+    for scan in scans:
+        buy_lines, hold_lines, unknown_symbols = [], [], []
+
+        for row in scan.rows:
+            symbol = row.get("_symbol", "?")
+            trigger = trigger_lookup.get((scan.scanner_name, symbol))
+            if trigger is None:
+                unknown_symbols.append(symbol)
+                continue
+            merged = dict(trigger)
+            merged["_current_row"] = row
+            delta = _price_delta(merged)
+            line = "  " + _format_symbol_line(merged).lstrip()
+            if delta is not None and delta > 0:
+                buy_lines.append(line)
+            else:
+                hold_lines.append(line)
+
+        lines.append(f"\n<b>{scan.scanner_name}</b>")
+        lines.append(f"  🟢 BUY ({len(buy_lines)})")
+        lines.extend(buy_lines or ["    (none)"])
+        lines.append(f"  ⏸ HOLD ({len(hold_lines)})")
+        lines.extend(hold_lines or ["    (none)"])
+        if unknown_symbols:
+            lines.append(f"  ❓ No trigger data yet: {', '.join(unknown_symbols)}")
 
     return "\n".join(lines)

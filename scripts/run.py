@@ -7,7 +7,13 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 import db
-from notify import format_breakout_message, format_digest_message, format_snapshot_message, send_telegram_message
+from notify import (
+    format_breakout_message,
+    format_buy_hold_message,
+    format_digest_message,
+    format_snapshot_message,
+    send_telegram_message,
+)
 from scrape_dashboard import scrape_dashboard
 
 DEFAULT_URL = "https://chartink.com/dashboard/45863"
@@ -63,6 +69,13 @@ def main() -> int:
             new_breakouts.append((scan.scanner_name, kind, row))
             print(f"  {kind}: {symbol}")
 
+    trigger_lookup = {}
+    if send_snapshot:
+        for scan in scans:
+            for row in scan.rows:
+                symbol = row["_symbol"]
+                trigger_lookup[(scan.scanner_name, symbol)] = db.trigger_row(conn, scan.scanner_name, symbol)
+
     conn.commit()
     conn.close()
 
@@ -73,6 +86,7 @@ def main() -> int:
 
     if send_snapshot:
         send_telegram_message(format_snapshot_message(scans))
+        send_telegram_message(format_buy_hold_message(scans, trigger_lookup))
 
     if send_digest:
         since = (datetime.now(timezone.utc) - timedelta(days=digest_days)).isoformat()

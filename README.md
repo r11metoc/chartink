@@ -10,7 +10,11 @@ scanners (i.e. a fresh breakout).
 
 - `.github/workflows/scan.yml` runs on a cron schedule (daily at 09:30,
   12:30 and 15:30 IST, Mon–Fri) and can also be triggered manually from
-  the Actions tab.
+  the Actions tab. Every scheduled run automatically sends the breakout
+  alert (if any), the current snapshot, the buy/hold list, and the digest
+  all together — no manual inputs needed for that. Manual runs still only
+  send the extras you explicitly opt into via the `snap`/`digest` inputs,
+  so you can trigger a quick breakout-only check without the noise.
 - `scripts/scrape_dashboard.py` opens the dashboard in a headless Chromium
   browser (via Playwright — the page is JS-rendered, so a plain HTTP request
   won't show the tables), and extracts each widget's table generically: it
@@ -32,17 +36,29 @@ scanners (i.e. a fresh breakout).
 The first run for each scanner just seeds the baseline (nothing to compare
 against yet), so no breakout alert fires until the second run onward.
 
-To get the current scan results in Telegram on demand (not just new
-breakouts), go to the Actions tab → "Chartink breakout scan" → Run workflow
-→ set `snap` to `true`. This sends every symbol currently in each
-scanner as a single message, independent of what's changed since the last
-run.
+Every scheduled run sends the current scan results too (not just new
+breakouts) — you don't need to do anything for this. To get the same thing
+on demand between scheduled runs, go to the Actions tab → "Chartink
+breakout scan" → Run workflow → set `snap` to `true`. Either way, it's two
+messages: the raw current results for every scanner, and a **🎯 Buy / Hold
+list** that splits every symbol currently on each scanner into:
 
-To get a digest of recent activity (top recurring symbols across scanners,
-retest candidates, fresh breakouts), run the same workflow with `digest`
-set to `true` and optionally `days` (default `7`) for the lookback
-window. There's no fixed schedule for this — it's on-demand only, run it
-whenever you want a report.
+- **BUY** — current price is above the price it had the first time it
+  ever triggered that scanner (or, if it triggered again after dropping
+  out, above that retest's price)
+- **HOLD** — at or below that trigger price
+
+This works even for symbols that have been sitting on a scanner
+continuously since before formal breakout tracking started, since the
+trigger price falls back to the earliest known price for that symbol on
+that scanner. A symbol showing up for the very first time this run will
+always start in HOLD (nothing to compare against yet but itself).
+
+Every scheduled run also sends a digest of recent activity (top recurring
+symbols across scanners, retest candidates, fresh breakouts) with a 7-day
+lookback. For a custom lookback, or a digest between scheduled runs,
+trigger the workflow manually with `digest` set to `true` and `days` set
+to whatever window you want.
 
 Every digest entry also shows a **BUY**/**HOLD** label per this fixed rule,
 evaluated separately for each scanner: BUY only if the current known price
