@@ -8,8 +8,8 @@ scanners (i.e. a fresh breakout).
 
 ## How it works
 
-- `.github/workflows/scan.yml` runs on a cron schedule (every 15 minutes
-  during NSE market hours, Mon–Fri) and can also be triggered manually from
+- `.github/workflows/scan.yml` runs on a cron schedule (daily at 09:30,
+  12:30 and 15:30 IST, Mon–Fri) and can also be triggered manually from
   the Actions tab.
 - `scripts/scrape_dashboard.py` opens the dashboard in a headless Chromium
   browser (via Playwright — the page is JS-rendered, so a plain HTTP request
@@ -91,4 +91,4 @@ sqlite3 data/chartink.db "select scanner_name, count(*) from results where run_i
 ## Changing the schedule
 
 Edit the `cron` entries in `.github/workflows/scan.yml`. They're in UTC;
-the defaults cover 09:15–15:30 IST every 15 minutes on weekdays.
+the defaults fire at 09:30, 12:30 and 15:30 IST on weekdays.
