@@ -1,0 +1,69 @@
+name: Chartink breakout scan
+
+on:
+  schedule:
+    # Mon-Fri, IST (UTC+5:30): 09:30, 12:30, 15:30 IST -> 04:00, 07:00, 10:00 UTC
+    - cron: "0 4 * * 1-5"
+    - cron: "0 7 * * 1-5"
+    - cron: "0 10 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Dump page HTML/screenshot as an artifact"
+        type: boolean
+        default: false
+      snapshot:
+        description: "Send current scan results to Telegram, regardless of breakouts"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chartink-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Run scan
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CHARTINK_DEBUG_DUMP: ${{ inputs.debug && '1' || '0' }}
+          CHARTINK_SEND_SNAPSHOT: ${{ inputs.snapshot && '1' || '0' }}
+        working-directory: scripts
+        run: python run.py
+
+      - name: Upload debug artifact
+        if: ${{ inputs.debug }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: chartink-debug-dump
+          path: debug/
+          retention-days: 7
+
+      - name: Commit updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/chartink.db
+          if git diff --cached --quiet; then
+            echo "No database changes to commit."
+          else
+            git commit -m "Update scan data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          fi
