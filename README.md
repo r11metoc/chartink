@@ -34,13 +34,13 @@ against yet), so no breakout alert fires until the second run onward.
 
 To get the current scan results in Telegram on demand (not just new
 breakouts), go to the Actions tab → "Chartink breakout scan" → Run workflow
-→ set `snapshot` to `true`. This sends every symbol currently in each
+→ set `snap` to `true`. This sends every symbol currently in each
 scanner as a single message, independent of what's changed since the last
 run.
 
 To get a digest of recent activity (top recurring symbols across scanners,
 retest candidates, fresh breakouts), run the same workflow with `digest`
-set to `true` and optionally `digest_days` (default `7`) for the lookback
+set to `true` and optionally `days` (default `7`) for the lookback
 window. There's no fixed schedule for this — it's on-demand only, run it
 whenever you want a report.
 
@@ -57,7 +57,7 @@ The digest also always includes a **🏭 Sectors in focus** section, broken
 out per scanner: the top 5 sectors by backtest-hit count in the last 7 days
 and the last 30 days. This comes from `data/backtest/*.csv`
 (`backtest_hits` table) and shows up even when there's been no live
-breakout activity in the `digest_days` window, since it's independent of
+breakout activity in the `days` window, since it's independent of
 that lookback.
 
 ## Backtest model: is a trigger a real breakout or a fake one?
