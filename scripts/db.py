@@ -40,13 +40,25 @@ CREATE TABLE IF NOT EXISTS breakouts (
     detected_at TEXT NOT NULL,
     row_json TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_breakouts_detected_at ON breakouts(detected_at);
 """
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns to tables created before this field existed."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(breakouts)")}
+    if "kind" not in cols:
+        # 'fresh' = symbol never seen before on this scanner; 'retest' = it
+        # was seen before, dropped out for at least one run, and is back -
+        # i.e. the scan condition re-triggered at the same technical level.
+        conn.execute("ALTER TABLE breakouts ADD COLUMN kind TEXT NOT NULL DEFAULT 'fresh'")
 
 
 def connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
 
 
@@ -85,9 +97,33 @@ def symbols_for_run(conn: sqlite3.Connection, scanner_name: str, run_id: int) ->
     return {r[0] for r in cur.fetchall()}
 
 
-def record_breakout(conn: sqlite3.Connection, run_id: int, scanner_name: str, symbol: str, row: dict) -> None:
+def has_appeared_before(conn: sqlite3.Connection, scanner_name: str, symbol: str, before_run_id: int) -> bool:
+    """True if this symbol was ever in this scanner's results in an earlier run
+    (used to tell a genuinely-first-time breakout apart from a retest)."""
+    cur = conn.execute(
+        "SELECT 1 FROM results WHERE scanner_name = ? AND symbol = ? AND run_id < ? LIMIT 1",
+        (scanner_name, symbol, before_run_id),
+    )
+    return cur.fetchone() is not None
+
+
+def record_breakout(conn: sqlite3.Connection, run_id: int, scanner_name: str, symbol: str, row: dict, kind: str = "fresh") -> None:
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
-        "INSERT INTO breakouts (run_id, scanner_name, symbol, detected_at, row_json) VALUES (?, ?, ?, ?, ?)",
-        (run_id, scanner_name, symbol, now, json.dumps(row, ensure_ascii=False)),
+        "INSERT INTO breakouts (run_id, scanner_name, symbol, detected_at, row_json, kind) VALUES (?, ?, ?, ?, ?, ?)",
+        (run_id, scanner_name, symbol, now, json.dumps(row, ensure_ascii=False), kind),
     )
+
+
+def breakouts_since(conn: sqlite3.Connection, since_iso: str) -> list[dict]:
+    cur = conn.execute(
+        "SELECT scanner_name, symbol, kind, detected_at, row_json FROM breakouts "
+        "WHERE detected_at >= ? ORDER BY detected_at DESC",
+        (since_iso,),
+    )
+    out = []
+    for scanner_name, symbol, kind, detected_at, row_json in cur.fetchall():
+        entry = json.loads(row_json)
+        entry.update(scanner_name=scanner_name, symbol=symbol, kind=kind, detected_at=detected_at)
+        out.append(entry)
+    return out

@@ -16,6 +16,14 @@ on:
         description: "Send current scan results to Telegram, regardless of breakouts"
         type: boolean
         default: false
+      digest:
+        description: "Send a digest of recent breakouts (top recurring symbols, retest candidates) to Telegram"
+        type: boolean
+        default: false
+      digest_days:
+        description: "Lookback window in days for the digest"
+        type: string
+        default: "7"
 
 permissions:
   contents: write
@@ -45,6 +53,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CHARTINK_DEBUG_DUMP: ${{ inputs.debug && '1' || '0' }}
           CHARTINK_SEND_SNAPSHOT: ${{ inputs.snapshot && '1' || '0' }}
+          CHARTINK_SEND_DIGEST: ${{ inputs.digest && '1' || '0' }}
+          CHARTINK_DIGEST_DAYS: ${{ inputs.digest_days || '7' }}
         working-directory: scripts
         run: python run.py
 

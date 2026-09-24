@@ -6,6 +6,8 @@ import os
 
 import requests
 
+_KIND_ICON = {"fresh": "🚀", "retest": "🔁"}
+
 
 def send_telegram_message(text: str) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -38,7 +40,13 @@ def _as_float(value) -> float | None:
         return None
 
 
-def _format_symbol_line(row: dict, pct_key: str | None, price_key: str | None, vol_key: str | None, industry_key: str | None) -> str:
+def _format_symbol_line(row: dict, prefix: str = "") -> str:
+    headers = [k for k in row.keys() if k not in ("_symbol", "scanner_name", "kind", "detected_at")]
+    pct_key = _find_column(headers, "%")
+    price_key = _find_column(headers, "price")
+    vol_key = _find_column(headers, "vol")
+    industry_key = _find_column(headers, "industry")
+
     symbol = row.get("_symbol", "?")
     pct = _as_float(row.get(pct_key)) if pct_key else None
     arrow = "🟢" if pct is None or pct >= 0 else "🔴"
@@ -55,36 +63,38 @@ def _format_symbol_line(row: dict, pct_key: str | None, price_key: str | None, v
         bits.append(row[industry_key])
 
     details = "  ·  ".join(bits)
-    return f"  {arrow} <b>{symbol}</b>  {details}" if details else f"  {arrow} <b>{symbol}</b>"
+    label = f"{prefix}{arrow} <b>{symbol}</b>"
+    return f"  {label}  {details}" if details else f"  {label}"
 
 
 def _format_rows(rows: list[dict]) -> list[str]:
-    """Render a scanner's rows sorted by % change (biggest movers first),
-    pulling out price/change/volume/industry when those columns exist."""
+    """Render rows sorted by % change (biggest movers first), pulling out
+    price/change/volume/industry when those columns exist."""
     if not rows:
         return ["  (no symbols)"]
 
-    headers = [k for k in rows[0].keys() if k != "_symbol"]
+    headers = [k for k in rows[0].keys() if k not in ("_symbol", "scanner_name", "kind", "detected_at")]
     pct_key = _find_column(headers, "%")
-    price_key = _find_column(headers, "price")
-    vol_key = _find_column(headers, "vol")
-    industry_key = _find_column(headers, "industry")
-
     ordered = sorted(rows, key=lambda r: _as_float(r.get(pct_key)) or 0, reverse=True) if pct_key else rows
 
-    return [_format_symbol_line(row, pct_key, price_key, vol_key, industry_key) for row in ordered]
+    return [_format_symbol_line(row) for row in ordered]
 
 
-def format_breakout_message(breakouts: list[tuple[str, dict]]) -> str:
-    """breakouts: list of (scanner_name, row) - row must include '_symbol'."""
-    by_scanner: dict[str, list[dict]] = {}
-    for scanner_name, row in breakouts:
-        by_scanner.setdefault(scanner_name, []).append(row)
+def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
+    """breakouts: list of (scanner_name, kind, row) - row must include '_symbol'.
+    kind is 'fresh' (never seen before) or 'retest' (re-triggered after a gap)."""
+    by_scanner: dict[str, list[tuple[str, dict]]] = {}
+    for scanner_name, kind, row in breakouts:
+        by_scanner.setdefault(scanner_name, []).append((kind, row))
 
     lines = ["<b>New Chartink breakouts</b>"]
-    for scanner_name, rows in by_scanner.items():
+    for scanner_name, kind_rows in by_scanner.items():
         lines.append(f"\n<b>{scanner_name}</b>")
-        lines.extend(_format_rows(rows))
+        headers = [k for k in kind_rows[0][1].keys() if k not in ("_symbol", "scanner_name", "kind", "detected_at")]
+        pct_key = _find_column(headers, "%")
+        ordered = sorted(kind_rows, key=lambda kr: _as_float(kr[1].get(pct_key)) or 0, reverse=True) if pct_key else kind_rows
+        for kind, row in ordered:
+            lines.append(_format_symbol_line(row, prefix=_KIND_ICON.get(kind, "")))
     return "\n".join(lines)
 
 
@@ -94,4 +104,38 @@ def format_snapshot_message(scans: list) -> str:
     for scan in scans:
         lines.append(f"\n<b>{scan.scanner_name}</b> ({len(scan.rows)})")
         lines.extend(_format_rows(scan.rows))
+    return "\n".join(lines)
+
+
+def format_digest_message(entries: list[dict], days: int) -> str:
+    """entries: breakout rows from db.breakouts_since(), each with
+    scanner_name/symbol/kind/detected_at plus the scan's own columns."""
+    if not entries:
+        return f"<b>📊 Chartink digest</b> (last {days} days)\n\nNo breakouts recorded in this window."
+
+    lines = [f"<b>📊 Chartink digest</b> (last {days} days)"]
+
+    scanners_by_symbol: dict[str, list[str]] = {}
+    for e in entries:
+        scanners_by_symbol.setdefault(e["symbol"], []).append(e["scanner_name"])
+
+    recurring = {s: scs for s, scs in scanners_by_symbol.items() if len(scs) > 1}
+    if recurring:
+        lines.append("\n<b>⭐ Top recurring symbols</b>")
+        for symbol, scanners in sorted(recurring.items(), key=lambda kv: len(kv[1]), reverse=True):
+            summary = ", ".join(f"{name} x{scanners.count(name)}" for name in dict.fromkeys(scanners))
+            lines.append(f"  <b>{symbol}</b> — {len(scanners)}x ({summary})")
+
+    retests = [e for e in entries if e["kind"] == "retest"]
+    if retests:
+        lines.append("\n<b>🔁 Retest candidates</b> (re-triggered after a gap)")
+        for e in retests:
+            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
+
+    fresh = [e for e in entries if e["kind"] == "fresh"]
+    if fresh:
+        lines.append("\n<b>🚀 Fresh breakouts</b> (first time seen)")
+        for e in fresh:
+            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
+
     return "\n".join(lines)

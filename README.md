@@ -20,9 +20,12 @@ scanners (i.e. a fresh breakout).
   - `runs` — one row per scrape
   - `results` — every symbol seen in every run, per scanner
   - `breakouts` — symbols that were *not* present in a scanner's previous
-    run but *are* present now
+    run but *are* present now, tagged `kind`:
+    - `fresh` — never seen on this scanner before
+    - `retest` — seen before, dropped out for at least one run, and back
+      again (the scan's own condition re-triggering at the same level)
 - `scripts/notify.py` sends a Telegram message listing new breakouts,
-  grouped by scanner.
+  grouped by scanner, with a 🚀 (fresh) or 🔁 (retest) marker per symbol.
 - The workflow commits `data/chartink.db` back to the repo after each run,
   so you get full git history of every scan.
 
@@ -34,6 +37,12 @@ breakouts), go to the Actions tab → "Chartink breakout scan" → Run workflow
 → set `snapshot` to `true`. This sends every symbol currently in each
 scanner as a single message, independent of what's changed since the last
 run.
+
+To get a digest of recent activity (top recurring symbols across scanners,
+retest candidates, fresh breakouts), run the same workflow with `digest`
+set to `true` and optionally `digest_days` (default `7`) for the lookback
+window. There's no fixed schedule for this — it's on-demand only, run it
+whenever you want a report.
 
 ## Setup
 
