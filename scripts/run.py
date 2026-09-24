@@ -105,8 +105,17 @@ def main() -> int:
                 "monthly": db.sector_counts_since(digest_conn, scanner_name, monthly_since),
             }
 
+        outcome_params = db.latest_outcome_params(digest_conn)
+        recent_outcomes = []
+        if outcome_params:
+            horizon_days, threshold_pct = outcome_params
+            outcomes_since_date = (today - timedelta(days=digest_days)).isoformat()
+            recent_outcomes = db.outcomes_with_context(digest_conn, horizon_days, threshold_pct, outcomes_since_date)
+
         digest_conn.close()
-        send_telegram_message(format_digest_message(entries, digest_days, sector_focus))
+        send_telegram_message(
+            format_digest_message(entries, digest_days, sector_focus, recent_outcomes, outcome_params)
+        )
 
     return 0
 

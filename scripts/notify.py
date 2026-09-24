@@ -159,12 +159,22 @@ def format_snapshot_message(scans: list) -> str:
     return "\n".join(lines)
 
 
-def format_digest_message(entries: list[dict], days: int, sector_focus: dict | None = None) -> str:
+def format_digest_message(
+    entries: list[dict],
+    days: int,
+    sector_focus: dict | None = None,
+    recent_outcomes: list[dict] | None = None,
+    outcome_params: tuple[int, float] | None = None,
+) -> str:
     """entries: breakout rows from db.breakouts_since(), each with
     scanner_name/symbol/kind/detected_at plus the scan's own columns.
     sector_focus: {scanner_name: {"weekly": [(sector, count), ...], "monthly": [...]}}
     from Chartink's backtest history, shown per scanner regardless of
-    whether there were any live breakouts in this window."""
+    whether there were any live breakouts in this window.
+    recent_outcomes: backtest_outcomes rows (db.outcomes_with_context with
+    since_date) - real BUY/HOLD results from actual historical price data,
+    distinct from the live entries above which only exist once the scan
+    itself has run long enough to see a change."""
     lines = [f"<b>📊 Chartink digest</b> (last {days} days)"]
 
     if not entries:
@@ -205,6 +215,33 @@ def format_digest_message(entries: list[dict], days: int, sector_focus: dict | N
             monthly_str = ", ".join(f"{s} ({c})" for s, c in monthly) if monthly else "no hits"
             lines.append(f"    Weekly top 5: {weekly_str}")
             lines.append(f"    Monthly top 5: {monthly_str}")
+
+    if recent_outcomes:
+        horizon_days, threshold_pct = outcome_params or (None, None)
+        rule = f" (+{threshold_pct:g}% within {horizon_days}d = real breakout)" if horizon_days else ""
+        lines.append(f"\n<b>📜 Backtest outcomes</b> (last {days} days){rule}")
+
+        total = len(recent_outcomes)
+        wins = sum(1 for o in recent_outcomes if o["label"] == 1)
+        lines.append(f"  {wins}/{total} real breakouts ({wins / total:.0%})")
+
+        by_scanner: dict[str, list[dict]] = {}
+        for o in recent_outcomes:
+            by_scanner.setdefault(o["scanner_name"], []).append(o)
+        for scanner_name, outcomes in by_scanner.items():
+            w = sum(1 for o in outcomes if o["label"] == 1)
+            lines.append(f"    {scanner_name}: {w}/{len(outcomes)} ({w / len(outcomes):.0%})")
+
+        max_rows = 15
+        lines.append(f"\n  Most recent {min(max_rows, total)}:")
+        for o in recent_outcomes[:max_rows]:
+            icon = "🟢 BUY" if o["label"] == 1 else "⏸ HOLD"
+            lines.append(
+                f"    {o['hit_date']} [{o['scanner_name']}] <b>{o['symbol']}</b> "
+                f"₹{o['trigger_close']:.2f}→₹{o['future_close']:.2f} ({o['pct_return']:+.1f}%) {icon}"
+            )
+        if total > max_rows:
+            lines.append(f"    ...+{total - max_rows} more — query backtest_outcomes in data/chartink.db for the rest")
 
     return "\n".join(lines)
 

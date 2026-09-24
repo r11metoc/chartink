@@ -76,6 +76,17 @@ and the last 30 days. This comes from `data/backtest/*.csv`
 breakout activity in the `days` window, since it's independent of
 that lookback.
 
+If `train_model.yml` has been run at least once, the digest also includes
+a **📜 Backtest outcomes** section for the same `days` window: real
+historical triggers (from `backtest_outcomes`) with their actual price
+move and BUY/HOLD result, plus a win-rate breakdown per scanner. This is
+a completely different data source from the live breakout list above —
+it's backtest history with real price outcomes already known, so it's
+useful from day one, while the live digest sections above only fill in
+as the scheduled scan accumulates its own history. Only the 15 most
+recent rows are shown in Telegram (message-length limits); query
+`backtest_outcomes` directly in `data/chartink.db` for the rest.
+
 ## Backtest model: is a trigger a real breakout or a fake one?
 
 The descriptive backtest context above (seen-before counts, sector share)
