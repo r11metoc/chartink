@@ -11,6 +11,7 @@ from notify import (
     format_breakout_message,
     format_buy_hold_message,
     format_digest_message,
+    format_sector_focus_message,
     format_snapshot_message,
     send_telegram_message,
 )
@@ -113,9 +114,8 @@ def main() -> int:
             recent_outcomes = db.outcomes_with_context(digest_conn, horizon_days, threshold_pct, outcomes_since_date)
 
         digest_conn.close()
-        send_telegram_message(
-            format_digest_message(entries, digest_days, sector_focus, recent_outcomes, outcome_params)
-        )
+        send_telegram_message(format_sector_focus_message(sector_focus))
+        send_telegram_message(format_digest_message(entries, digest_days, recent_outcomes, outcome_params))
 
     return 0
 

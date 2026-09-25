@@ -173,31 +173,44 @@ def _sector_table(windows: dict) -> str:
     return "<pre>" + "\n".join(rows) + "</pre>"
 
 
-def _outcome_table(outcomes: list[dict]) -> str:
-    """Monospace table: date, symbol, % return, BUY/HOLD result."""
-    rows = [f"{'Date':<11}{'Symbol':<13}{'Ret%':>7}  Result"]
+def _buy_list_table(outcomes: list[dict]) -> str:
+    """Monospace table: date, symbol, % return - buy-list rows only (all
+    already real breakouts), so no separate result column is needed."""
+    rows = [f"{'Date':<11}{'Symbol':<15}{'Ret%':>6}"]
     for o in outcomes:
-        result = "BUY " if o["label"] == 1 else "HOLD"
-        rows.append(f"{o['hit_date']:<11}{o['symbol'][:13]:<13}{o['pct_return']:>+6.1f}%  {result}")
+        rows.append(f"{o['hit_date']:<11}{o['symbol'][:15]:<15}{o['pct_return']:>+5.1f}%")
     return "<pre>" + "\n".join(rows) + "</pre>"
+
+
+def format_sector_focus_message(sector_focus: dict) -> str:
+    """Standalone message: {scanner_name: {"weekly": [...], "monthly": [...]}}
+    from Chartink's backtest history. Kept separate from the digest so the
+    digest has more room for the buy list."""
+    lines = ["<b>🏭 Sectors in focus</b> (backtest history, per scanner)"]
+    for scanner_name, windows in sector_focus.items():
+        lines.append(f"\n<b>{scanner_name}</b>")
+        lines.append(_sector_table(windows))
+    return "\n".join(lines)
 
 
 def format_digest_message(
     entries: list[dict],
     days: int,
-    sector_focus: dict | None = None,
     recent_outcomes: list[dict] | None = None,
     outcome_params: tuple[int, float] | None = None,
+    buy_min_pct: float = 1.0,
+    buy_max_pct: float = 15.0,
 ) -> str:
     """entries: breakout rows from db.breakouts_since(), each with
     scanner_name/symbol/kind/detected_at plus the scan's own columns.
-    sector_focus: {scanner_name: {"weekly": [(sector, count), ...], "monthly": [...]}}
-    from Chartink's backtest history, shown per scanner regardless of
-    whether there were any live breakouts in this window.
     recent_outcomes: backtest_outcomes rows (db.outcomes_with_context with
     since_date) - real BUY/HOLD results from actual historical price data,
     distinct from the live entries above which only exist once the scan
-    itself has run long enough to see a change."""
+    itself has run long enough to see a change. The buy list below only
+    shows real breakouts with a return strictly between buy_min_pct and
+    buy_max_pct - moderate, believable gains, excluding both near-flat
+    moves and extreme outliers (often corporate-action artifacts like
+    stock splits rather than genuine price moves)."""
     DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
     lines = [f"<b>📊 Chartink digest</b> (last {days} days)"]
 
@@ -232,13 +245,7 @@ def format_digest_message(
         for e in fresh:
             lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
 
-    # --- Backtest-derived context (historical, from Chartink's own export + Yahoo Finance prices) ---
-    if sector_focus:
-        lines.append(f"\n{DIVIDER}\n<b>🏭 Sectors in focus</b> (backtest history, per scanner)")
-        for scanner_name, windows in sector_focus.items():
-            lines.append(f"\n<b>{scanner_name}</b>")
-            lines.append(_sector_table(windows))
-
+    # --- Backtest-derived buy list (historical, from Yahoo Finance prices) ---
     if recent_outcomes:
         horizon_days, threshold_pct = outcome_params or (None, None)
         rule = f"+{threshold_pct:g}% within {horizon_days}d = real breakout" if horizon_days else ""
@@ -248,17 +255,26 @@ def format_digest_message(
         wins = sum(1 for o in recent_outcomes if o["label"] == 1)
         lines.append(f"Overall: {wins}/{total} real breakouts ({wins / total:.0%})")
 
-        by_scanner: dict[str, list[dict]] = {}
-        for o in recent_outcomes:
-            by_scanner.setdefault(o["scanner_name"], []).append(o)
+        buy_list = [
+            o for o in recent_outcomes
+            if o["label"] == 1 and buy_min_pct < o["pct_return"] < buy_max_pct
+        ]
+        lines.append(f"\n<b>🎯 Buy list</b> ({buy_min_pct:g}%–{buy_max_pct:g}% gain only, {len(buy_list)} of {wins} real breakouts)")
 
-        max_per_scanner = 5
-        for scanner_name, outcomes in by_scanner.items():
-            w = sum(1 for o in outcomes if o["label"] == 1)
-            lines.append(f"\n<b>{scanner_name}</b> — {w}/{len(outcomes)} ({w / len(outcomes):.0%})")
-            lines.append(_outcome_table(outcomes[:max_per_scanner]))
-            if len(outcomes) > max_per_scanner:
-                lines.append(f"  ...+{len(outcomes) - max_per_scanner} more this scanner")
+        if not buy_list:
+            lines.append("  (none in this range)")
+        else:
+            by_scanner: dict[str, list[dict]] = {}
+            for o in buy_list:
+                by_scanner.setdefault(o["scanner_name"], []).append(o)
+
+            max_per_scanner = 10
+            for scanner_name, outcomes in by_scanner.items():
+                ordered = sorted(outcomes, key=lambda o: o["pct_return"], reverse=True)
+                lines.append(f"\n<b>{scanner_name}</b> ({len(outcomes)})")
+                lines.append(_buy_list_table(ordered[:max_per_scanner]))
+                if len(outcomes) > max_per_scanner:
+                    lines.append(f"  ...+{len(outcomes) - max_per_scanner} more this scanner")
 
         lines.append("\n<i>Full list: query backtest_outcomes in data/chartink.db</i>")
 

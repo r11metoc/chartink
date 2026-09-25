@@ -69,23 +69,28 @@ recommendation, and it's only as fresh as the last time the symbol actually
 appeared in that scanner's results — if it's since dropped out entirely,
 the "current" price shown is stale.
 
-The digest also always includes a **🏭 Sectors in focus** section, broken
+Every digest also sends a separate **🏭 Sectors in focus** message, broken
 out per scanner: the top 5 sectors by backtest-hit count in the last 7 days
 and the last 30 days. This comes from `data/backtest/*.csv`
 (`backtest_hits` table) and shows up even when there's been no live
-breakout activity in the `days` window, since it's independent of
-that lookback.
+breakout activity in the `days` window, since it's independent of that
+lookback. It's kept as its own message (rather than folded into the main
+digest) to leave more room for the buy list below.
 
-If `train_model.yml` has been run at least once, the digest also includes
-a **📜 Backtest outcomes** section for the same `days` window: real
-historical triggers (from `backtest_outcomes`) with their actual price
-move and BUY/HOLD result, plus a win-rate breakdown per scanner. This is
-a completely different data source from the live breakout list above —
-it's backtest history with real price outcomes already known, so it's
-useful from day one, while the live digest sections above only fill in
-as the scheduled scan accumulates its own history. Only the 15 most
-recent rows are shown in Telegram (message-length limits); query
-`backtest_outcomes` directly in `data/chartink.db` for the rest.
+If `train_model.yml` has been run at least once, the main digest message
+also includes a **📜 Backtest outcomes** section for the same `days`
+window: an overall win-rate summary, plus a **🎯 Buy list** — real
+historical triggers (from `backtest_outcomes`) that turned out to be real
+breakouts, filtered to a **1%–15% gain** (excludes near-flat moves and
+extreme outliers, which are often corporate-action artifacts like stock
+splits rather than genuine price moves), sorted by return per scanner.
+This is a completely different data source from the live breakout list
+above — it's backtest history with real price outcomes already known, so
+it's useful from day one, while the live sections only fill in as the
+scheduled scan accumulates its own history. Up to 10 rows per scanner are
+shown in Telegram (message-length limits); query `backtest_outcomes`
+directly in `data/chartink.db` for the rest, or adjust `buy_min_pct`/
+`buy_max_pct` in `format_digest_message` if you want a different range.
 
 ## Backtest model: is a trigger a real breakout or a fake one?
 
