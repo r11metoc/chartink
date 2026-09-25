@@ -133,6 +133,13 @@ def has_appeared_before(conn: sqlite3.Connection, scanner_name: str, symbol: str
     return cur.fetchone() is not None
 
 
+def _load_row(row_json: str) -> dict:
+    # Rows from the earliest runs were saved with headers like
+    # "Price\nSort table by Price in ascending order"; keep just the label so
+    # they compare against current rows.
+    return {k.split("\n", 1)[0]: v for k, v in json.loads(row_json).items()}
+
+
 def latest_breakout_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict | None:
     cur = conn.execute(
         "SELECT row_json FROM breakouts WHERE scanner_name = ? AND symbol = ? "
@@ -140,7 +147,7 @@ def latest_breakout_row(conn: sqlite3.Connection, scanner_name: str, symbol: str
         (scanner_name, symbol),
     )
     row = cur.fetchone()
-    return json.loads(row[0]) if row else None
+    return _load_row(row[0]) if row else None
 
 
 def first_seen_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict | None:
@@ -150,7 +157,7 @@ def first_seen_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> 
         (scanner_name, symbol),
     )
     row = cur.fetchone()
-    return json.loads(row[0]) if row else None
+    return _load_row(row[0]) if row else None
 
 
 def trigger_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict | None:
@@ -185,7 +192,15 @@ def latest_row(conn: sqlite3.Connection, scanner_name: str, symbol: str) -> dict
         (scanner_name, symbol),
     )
     row = cur.fetchone()
-    return json.loads(row[0]) if row else None
+    return _load_row(row[0]) if row else None
+
+
+def symbols_in_latest_run(conn: sqlite3.Connection, scanner_name: str) -> set[str]:
+    cur = conn.execute(
+        "SELECT symbol FROM results WHERE scanner_name = ? AND run_id = (SELECT MAX(id) FROM runs)",
+        (scanner_name,),
+    )
+    return {r[0] for r in cur.fetchall()}
 
 
 def import_backtest_hit(conn: sqlite3.Connection, scanner_name: str, hit_date: str, symbol: str, marketcap: str, sector: str) -> bool:
@@ -205,24 +220,6 @@ def backtest_history(conn: sqlite3.Connection, scanner_name: str, symbol: str) -
         (scanner_name, symbol),
     )
     return [r[0] for r in cur.fetchall()]
-
-
-def backtest_sector_share(conn: sqlite3.Connection, scanner_name: str, sector: str) -> tuple[int, int] | None:
-    """(hits for this sector, total hits) for this scanner, matching sector
-    case-insensitively and loosely (either string contains the other) since
-    live scan 'Industry' labels don't exactly match backtest 'Sector' labels."""
-    total = conn.execute(
-        "SELECT COUNT(*) FROM backtest_hits WHERE scanner_name = ?", (scanner_name,)
-    ).fetchone()[0]
-    if total == 0 or not sector:
-        return None
-    sector_low = sector.lower()
-    cur = conn.execute("SELECT sector FROM backtest_hits WHERE scanner_name = ?", (scanner_name,))
-    matches = sum(
-        1 for (s,) in cur.fetchall()
-        if s and (s.lower() in sector_low or sector_low in s.lower())
-    )
-    return (matches, total)
 
 
 def distinct_backtest_scanners(conn: sqlite3.Connection) -> list[str]:
@@ -317,7 +314,7 @@ def breakouts_since(conn: sqlite3.Connection, since_iso: str) -> list[dict]:
     )
     out = []
     for scanner_name, symbol, kind, detected_at, row_json in cur.fetchall():
-        entry = json.loads(row_json)
+        entry = _load_row(row_json)
         entry.update(scanner_name=scanner_name, symbol=symbol, kind=kind, detected_at=detected_at)
         out.append(entry)
     return out

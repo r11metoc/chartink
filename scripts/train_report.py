@@ -13,6 +13,7 @@ sizes and rough confidence intervals so the numbers aren't over-trusted.
 
 from __future__ import annotations
 
+import html
 import math
 import sys
 from datetime import datetime, timezone
@@ -201,7 +202,7 @@ def format_telegram_summary(summary: dict[str, dict]) -> str:
         lines.append(f"  Win rate: {s['wins']}/{s['n']} ({s['rate']:.0%}, CI {lo:.0%}-{hi:.0%})")
         if s["top_sector"] is not None:
             ts = s["top_sector"]
-            lines.append(f"  Best sector: {ts['sector']} ({ts['win_rate']:.0%}, n={ts['n']})")
+            lines.append(f"  Best sector: {html.escape(ts['sector'])} ({ts['win_rate']:.0%}, n={ts['n']})")
         if s["model"] and "auc" in s["model"]:
             lines.append(f"  Model AUC: {s['model']['auc']:.2f} (n={s['model']['train_n']}+{s['model']['test_n']})")
     lines.append("\nFull tables + methodology: reports/model_report.md in the repo.")
