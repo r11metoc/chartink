@@ -115,7 +115,7 @@ def main() -> int:
 
         digest_conn.close()
         send_telegram_message(format_sector_focus_message(sector_focus))
-        send_telegram_message(format_digest_message(entries, digest_days, recent_outcomes, outcome_params))
+        send_telegram_message(format_digest_message(entries, digest_days, recent_outcomes))
 
     return 0
 

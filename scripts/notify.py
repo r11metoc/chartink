@@ -186,7 +186,7 @@ def format_sector_focus_message(sector_focus: dict) -> str:
     """Standalone message: {scanner_name: {"weekly": [...], "monthly": [...]}}
     from Chartink's backtest history. Kept separate from the digest so the
     digest has more room for the buy list."""
-    lines = ["<b>🏭 Sectors in focus</b> (backtest history, per scanner)"]
+    lines = ["<b>🏭 Sectors in focus</b>"]
     for scanner_name, windows in sector_focus.items():
         lines.append(f"\n<b>{scanner_name}</b>")
         lines.append(_sector_table(windows))
@@ -197,7 +197,6 @@ def format_digest_message(
     entries: list[dict],
     days: int,
     recent_outcomes: list[dict] | None = None,
-    outcome_params: tuple[int, float] | None = None,
     buy_min_pct: float = 1.0,
     buy_max_pct: float = 15.0,
 ) -> str:
@@ -212,13 +211,13 @@ def format_digest_message(
     moves and extreme outliers (often corporate-action artifacts like
     stock splits rather than genuine price moves)."""
     DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
-    lines = [f"<b>📊 Chartink digest</b> (last {days} days)"]
+    lines = [f"<b>📊 Chartink digest</b> ({days}d)"]
 
     # --- Live scan activity (from this repo's own scheduled scans) ---
-    lines.append(f"\n{DIVIDER}\n<b>🔴 Live scan activity</b> (from this tool's own scans)")
+    lines.append(f"\n{DIVIDER}\n<b>🔴 Live scan activity</b>")
 
     if not entries:
-        lines.append("  No breakouts recorded in this window yet.")
+        lines.append("  No breakouts yet.")
 
     by_symbol: dict[str, list[dict]] = {}
     for e in entries:
@@ -235,31 +234,29 @@ def format_digest_message(
 
     retests = [e for e in entries if e["kind"] == "retest"]
     if retests:
-        lines.append("\n<b>🔁 Retest candidates</b> (re-triggered after a gap)")
+        lines.append("\n<b>🔁 Retest candidates</b>")
         for e in retests:
             lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
 
     fresh = [e for e in entries if e["kind"] == "fresh"]
     if fresh:
-        lines.append("\n<b>🚀 Fresh breakouts</b> (first time seen)")
+        lines.append("\n<b>🚀 Fresh breakouts</b>")
         for e in fresh:
             lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
 
     # --- Backtest-derived buy list (historical, from Yahoo Finance prices) ---
     if recent_outcomes:
-        horizon_days, threshold_pct = outcome_params or (None, None)
-        rule = f"+{threshold_pct:g}% within {horizon_days}d = real breakout" if horizon_days else ""
-        lines.append(f"\n{DIVIDER}\n<b>📜 Backtest outcomes</b> (last {days} days{f', {rule}' if rule else ''})")
+        lines.append(f"\n{DIVIDER}\n<b>📜 Backtest outcomes</b> ({days}d)")
 
         total = len(recent_outcomes)
         wins = sum(1 for o in recent_outcomes if o["label"] == 1)
-        lines.append(f"Overall: {wins}/{total} real breakouts ({wins / total:.0%})")
+        lines.append(f"{wins}/{total} real breakouts ({wins / total:.0%})")
 
         buy_list = [
             o for o in recent_outcomes
             if o["label"] == 1 and buy_min_pct < o["pct_return"] < buy_max_pct
         ]
-        lines.append(f"\n<b>🎯 Buy list</b> ({buy_min_pct:g}%–{buy_max_pct:g}% gain only, {len(buy_list)} of {wins} real breakouts)")
+        lines.append(f"\n<b>🎯 Buy list</b> ({len(buy_list)}/{wins})")
 
         if not buy_list:
             lines.append("  (none in this range)")
@@ -276,7 +273,7 @@ def format_digest_message(
                 if len(outcomes) > max_per_scanner:
                     lines.append(f"  ...+{len(outcomes) - max_per_scanner} more this scanner")
 
-        lines.append("\n<i>Full list: query backtest_outcomes in data/chartink.db</i>")
+        lines.append("\n<i>Full list in data/chartink.db</i>")
 
     return "\n".join(lines)
 
