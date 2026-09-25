@@ -265,15 +265,10 @@ def format_digest_message(
             for o in buy_list:
                 by_scanner.setdefault(o["scanner_name"], []).append(o)
 
-            max_per_scanner = 10
             for scanner_name, outcomes in by_scanner.items():
                 ordered = sorted(outcomes, key=lambda o: o["pct_return"], reverse=True)
                 lines.append(f"\n<b>{scanner_name}</b> ({len(outcomes)})")
-                lines.append(_buy_list_table(ordered[:max_per_scanner]))
-                if len(outcomes) > max_per_scanner:
-                    lines.append(f"  ...+{len(outcomes) - max_per_scanner} more this scanner")
-
-        lines.append("\n<i>Full list in data/chartink.db</i>")
+                lines.append(_buy_list_table(ordered))
 
     return "\n".join(lines)
 

@@ -87,10 +87,11 @@ splits rather than genuine price moves), sorted by return per scanner.
 This is a completely different data source from the live breakout list
 above — it's backtest history with real price outcomes already known, so
 it's useful from day one, while the live sections only fill in as the
-scheduled scan accumulates its own history. Up to 10 rows per scanner are
-shown in Telegram (message-length limits); query `backtest_outcomes`
-directly in `data/chartink.db` for the rest, or adjust `buy_min_pct`/
-`buy_max_pct` in `format_digest_message` if you want a different range.
+scheduled scan accumulates its own history. Every matching row is shown
+(no per-scanner cap); if the list ever grows past Telegram's 4096-character
+message limit, narrow it by adjusting `buy_min_pct`/`buy_max_pct` in
+`format_digest_message`, or query `backtest_outcomes` directly in
+`data/chartink.db` (or via the "Chartink database query" workflow) instead.
 
 ## Backtest model: is a trigger a real breakout or a fake one?
 
