@@ -8,11 +8,10 @@ scanners (i.e. a fresh breakout).
 
 ## How it works
 
-- `.github/workflows/scan.yml` runs on a cron schedule (daily at 09:30,
-  12:30 and 15:30 IST, Mon–Fri) and can also be triggered manually from
+- `.github/workflows/scan.yml` runs on a cron schedule (daily at 09:23,
+  12:23 and 15:23 IST, Mon–Fri) and can also be triggered manually from
   the Actions tab. Every scheduled run automatically sends the breakout
-  alert (if any), the current snapshot, the buy/hold list, and the digest
-  all together — no manual inputs needed for that. Manual runs still only
+  alert (if any), the snapshot, sectors and digest, all together — no manual inputs needed for that. Manual runs still only
   send the extras you explicitly opt into via the `snap`/`digest` inputs,
   so you can trigger a quick breakout-only check without the noise.
 - `scripts/scrape_dashboard.py` opens the dashboard in a headless Chromium
@@ -39,63 +38,36 @@ against yet), so no breakout alert fires until the second run onward.
 Every scheduled run sends the current scan results too (not just new
 breakouts) — you don't need to do anything for this. To get the same thing
 on demand between scheduled runs, go to the Actions tab → "Chartink
-breakout scan" → Run workflow → set `snap` to `true`. Either way, it's two
-messages: the raw current results for every scanner, and a **🎯 Buy / Hold
-list** that splits every symbol currently on each scanner into:
+breakout scan" → Run workflow → set `snap` to `true`.
 
-- **BUY** — current price is above the price it had the first time it
-  ever triggered that scanner (or, if it triggered again after dropping
-  out, above that retest's price)
-- **HOLD** — at or below that trigger price
+Each scheduled run sends these messages (the digest ones with `digest`):
 
-This works even for symbols that have been sitting on a scanner
-continuously since before formal breakout tracking started, since the
-trigger price falls back to the earliest known price for that symbol on
-that scanner. A symbol showing up for the very first time this run will
-always start in HOLD (nothing to compare against yet but itself).
+| Message | Answers | Contents |
+|---|---|---|
+| **📋 Snapshot** | What's on my scanners right now? | Every stock on each scanner, in a 🟢 BUY table and a ⏸ HOLD table |
+| **🏭 Sectors in focus** | Which sectors are the scanners picking? | Top 5 sectors per scanner by backtest picks, last 7 and 30 days |
+| **📊 Digest** | How are this month's new triggers doing? | Stocks that triggered in the last `days` (default 30), in BUY / HOLD tables per scanner |
 
-Every scheduled run also sends a digest of recent activity (top recurring
-symbols across scanners, retest candidates, fresh breakouts) with a 7-day
-lookback. For a custom lookback, or a digest between scheduled runs,
-trigger the workflow manually with `digest` set to `true` and `days` set
-to whatever window you want.
+**BUY / HOLD rule** (snapshot and digest): BUY if the price now is above
+the trigger price, HOLD otherwise. The trigger price is the price when the
+stock last broke out on that scanner, or, if no breakout was recorded,
+the earliest price seen for it there — so a stock that appeared this run
+starts in HOLD at +0.0%. Each table shows Symbol, Trig, Now and Chg (% move
+since the trigger), best move first. In the digest, `*` marks a stock that
+has since dropped off the scanner (its "Now" is the last price seen). This
+is a mechanical comparison of two stored prices, not a recommendation.
 
-Every digest entry also shows a **BUY**/**HOLD** label per this fixed rule,
-evaluated separately for each scanner: BUY only if the current known price
-is above the price recorded when that breakout triggered, HOLD otherwise
-(covers both "unchanged" and "below"). This is a mechanical comparison of
-two stored numbers per the user's own stated rule, not an independent
-recommendation, and it's only as fresh as the last time the symbol actually
-appeared in that scanner's results — if it's since dropped out entirely,
-the "current" price shown is stale.
+**Sectors in focus** comes from `data/backtest/*.csv` (`backtest_hits`),
+so it's independent of the live scans.
 
-Every digest also sends a separate **🏭 Sectors in focus** message, broken
-out per scanner: the top 5 sectors by backtest-hit count in the last 7 days
-and the last 30 days. This comes from `data/backtest/*.csv`
-(`backtest_hits` table) and shows up even when there's been no live
-breakout activity in the `days` window, since it's independent of that
-lookback. It's kept as its own message (rather than folded into the main
-digest) to leave more room for the buy list below.
-
-If `train_model.yml` has been run at least once, the main digest message
-also includes a **📜 Backtest outcomes** section for the same `days`
-window: an overall win-rate summary, plus a **🎯 Buy list** — real
-historical triggers (from `backtest_outcomes`) that turned out to be real
-breakouts, filtered to a **1%–15% gain** (excludes near-flat moves and
-extreme outliers, which are often corporate-action artifacts like stock
-splits rather than genuine price moves), sorted by return per scanner.
-This is a completely different data source from the live breakout list
-above — it's backtest history with real price outcomes already known, so
-it's useful from day one, while the live sections only fill in as the
-scheduled scan accumulates its own history. Every matching row is shown
-(no per-scanner cap); if the list ever grows past Telegram's 4096-character
-message limit, narrow it by adjusting `buy_min_pct`/`buy_max_pct` in
-`format_digest_message`, or query `backtest_outcomes` directly in
-`data/chartink.db` (or via the "Chartink database query" workflow) instead.
+For a custom lookback, trigger the workflow manually with `digest` set to
+`true` and `days` set to whatever window you want. Any message longer than
+Telegram's 4096-character limit is split at section boundaries, and a
+message Telegram rejects is resent as plain text rather than dropped.
 
 ## Backtest model: is a trigger a real breakout or a fake one?
 
-The descriptive backtest context above (seen-before counts, sector share)
+The descriptive backtest context above (seen-before counts, sector focus)
 doesn't say whether a scanner's trigger actually led anywhere - it has no
 price data. `.github/workflows/train_model.yml` (manual only, Actions tab →
 "Chartink backtest model training" → Run workflow) fills that gap:
@@ -203,13 +175,8 @@ To refresh, export a new backtest CSV from Chartink, drop it into
 `data/backtest/<scanner_name>.csv` (filename must match the scanner name),
 and re-run the import.
 
-Every breakout and digest entry now shows, when available:
-- **📚 seen Nx before, last DATE** — how many times this exact symbol has
-  triggered this scanner historically (exact match, high confidence)
-- **sector ~X% of history** — how common this symbol's sector is among the
-  scanner's historical hits (approximate — matched by loose substring
-  comparison since the live scan's "Industry" labels don't exactly match
-  the backtest's "Sector" labels)
+Breakout alerts and the scan snapshot show **📚 Nx before** when available:
+how many times this exact symbol has triggered this scanner in the backtest.
 
 This is **descriptive pattern-counting, not a return prediction** — the
 backtest data has no outcome (win/loss, % gain) attached to any historical
@@ -237,4 +204,8 @@ characters to fit in a single Telegram message; narrow your query
 ## Changing the schedule
 
 Edit the `cron` entries in `.github/workflows/scan.yml`. They're in UTC;
-the defaults fire at 09:30, 12:30 and 15:30 IST on weekdays.
+the defaults fire at 09:23, 12:23 and 15:23 IST on weekdays. They're kept
+off the top of the hour on purpose: GitHub queues scheduled runs and is
+busiest on the hour, so on-the-hour schedules tend to start later.
+Scheduled runs can still be late (sometimes by hours), and they only run
+from the repository's default branch.

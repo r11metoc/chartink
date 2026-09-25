@@ -2,12 +2,32 @@
 
 from __future__ import annotations
 
+import html
 import os
+import re
+from datetime import datetime, timedelta, timezone
 
 import requests
 
+TELEGRAM_LIMIT = 4096
+IST = timezone(timedelta(hours=5, minutes=30))
 _KIND_ICON = {"fresh": "🚀", "retest": "🔁"}
-_META_KEYS = ("_symbol", "_current_row", "_backtest_hits", "_sector_share", "scanner_name", "kind", "detected_at")
+
+
+def _chunks(text: str, limit: int = TELEGRAM_LIMIT) -> list[str]:
+    """Split on blank lines, which never fall inside a <pre>/<b> block here."""
+    chunks, current = [], ""
+    for block in text.split("\n\n"):
+        candidate = f"{current}\n\n{block}" if current else block
+        if len(candidate) <= limit:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+        current = block[:limit]
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def send_telegram_message(text: str) -> None:
@@ -17,119 +37,66 @@ def send_telegram_message(text: str) -> None:
         print("TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set, skipping notification.")
         return
 
-    resp = requests.post(
-        f"https://api.telegram.org/bot{token}/sendMessage",
-        json={"chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True},
-        timeout=15,
-    )
-    if not resp.ok:
-        print(f"Telegram notification failed: {resp.status_code} {resp.text}")
+    def post(body: str, as_html: bool) -> requests.Response:
+        payload = {"chat_id": chat_id, "text": body, "disable_web_page_preview": True}
+        if as_html:
+            payload["parse_mode"] = "HTML"
+        return requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json=payload, timeout=15)
+
+    for chunk in _chunks(text):
+        resp = post(chunk, as_html=True)
+        if resp.status_code == 400:
+            print(f"Telegram rejected the HTML ({resp.text}); resending as plain text.")
+            resp = post(html.unescape(re.sub(r"<[^>]+>", "", chunk)), as_html=False)
+        if not resp.ok:
+            print(f"Telegram notification failed: {resp.status_code} {resp.text}")
 
 
-def _find_column(headers: list[str], *keywords: str) -> str | None:
-    for h in headers:
-        low = h.lower()
-        if any(k in low for k in keywords):
-            return h
+def _now_ist() -> str:
+    return datetime.now(IST).strftime("%d %b %H:%M IST")
+
+
+def _col(row: dict | None, keyword: str) -> str | None:
+    """Value of the first scan column whose header contains keyword."""
+    for k, v in (row or {}).items():
+        if not k.startswith("_") and keyword in k.lower():
+            return v
     return None
 
 
-def _as_float(value) -> float | None:
+def _num(value) -> float | None:
     try:
         return float(str(value).replace(",", "").replace("%", "").strip())
     except (TypeError, ValueError):
         return None
 
 
-def _price_delta(row: dict) -> float | None:
-    """current price minus trigger price, or None if either is unknown.
-    'row' holds the trigger-time values; row['_current_row'] holds the
-    current ones."""
-    current_row = row.get("_current_row")
-    if not current_row:
-        return None
-    headers = [k for k in row.keys() if k not in _META_KEYS]
-    price_key = _find_column(headers, "price")
-    if not price_key:
-        return None
-    triggered = _as_float(row.get(price_key))
-    current = _as_float(current_row.get(price_key))
-    if triggered is None or current is None:
-        return None
-    return current - triggered
+def _price(row: dict | None) -> float | None:
+    return _num(_col(row, "price"))
 
 
-def _price_status(row: dict) -> str:
-    """Mechanical rule, evaluated per scanner: BUY only if the current known
-    price is above the price recorded when the breakout triggered, otherwise
-    HOLD. This is the user's own stated rule applied to stored numbers, not
-    an independent recommendation."""
-    delta = _price_delta(row)
-    if delta is None:
-        return ""
-    headers = [k for k in row.keys() if k not in _META_KEYS]
-    price_key = _find_column(headers, "price")
-    current_row = row["_current_row"]
-    if delta > 0:
-        return f"  🟢 BUY (₹{row[price_key]} → ₹{current_row[price_key]})"
-    return f"  ⏸ HOLD (₹{row[price_key]} → ₹{current_row[price_key]})"
-
-
-def _backtest_context(row: dict) -> str:
-    """Descriptive-only context from Chartink's own backtest export: how
-    often this exact symbol has triggered this scanner before, and roughly
-    how common its sector is among the scanner's historical hits. Not a
-    return prediction - the backtest data has no price/outcome history."""
-    parts = []
-    hits = row.get("_backtest_hits")
-    if hits:
-        parts.append(f"seen {len(hits)}x before, last {hits[-1]}")
-    share = row.get("_sector_share")
-    if share and share[1]:
-        matches, total = share
-        parts.append(f"sector ~{round(100 * matches / total)}% of history")
-    return f"\n      📚 {' · '.join(parts)}" if parts else ""
-
-
-def _format_symbol_line(row: dict, prefix: str = "") -> str:
-    headers = [k for k in row.keys() if k not in _META_KEYS]
-    pct_key = _find_column(headers, "%")
-    price_key = _find_column(headers, "price")
-    vol_key = _find_column(headers, "vol")
-    industry_key = _find_column(headers, "industry")
-
-    symbol = row.get("_symbol", "?")
-    pct = _as_float(row.get(pct_key)) if pct_key else None
-    arrow = "🟢" if pct is None or pct >= 0 else "🔴"
-
+def _details(row: dict, hits: list | None = None) -> str:
+    """Indented second line: day change, volume, industry, backtest repeats."""
     bits = []
-    if price_key and row.get(price_key):
-        bits.append(f"₹{row[price_key]}")
-    if pct_key and row.get(pct_key) not in (None, ""):
-        sign = "+" if (pct or 0) >= 0 else ""
-        bits.append(f"{sign}{row[pct_key]}%")
-    if vol_key and row.get(vol_key):
-        bits.append(f"Vol {row[vol_key]}")
-    if industry_key and row.get(industry_key):
-        bits.append(row[industry_key])
-
-    details = "  ·  ".join(bits)
-    label = f"{prefix}{arrow} <b>{symbol}</b>"
-    base = f"  {label}  {details}" if details else f"  {label}"
-    return base + _price_status(row) + _backtest_context(row)
+    day = _num(_col(row, "%"))
+    if day is not None:
+        bits.append(f"day {day:+.2f}%")
+    vol = _col(row, "vol")
+    if vol:
+        bits.append(f"Vol {vol}")
+    industry = _col(row, "industry")
+    if industry:
+        bits.append(industry[:28].rstrip(" -/"))
+    if hits:
+        bits.append(f"📚 {len(hits)}x before")
+    return "     " + html.escape(" · ".join(bits)) if bits else ""
 
 
-def _format_rows(rows: list[dict]) -> list[str]:
-    """Render rows sorted by % change (biggest movers first), pulling out
-    price/change/volume/industry when those columns exist."""
-    if not rows:
-        return ["  (no symbols)"]
-
-    headers = [k for k in rows[0].keys() if k not in _META_KEYS]
-    pct_key = _find_column(headers, "%")
-    ordered = sorted(rows, key=lambda r: _as_float(r.get(pct_key)) or 0, reverse=True) if pct_key else rows
-
-    return [_format_symbol_line(row) for row in ordered]
+def _stock_line(icon: str, symbol: str, row: dict) -> str:
+    """'🚀 VETO ₹150.32'"""
+    line = f"{icon} <b>{html.escape(symbol)}</b>"
+    price = _price(row)
+    return line + (f" ₹{price:.2f}" if price is not None else "")
 
 
 def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
@@ -139,24 +106,63 @@ def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
     for scanner_name, kind, row in breakouts:
         by_scanner.setdefault(scanner_name, []).append((kind, row))
 
-    lines = ["<b>New Chartink breakouts</b>"]
+    blocks = [f"<b>🚨 New breakouts</b> · {_now_ist()}"]
     for scanner_name, kind_rows in by_scanner.items():
-        lines.append(f"\n<b>{scanner_name}</b>")
-        headers = [k for k in kind_rows[0][1].keys() if k not in _META_KEYS]
-        pct_key = _find_column(headers, "%")
-        ordered = sorted(kind_rows, key=lambda kr: _as_float(kr[1].get(pct_key)) or 0, reverse=True) if pct_key else kind_rows
-        for kind, row in ordered:
-            lines.append(_format_symbol_line(row, prefix=_KIND_ICON.get(kind, "")))
-    return "\n".join(lines)
+        lines = [f"<b>{html.escape(scanner_name)}</b>"]
+        for kind, row in sorted(kind_rows, key=lambda kr: _num(_col(kr[1], "%")) or 0, reverse=True):
+            lines.append(_stock_line(_KIND_ICON.get(kind, "🚀"), row["_symbol"], row))
+            lines.append(_details(row, row.get("_backtest_hits")))
+        blocks.append("\n".join(filter(None, lines)))
+    blocks.append("🚀 first time on this scanner · 🔁 back after dropping off")
+    return "\n\n".join(blocks)
 
 
-def format_snapshot_message(scans: list) -> str:
-    """Full current scan results, regardless of what's new vs. the last run."""
-    lines = ["<b>Chartink scan snapshot</b>"]
+def _fmt_price(value: float | None) -> str:
+    return f"{value:.2f}" if value is not None else "-"
+
+
+def _buy_hold_tables(items: list[dict]) -> str:
+    """items: {"symbol", "trig", "now", "mark"}. BUY = now above trig, HOLD =
+    everything else. One monospace table per group, best move first."""
+    def move(item):
+        t, c = item["trig"], item["now"]
+        return (c - t) / t * 100 if t and c is not None else None
+
+    buys = [i for i in items if (move(i) or 0) > 0]
+    holds = [i for i in items if (move(i) or 0) <= 0]
+    parts = []
+    for title, group in (("🟢 BUY", buys), ("⏸ HOLD", holds)):
+        if not group:
+            continue
+        group.sort(key=lambda i: move(i) if move(i) is not None else float("-inf"), reverse=True)
+        lines = [f"{'Symbol':<10} {'Trig':>8} {'Now':>8} {'Chg':>6}"]
+        for i in group:
+            m = move(i)
+            chg = f"{m:+.1f}%" if m is not None else "-"
+            lines.append(f"{i['symbol'][:10]:<10} {_fmt_price(i['trig']):>8} {_fmt_price(i['now']):>8} {chg:>6}{i.get('mark', '')}")
+        parts.append(f"{title} ({len(group)})\n<pre>" + html.escape("\n".join(lines)) + "</pre>")
+    return "\n".join(parts)
+
+
+RULE_LINE = "<i>BUY = price above trigger · HOLD = at or below</i>"
+
+
+def format_scan_message(scans: list, trigger_lookup: dict) -> str:
+    """Every stock on each scanner right now, as BUY / HOLD tables.
+    trigger_lookup maps (scanner_name, symbol) -> trigger row or None."""
+    blocks = [f"<b>📋 Snapshot</b> · {_now_ist()}\n{RULE_LINE}"]
     for scan in scans:
-        lines.append(f"\n<b>{scan.scanner_name}</b> ({len(scan.rows)})")
-        lines.extend(_format_rows(scan.rows))
-    return "\n".join(lines)
+        header = f"<b>{html.escape(scan.scanner_name)}</b> ({len(scan.rows)})"
+        if not scan.rows:
+            blocks.append(f"{header}\nno stocks right now")
+            continue
+        items = [
+            {"symbol": row["_symbol"], "now": _price(row),
+             "trig": _price(trigger_lookup.get((scan.scanner_name, row["_symbol"])))}
+            for row in scan.rows
+        ]
+        blocks.append(f"{header}\n{_buy_hold_tables(items)}")
+    return "\n\n".join(blocks)
 
 
 def _sector_table(windows: dict) -> str:
@@ -164,146 +170,45 @@ def _sector_table(windows: dict) -> str:
     30-day count so the most persistently active sector leads."""
     weekly = dict(windows.get("weekly") or [])
     monthly = dict(windows.get("monthly") or [])
-    sectors = sorted(set(weekly) | set(monthly), key=lambda s: monthly.get(s, 0), reverse=True)[:5]
+    sectors = sorted(set(weekly) | set(monthly), key=lambda s: (-monthly.get(s, 0), -weekly.get(s, 0), s))[:5]
     if not sectors:
         return "<pre>no hits</pre>"
     rows = [f"{'Sector':<22}{'7d':>4}{'30d':>5}"]
     for s in sectors:
         rows.append(f"{s[:22]:<22}{weekly.get(s, 0):>4}{monthly.get(s, 0):>5}")
-    return "<pre>" + "\n".join(rows) + "</pre>"
-
-
-def _buy_list_table(outcomes: list[dict]) -> str:
-    """Monospace table: date, symbol, % return - buy-list rows only (all
-    already real breakouts), so no separate result column is needed."""
-    rows = [f"{'Date':<11}{'Symbol':<15}{'Ret%':>6}"]
-    for o in outcomes:
-        rows.append(f"{o['hit_date']:<11}{o['symbol'][:15]:<15}{o['pct_return']:>+5.1f}%")
-    return "<pre>" + "\n".join(rows) + "</pre>"
+    return "<pre>" + html.escape("\n".join(rows)) + "</pre>"
 
 
 def format_sector_focus_message(sector_focus: dict) -> str:
-    """Standalone message: {scanner_name: {"weekly": [...], "monthly": [...]}}
-    from Chartink's backtest history. Kept separate from the digest so the
-    digest has more room for the buy list."""
-    lines = ["<b>🏭 Sectors in focus</b>"]
+    """{scanner_name: {"weekly": [...], "monthly": [...]}} from the backtest hits."""
+    blocks = ["<b>🏭 Sectors in focus</b>\n<i>How many stocks each scanner picked per sector</i>"]
     for scanner_name, windows in sector_focus.items():
-        lines.append(f"\n<b>{scanner_name}</b>")
-        lines.append(_sector_table(windows))
-    return "\n".join(lines)
+        blocks.append(f"<b>{html.escape(scanner_name)}</b>\n{_sector_table(windows)}")
+    return "\n\n".join(blocks)
 
 
-def format_digest_message(
-    entries: list[dict],
-    days: int,
-    recent_outcomes: list[dict] | None = None,
-    buy_min_pct: float = 1.0,
-    buy_max_pct: float = 15.0,
-) -> str:
-    """entries: breakout rows from db.breakouts_since(), each with
-    scanner_name/symbol/kind/detected_at plus the scan's own columns.
-    recent_outcomes: backtest_outcomes rows (db.outcomes_with_context with
-    since_date) - real BUY/HOLD results from actual historical price data,
-    distinct from the live entries above which only exist once the scan
-    itself has run long enough to see a change. The buy list below only
-    shows real breakouts with a return strictly between buy_min_pct and
-    buy_max_pct - moderate, believable gains, excluding both near-flat
-    moves and extreme outliers (often corporate-action artifacts like
-    stock splits rather than genuine price moves)."""
-    DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
-    lines = [f"<b>📊 Chartink digest</b> ({days}d)"]
-
-    # --- Live scan activity (from this repo's own scheduled scans) ---
-    lines.append(f"\n{DIVIDER}\n<b>🔴 Live scan activity</b>")
-
+def format_digest_message(entries: list[dict], days: int) -> str:
+    """Stocks that triggered on a scanner in the last `days`, as BUY / HOLD
+    tables per scanner. entries come from db.breakouts_since() (newest first)
+    with _current_row (latest scraped row) and _on_scan (still on the scanner)."""
+    blocks = [f"<b>📊 Digest</b> · triggers in last {days}d · {_now_ist()}\n{RULE_LINE}"]
     if not entries:
-        lines.append("  No breakouts yet.")
+        blocks.append("No new triggers in this window.")
+        return "\n\n".join(blocks)
 
-    by_symbol: dict[str, list[dict]] = {}
-    for e in entries:
-        by_symbol.setdefault(e["symbol"], []).append(e)
+    latest: dict[str, dict[str, dict]] = {}
+    for e in entries:  # newest first, so the first event per stock is its latest trigger
+        latest.setdefault(e["scanner_name"], {}).setdefault(e["symbol"], e)
 
-    recurring = {s: es for s, es in by_symbol.items() if len(es) > 1}
-    if recurring:
-        lines.append("\n<b>⭐ Top recurring symbols</b>")
-        for symbol, es in sorted(recurring.items(), key=lambda kv: len(kv[1]), reverse=True):
-            scanners = [e["scanner_name"] for e in es]
-            summary = ", ".join(f"{name} x{scanners.count(name)}" for name in dict.fromkeys(scanners))
-            earliest = min(es, key=lambda e: e["detected_at"])
-            lines.append(f"  <b>{symbol}</b> — {len(es)}x ({summary})" + _price_status(earliest))
-
-    retests = [e for e in entries if e["kind"] == "retest"]
-    if retests:
-        lines.append("\n<b>🔁 Retest candidates</b>")
-        for e in retests:
-            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
-
-    fresh = [e for e in entries if e["kind"] == "fresh"]
-    if fresh:
-        lines.append("\n<b>🚀 Fresh breakouts</b>")
-        for e in fresh:
-            lines.append(f"  [{e['scanner_name']}] " + _format_symbol_line(e).lstrip())
-
-    # --- Backtest-derived buy list (historical, from Yahoo Finance prices) ---
-    if recent_outcomes:
-        lines.append(f"\n{DIVIDER}\n<b>📜 Backtest outcomes</b> ({days}d)")
-
-        total = len(recent_outcomes)
-        wins = sum(1 for o in recent_outcomes if o["label"] == 1)
-        lines.append(f"{wins}/{total} real breakouts ({wins / total:.0%})")
-
-        buy_list = [
-            o for o in recent_outcomes
-            if o["label"] == 1 and buy_min_pct < o["pct_return"] < buy_max_pct
-        ]
-        lines.append(f"\n<b>🎯 Buy list</b> ({len(buy_list)}/{wins})")
-
-        if not buy_list:
-            lines.append("  (none in this range)")
-        else:
-            by_scanner: dict[str, list[dict]] = {}
-            for o in buy_list:
-                by_scanner.setdefault(o["scanner_name"], []).append(o)
-
-            for scanner_name, outcomes in by_scanner.items():
-                ordered = sorted(outcomes, key=lambda o: o["pct_return"], reverse=True)
-                lines.append(f"\n<b>{scanner_name}</b> ({len(outcomes)})")
-                lines.append(_buy_list_table(ordered))
-
-    return "\n".join(lines)
-
-
-def format_buy_hold_message(scans: list, trigger_lookup: dict) -> str:
-    """Every symbol currently on each scanner, split into a BUY list
-    (current price above the price it had when it first triggered that
-    scanner) and a HOLD list (at or below). trigger_lookup maps
-    (scanner_name, symbol) -> trigger row dict or None if unknown."""
-    lines = ["<b>🎯 Buy / Hold list</b> (current price vs. trigger price, per scanner)"]
-
-    for scan in scans:
-        buy_lines, hold_lines, unknown_symbols = [], [], []
-
-        for row in scan.rows:
-            symbol = row.get("_symbol", "?")
-            trigger = trigger_lookup.get((scan.scanner_name, symbol))
-            if trigger is None:
-                unknown_symbols.append(symbol)
-                continue
-            merged = dict(trigger)
-            merged["_current_row"] = row
-            delta = _price_delta(merged)
-            line = "  " + _format_symbol_line(merged).lstrip()
-            if delta is not None and delta > 0:
-                buy_lines.append(line)
-            else:
-                hold_lines.append(line)
-
-        lines.append(f"\n<b>{scan.scanner_name}</b>")
-        lines.append(f"  🟢 BUY ({len(buy_lines)})")
-        lines.extend(buy_lines or ["    (none)"])
-        lines.append(f"  ⏸ HOLD ({len(hold_lines)})")
-        lines.extend(hold_lines or ["    (none)"])
-        if unknown_symbols:
-            lines.append(f"  ❓ No trigger data yet: {', '.join(unknown_symbols)}")
-
-    return "\n".join(lines)
+    any_off = False
+    for scanner_name, by_symbol in latest.items():
+        items = []
+        for symbol, e in by_symbol.items():
+            off = not e.get("_on_scan")
+            any_off |= off
+            items.append({"symbol": symbol, "trig": _price(e), "now": _price(e.get("_current_row")),
+                          "mark": " *" if off else ""})
+        blocks.append(f"<b>{html.escape(scanner_name)}</b> ({len(items)})\n{_buy_hold_tables(items)}")
+    if any_off:
+        blocks.append("<i>* no longer on the scanner - last seen price</i>")
+    return "\n\n".join(blocks)

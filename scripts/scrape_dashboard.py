@@ -171,6 +171,11 @@ def scrape_dashboard(url: str, debug: bool = False) -> list[ScanResult]:
             "name(s) - keeping auto-detected titles. Set CHARTINK_SCANNER_NAMES if the "
             "dashboard's scanners changed."
         )
+
+    # An empty widget still renders a single "No data for table" row. It has to
+    # count toward the positional naming above, but it isn't a stock.
+    for result in results:
+        result.rows = [r for r in result.rows if sum(1 for v in r.values() if str(v).strip()) >= 3]
     return results
 
 
