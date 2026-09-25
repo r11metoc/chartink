@@ -26,7 +26,7 @@ def main() -> int:
     debug = os.environ.get("CHARTINK_DEBUG_DUMP") == "1"
     send_snapshot = os.environ.get("CHARTINK_SEND_SNAPSHOT") == "1"
     send_digest = os.environ.get("CHARTINK_SEND_DIGEST") == "1"
-    digest_days = int(os.environ.get("CHARTINK_DIGEST_DAYS") or "7")
+    digest_days = int(os.environ.get("CHARTINK_DIGEST_DAYS") or "30")
 
     scans = scrape_dashboard(url, debug=debug)
     if not scans:

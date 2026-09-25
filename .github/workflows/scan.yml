@@ -24,7 +24,7 @@ on:
       days:
         description: "Lookback window in days for the digest"
         type: string
-        default: "7"
+        default: "30"
 
 permissions:
   contents: write
@@ -55,7 +55,7 @@ jobs:
           CHARTINK_DEBUG_DUMP: ${{ inputs.debug && '1' || '0' }}
           CHARTINK_SEND_SNAPSHOT: ${{ (github.event_name == 'schedule' || inputs.snap) && '1' || '0' }}
           CHARTINK_SEND_DIGEST: ${{ (github.event_name == 'schedule' || inputs.digest) && '1' || '0' }}
-          CHARTINK_DIGEST_DAYS: ${{ inputs.days || '7' }}
+          CHARTINK_DIGEST_DAYS: ${{ inputs.days || '30' }}
         working-directory: scripts
         run: python run.py
 

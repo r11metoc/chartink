@@ -47,7 +47,7 @@ Each scheduled run sends these messages (the digest ones with `digest`):
 |---|---|---|
 | **📋 Snapshot** | What's on my scanners right now? | Every stock on each scanner, in a 🟢 BUY table and a ⏸ HOLD table |
 | **🏭 Sectors in focus** | Which sectors are the scanners picking? | Top 5 sectors per scanner by backtest picks, last 7 and 30 days |
-| **📊 Digest** | How are this week's new triggers doing? | Stocks that triggered in the last `days` (default 7), in BUY / HOLD tables per scanner |
+| **📊 Digest** | How are this month's new triggers doing? | Stocks that triggered in the last `days` (default 30), in BUY / HOLD tables per scanner |
 | **📜 Scanner track record** | How often did past triggers work? | Per scanner: past triggers that rose 3%+ within 5 trading days, and the winners that gained 1–15% |
 
 **BUY / HOLD rule** (snapshot and digest): BUY if the price now is above
