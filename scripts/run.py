@@ -8,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 
 import db
 from notify import (
-    format_backtest_message,
     format_breakout_message,
     format_digest_message,
     format_scan_message,
@@ -18,7 +17,6 @@ from notify import (
 from scrape_dashboard import scrape_dashboard
 
 DEFAULT_URL = "https://chartink.com/dashboard/45863"
-BACKTEST_DIGEST_DAYS = 30
 
 
 def main() -> int:
@@ -97,20 +95,9 @@ def main() -> int:
                 "monthly": db.sector_counts_since(digest_conn, scanner_name, monthly_since),
             }
 
-        # Outcomes need 5+ trading days to play out, so a 7-day window would
-        # almost always be empty; the track record looks back further.
-        backtest_days = max(digest_days, BACKTEST_DIGEST_DAYS)
-        outcome_params = db.latest_outcome_params(digest_conn)
-        recent_outcomes = []
-        if outcome_params:
-            outcomes_since_date = (today - timedelta(days=backtest_days)).isoformat()
-            recent_outcomes = db.outcomes_with_context(digest_conn, *outcome_params, outcomes_since_date)
-
         digest_conn.close()
         send_telegram_message(format_sector_focus_message(sector_focus))
         send_telegram_message(format_digest_message(entries, digest_days))
-        if recent_outcomes:
-            send_telegram_message(format_backtest_message(recent_outcomes, backtest_days, *outcome_params))
 
     return 0
 

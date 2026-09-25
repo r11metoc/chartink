@@ -212,36 +212,3 @@ def format_digest_message(entries: list[dict], days: int) -> str:
     if any_off:
         blocks.append("<i>* no longer on the scanner - last seen price</i>")
     return "\n\n".join(blocks)
-
-
-def format_backtest_message(
-    outcomes: list[dict],
-    days: int,
-    horizon_days: int,
-    threshold_pct: float,
-    gain_min_pct: float = 1.0,
-    gain_max_pct: float = 15.0,
-) -> str:
-    """How each scanner's past triggers (from the Chartink backtest file) played
-    out. Lists the winners with a gain strictly between gain_min_pct and
-    gain_max_pct, leaving out near-flat moves and extreme outliers (often
-    corporate actions like splits rather than genuine moves)."""
-    blocks = [
-        f"<b>📜 Scanner track record</b> · last {days}d\n"
-        f"<i>Past triggers only, not today's picks. Worked = rose {threshold_pct:g}%+ within {horizon_days} trading days.</i>"
-    ]
-    by_scanner: dict[str, list[dict]] = {}
-    for o in outcomes:
-        by_scanner.setdefault(o["scanner_name"], []).append(o)
-
-    for scanner_name, rows in by_scanner.items():
-        wins = [o for o in rows if o["label"] == 1]
-        block = f"<b>{html.escape(scanner_name)}</b> · {len(wins)}/{len(rows)} worked ({len(wins) / len(rows):.0%})"
-        shown = sorted((o for o in wins if gain_min_pct < o["pct_return"] < gain_max_pct),
-                       key=lambda o: o["pct_return"], reverse=True)
-        if shown:
-            lines = [f"{'Date':<11}{'Symbol':<12}{'Gain':>6}"]
-            lines += [f"{o['hit_date']:<11}{o['symbol'][:11]:<12}{o['pct_return']:>+5.1f}%" for o in shown]
-            block += "\n<pre>" + html.escape("\n".join(lines)) + "</pre>"
-        blocks.append(block)
-    return "\n\n".join(blocks)

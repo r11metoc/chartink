@@ -268,42 +268,21 @@ def save_backtest_outcome(
     )
 
 
-def outcomes_with_context(
-    conn: sqlite3.Connection, horizon_days: int, success_threshold_pct: float, since_date: str | None = None
-) -> list[dict]:
+def outcomes_with_context(conn: sqlite3.Connection, horizon_days: int, success_threshold_pct: float) -> list[dict]:
     """Join backtest_outcomes with backtest_hits (sector/marketcap) for a
-    given labeling rule - the training/reporting dataset. Pass since_date
-    (ISO date) to restrict to recent hits, most-recent first; omit it for
-    the full history in chronological order (the training script's need)."""
-    query = (
+    given labeling rule, in chronological order - the training/reporting dataset."""
+    cur = conn.execute(
         "SELECT o.scanner_name, o.hit_date, o.symbol, o.trigger_close, o.future_close, "
         "       o.pct_return, o.label, h.marketcap, h.sector "
         "FROM backtest_outcomes o "
         "JOIN backtest_hits h ON h.scanner_name = o.scanner_name "
         "                    AND h.hit_date = o.hit_date AND h.symbol = o.symbol "
         "WHERE o.horizon_days = ? AND o.success_threshold_pct = ? "
+        "ORDER BY o.hit_date",
+        (horizon_days, success_threshold_pct),
     )
-    params: list = [horizon_days, success_threshold_pct]
-    if since_date is not None:
-        query += "AND o.hit_date >= ? ORDER BY o.hit_date DESC"
-        params.append(since_date)
-    else:
-        query += "ORDER BY o.hit_date"
-
-    cur = conn.execute(query, params)
     cols = ["scanner_name", "hit_date", "symbol", "trigger_close", "future_close", "pct_return", "label", "marketcap", "sector"]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
-
-
-def latest_outcome_params(conn: sqlite3.Connection) -> tuple[int, float] | None:
-    """The (horizon_days, success_threshold_pct) rule used by the most
-    recent training run - lets callers query backtest_outcomes without
-    hardcoding or importing those constants from fetch_price_outcomes.py
-    (which pulls in yfinance/pandas, not installed in the lean scan job)."""
-    row = conn.execute(
-        "SELECT horizon_days, success_threshold_pct FROM backtest_outcomes ORDER BY computed_at DESC LIMIT 1"
-    ).fetchone()
-    return (row[0], row[1]) if row else None
 
 
 def breakouts_since(conn: sqlite3.Connection, since_iso: str) -> list[dict]:

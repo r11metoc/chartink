@@ -11,8 +11,7 @@ scanners (i.e. a fresh breakout).
 - `.github/workflows/scan.yml` runs on a cron schedule (daily at 09:23,
   12:23 and 15:23 IST, Mon–Fri) and can also be triggered manually from
   the Actions tab. Every scheduled run automatically sends the breakout
-  alert (if any), the snapshot, sectors, digest and scanner track record,
-  all together — no manual inputs needed for that. Manual runs still only
+  alert (if any), the snapshot, sectors and digest, all together — no manual inputs needed for that. Manual runs still only
   send the extras you explicitly opt into via the `snap`/`digest` inputs,
   so you can trigger a quick breakout-only check without the noise.
 - `scripts/scrape_dashboard.py` opens the dashboard in a headless Chromium
@@ -48,7 +47,6 @@ Each scheduled run sends these messages (the digest ones with `digest`):
 | **📋 Snapshot** | What's on my scanners right now? | Every stock on each scanner, in a 🟢 BUY table and a ⏸ HOLD table |
 | **🏭 Sectors in focus** | Which sectors are the scanners picking? | Top 5 sectors per scanner by backtest picks, last 7 and 30 days |
 | **📊 Digest** | How are this month's new triggers doing? | Stocks that triggered in the last `days` (default 30), in BUY / HOLD tables per scanner |
-| **📜 Scanner track record** | How often did past triggers work? | Per scanner: past triggers that rose 3%+ within 5 trading days, and the winners that gained 1–15% |
 
 **BUY / HOLD rule** (snapshot and digest): BUY if the price now is above
 the trigger price, HOLD otherwise. The trigger price is the price when the
@@ -61,13 +59,6 @@ is a mechanical comparison of two stored prices, not a recommendation.
 
 **Sectors in focus** comes from `data/backtest/*.csv` (`backtest_hits`),
 so it's independent of the live scans.
-
-**Scanner track record** needs `train_model.yml` to have run at least
-once. It's history from the backtest file with real prices, not today's
-picks — those moves already happened. It looks back 30 days (or `days` if
-longer), since outcomes need 5 trading days to settle. The 1–15% filter
-leaves out near-flat moves and extreme outliers, which are often corporate
-actions like splits rather than genuine moves.
 
 For a custom lookback, trigger the workflow manually with `digest` set to
 `true` and `days` set to whatever window you want. Any message longer than
