@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import db
 from notify import (
+    format_backtest_message,
     format_breakout_message,
     format_digest_message,
     format_scan_message,
@@ -75,8 +76,7 @@ def main() -> int:
         print("No new breakouts this run.")
 
     if send_snapshot:
-        new_symbols = {(scanner_name, row["_symbol"]) for scanner_name, _, row in new_breakouts}
-        send_telegram_message(format_scan_message(scans, trigger_lookup, new_symbols))
+        send_telegram_message(format_scan_message(scans, trigger_lookup))
 
     if send_digest:
         since = (datetime.now(timezone.utc) - timedelta(days=digest_days)).isoformat()
@@ -98,18 +98,19 @@ def main() -> int:
             }
 
         # Outcomes need 5+ trading days to play out, so a 7-day window would
-        # almost always be empty; the backtest section looks back further.
+        # almost always be empty; the track record looks back further.
         backtest_days = max(digest_days, BACKTEST_DIGEST_DAYS)
         outcome_params = db.latest_outcome_params(digest_conn)
         recent_outcomes = []
         if outcome_params:
-            horizon_days, threshold_pct = outcome_params
             outcomes_since_date = (today - timedelta(days=backtest_days)).isoformat()
-            recent_outcomes = db.outcomes_with_context(digest_conn, horizon_days, threshold_pct, outcomes_since_date)
+            recent_outcomes = db.outcomes_with_context(digest_conn, *outcome_params, outcomes_since_date)
 
         digest_conn.close()
         send_telegram_message(format_sector_focus_message(sector_focus))
-        send_telegram_message(format_digest_message(entries, digest_days, recent_outcomes, backtest_days))
+        send_telegram_message(format_digest_message(entries, digest_days))
+        if recent_outcomes:
+            send_telegram_message(format_backtest_message(recent_outcomes, backtest_days, *outcome_params))
 
     return 0
 

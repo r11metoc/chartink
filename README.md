@@ -11,8 +11,8 @@ scanners (i.e. a fresh breakout).
 - `.github/workflows/scan.yml` runs on a cron schedule (daily at 09:23,
   12:23 and 15:23 IST, Mon–Fri) and can also be triggered manually from
   the Actions tab. Every scheduled run automatically sends the breakout
-  alert (if any), the scan snapshot with its buy/hold split, the sectors
-  message and the digest, all together — no manual inputs needed for that. Manual runs still only
+  alert (if any), the snapshot, sectors, digest and scanner track record,
+  all together — no manual inputs needed for that. Manual runs still only
   send the extras you explicitly opt into via the `snap`/`digest` inputs,
   so you can trigger a quick breakout-only check without the noise.
 - `scripts/scrape_dashboard.py` opens the dashboard in a headless Chromium
@@ -39,53 +39,40 @@ against yet), so no breakout alert fires until the second run onward.
 Every scheduled run sends the current scan results too (not just new
 breakouts) — you don't need to do anything for this. To get the same thing
 on demand between scheduled runs, go to the Actions tab → "Chartink
-breakout scan" → Run workflow → set `snap` to `true`. Either way it's one
-**📋 Scan snapshot** message that lists every stock currently on each
-scanner, grouped into:
+breakout scan" → Run workflow → set `snap` to `true`.
 
-- **🆕 NEW** — triggered on this very run (no move to compare yet)
-- **🟢 BUY** — current price is above its trigger price: the price when it
-  last broke out on that scanner, or, if no breakout was ever recorded,
-  the earliest price seen for it there
-- **⏸ HOLD** — at or below that trigger price
+Each scheduled run sends these messages (the digest ones with `digest`):
 
-Each stock shows its current price, the % move since the trigger, and a
-second line with the day's change, volume, industry and how often it hit
-this scanner in the backtest (📚). A scanner with no results says so.
+| Message | Answers | Contents |
+|---|---|---|
+| **📋 Snapshot** | What's on my scanners right now? | Every stock on each scanner, in a 🟢 BUY table and a ⏸ HOLD table |
+| **🏭 Sectors in focus** | Which sectors are the scanners picking? | Top 5 sectors per scanner by backtest picks, last 7 and 30 days |
+| **📊 Digest** | How are this week's new triggers doing? | Stocks that triggered in the last `days` (default 7), in BUY / HOLD tables per scanner |
+| **📜 Scanner track record** | How often did past triggers work? | Per scanner: past triggers that rose 3%+ within 5 trading days, and the winners that gained 1–15% |
 
-Every scheduled run also sends a digest with a 7-day lookback of live
-triggers, one line per stock per scanner: trigger date and price, latest
-price, % move, and a status — 🟢 above trigger, ⏸ at/below, ⚪ dropped off
-the scan (last known price, so it's stale). Stocks that triggered on more
-than one scanner are called out separately. For a custom lookback, trigger
-the workflow manually with `digest` set to `true` and `days` set to
-whatever window you want. BUY/HOLD is a mechanical comparison of two stored
-prices per your rule, not an independent recommendation.
+**BUY / HOLD rule** (snapshot and digest): BUY if the price now is above
+the trigger price, HOLD otherwise. The trigger price is the price when the
+stock last broke out on that scanner, or, if no breakout was recorded,
+the earliest price seen for it there — so a stock that appeared this run
+starts in HOLD at +0.0%. Each table shows Symbol, Trig, Now and Chg (% move
+since the trigger), best move first. In the digest, `*` marks a stock that
+has since dropped off the scanner (its "Now" is the last price seen). This
+is a mechanical comparison of two stored prices, not a recommendation.
 
-Every digest also sends a separate **🏭 Sectors in focus** message, broken
-out per scanner: the top 5 sectors by backtest-hit count in the last 7 days
-and the last 30 days. This comes from `data/backtest/*.csv`
-(`backtest_hits` table) and shows up even when there's been no live
-breakout activity in the `days` window, since it's independent of that
-lookback. It's kept as its own message (rather than folded into the main
-digest) to leave more room for the buy list below.
+**Sectors in focus** comes from `data/backtest/*.csv` (`backtest_hits`),
+so it's independent of the live scans.
 
-If `train_model.yml` has been run at least once, the main digest message
-also includes a **📜 Backtest outcomes** section covering the last 30 days
-(or `days`, if longer — outcomes need 5 trading days to play out, so a
-7-day window would almost always be empty): an overall win-rate summary, plus a **🎯 Buy list** — real
-historical triggers (from `backtest_outcomes`) that turned out to be real
-breakouts, filtered to a **1%–15% gain** (excludes near-flat moves and
-extreme outliers, which are often corporate-action artifacts like stock
-splits rather than genuine price moves), sorted by return per scanner.
-This is a completely different data source from the live breakout list
-above — it's backtest history with real price outcomes already known, so
-it's useful from day one, while the live sections only fill in as the
-scheduled scan accumulates its own history. Every matching row is shown
-(no per-scanner cap). Any message longer than Telegram's 4096-character
-limit is split into several messages at section boundaries, and if
-Telegram ever rejects a message's formatting it's resent as plain text
-rather than dropped.
+**Scanner track record** needs `train_model.yml` to have run at least
+once. It's history from the backtest file with real prices, not today's
+picks — those moves already happened. It looks back 30 days (or `days` if
+longer), since outcomes need 5 trading days to settle. The 1–15% filter
+leaves out near-flat moves and extreme outliers, which are often corporate
+actions like splits rather than genuine moves.
+
+For a custom lookback, trigger the workflow manually with `digest` set to
+`true` and `days` set to whatever window you want. Any message longer than
+Telegram's 4096-character limit is split at section boundaries, and a
+message Telegram rejects is resent as plain text rather than dropped.
 
 ## Backtest model: is a trigger a real breakout or a fake one?
 
