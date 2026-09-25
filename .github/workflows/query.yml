@@ -1,0 +1,34 @@
+name: Chartink database query
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: "Read-only SQL to run against data/chartink.db (SELECT only - writes are blocked)"
+        type: string
+        required: true
+        default: "SELECT * FROM breakouts ORDER BY detected_at DESC LIMIT 10;"
+
+permissions:
+  contents: read
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run query
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CHARTINK_SQL: ${{ inputs.sql }}
+        working-directory: scripts
+        run: python run_query.py

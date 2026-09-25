@@ -223,6 +223,16 @@ sqlite3 data/chartink.db "select * from breakouts order by detected_at desc limi
 sqlite3 data/chartink.db "select scanner_name, count(*) from results where run_id = (select max(id) from runs) group by scanner_name;"
 ```
 
+Or without touching git/sqlite at all: Actions tab → **"Chartink database query"** →
+Run workflow → paste a `SELECT` statement into the `sql` field → the result
+comes back as a message in Telegram (you still trigger it from GitHub, not
+by typing into Telegram itself — this bot can only send messages, not
+receive them). The connection is opened read-only at the SQLite level, so
+`INSERT`/`UPDATE`/`DELETE`/`DROP`/etc. fail outright rather than risk
+corrupting your tracked history. Results are capped at 50 rows and ~3800
+characters to fit in a single Telegram message; narrow your query
+(`LIMIT`, fewer columns) if it gets truncated.
+
 ## Changing the schedule
 
 Edit the `cron` entries in `.github/workflows/scan.yml`. They're in UTC;
