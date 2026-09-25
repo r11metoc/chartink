@@ -69,12 +69,29 @@ recommendation, and it's only as fresh as the last time the symbol actually
 appeared in that scanner's results — if it's since dropped out entirely,
 the "current" price shown is stale.
 
-The digest also always includes a **🏭 Sectors in focus** section, broken
+Every digest also sends a separate **🏭 Sectors in focus** message, broken
 out per scanner: the top 5 sectors by backtest-hit count in the last 7 days
 and the last 30 days. This comes from `data/backtest/*.csv`
 (`backtest_hits` table) and shows up even when there's been no live
-breakout activity in the `days` window, since it's independent of
-that lookback.
+breakout activity in the `days` window, since it's independent of that
+lookback. It's kept as its own message (rather than folded into the main
+digest) to leave more room for the buy list below.
+
+If `train_model.yml` has been run at least once, the main digest message
+also includes a **📜 Backtest outcomes** section for the same `days`
+window: an overall win-rate summary, plus a **🎯 Buy list** — real
+historical triggers (from `backtest_outcomes`) that turned out to be real
+breakouts, filtered to a **1%–15% gain** (excludes near-flat moves and
+extreme outliers, which are often corporate-action artifacts like stock
+splits rather than genuine price moves), sorted by return per scanner.
+This is a completely different data source from the live breakout list
+above — it's backtest history with real price outcomes already known, so
+it's useful from day one, while the live sections only fill in as the
+scheduled scan accumulates its own history. Every matching row is shown
+(no per-scanner cap); if the list ever grows past Telegram's 4096-character
+message limit, narrow it by adjusting `buy_min_pct`/`buy_max_pct` in
+`format_digest_message`, or query `backtest_outcomes` directly in
+`data/chartink.db` (or via the "Chartink database query" workflow) instead.
 
 ## Backtest model: is a trigger a real breakout or a fake one?
 
@@ -206,6 +223,16 @@ symbol/sector before.
 sqlite3 data/chartink.db "select * from breakouts order by detected_at desc limit 20;"
 sqlite3 data/chartink.db "select scanner_name, count(*) from results where run_id = (select max(id) from runs) group by scanner_name;"
 ```
+
+Or without touching git/sqlite at all: Actions tab → **"Chartink database query"** →
+Run workflow → paste a `SELECT` statement into the `sql` field → the result
+comes back as a message in Telegram (you still trigger it from GitHub, not
+by typing into Telegram itself — this bot can only send messages, not
+receive them). The connection is opened read-only at the SQLite level, so
+`INSERT`/`UPDATE`/`DELETE`/`DROP`/etc. fail outright rather than risk
+corrupting your tracked history. Results are capped at 50 rows and ~3800
+characters to fit in a single Telegram message; narrow your query
+(`LIMIT`, fewer columns) if it gets truncated.
 
 ## Changing the schedule
 
