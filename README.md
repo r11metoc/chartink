@@ -124,7 +124,8 @@ tests the actual trade and scores new scanner results:
   Full results: `reports/signal_model_report.md`.
   `horizon_returns.py` then shows where each stock was 2, 4, 6, 8 and 12
   weeks after crossing the trigger (plain hold, no stop), against the
-  Nifty 500: `reports/horizon_returns.md`, per-trade prices in
+  Nifty 500, and compares 10/15/20% trailing stops with plain holding
+  on the same trades: `reports/horizon_returns.md`, per-trade prices in
   `data/model/horizon_returns.csv`.
 - `mode=predict`: scores the symbols you type in (plus which scanner they
   came from), or the latest dashboard scan if left blank, and sends each

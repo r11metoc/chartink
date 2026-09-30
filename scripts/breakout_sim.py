@@ -18,7 +18,8 @@ price"):
   target at `target_r` times the risk, otherwise out at the close after
   `max_hold` sessions. When a bar touches both stop and target the stop is
   assumed to come first, and a stop touched on the entry day counts, so
-  results lean pessimistic rather than optimistic.
+  results lean pessimistic rather than optimistic. With `trail_pct` the
+  stop also ratchets up to that % below the highest close since entry.
 
 Everything here is pure pandas/numpy so it can be tested without network.
 """
@@ -44,6 +45,7 @@ class ExitRule:
     min_risk_pct: float = 2.0   # ...nor closer than this (avoids noise stops)
     target_r: float = 2.0       # target = entry + target_r * risk; 0 disables
     max_hold: int = 20          # sessions after entry, then exit at close
+    trail_pct: float = 0.0      # >0: after each close, raise the stop to this % below the highest close
 
 
 DEFAULT_RULE = ExitRule()
@@ -123,6 +125,7 @@ def simulate_trade(path: pd.DataFrame, trigger: float, bar_low: float, window: i
 
     e_i, e_px = entry
     stop, target = stop_and_target(e_px, bar_low, rule)
+    initial_stop = stop
     exit_i, exit_px, reason = None, None, None
     last = e_i + rule.max_hold
     for i in range(e_i, min(last + 1, len(path))):
@@ -138,12 +141,15 @@ def simulate_trade(path: pd.DataFrame, trigger: float, bar_low: float, window: i
             exit_i, exit_px, reason = i, c[i], "time"
         if exit_i is not None:
             break
+        if rule.trail_pct > 0:  # takes effect from the next session
+            stop = max(stop, c[e_i:i + 1].max() * (1 - rule.trail_pct / 100))
 
     out = {
         "status": "triggered",
         "entry_offset": e_i,
         "entry_price": e_px,
-        "stop": stop,
+        "stop": initial_stop,
+        "final_stop": stop,
         "target": target,
         "gap_entry": bool(o[e_i] > trigger),
     }
@@ -151,7 +157,7 @@ def simulate_trade(path: pd.DataFrame, trigger: float, bar_low: float, window: i
         out.update(status="pending", exit_offset=len(path) - 1, exit_price=c[-1], exit_reason="open")
     else:
         out.update(exit_offset=exit_i, exit_price=float(exit_px), exit_reason=reason)
-    risk = e_px - stop
+    risk = e_px - initial_stop
     out["ret_pct"] = (out["exit_price"] / e_px - 1) * 100 - COST_PCT
     out["r_multiple"] = (out["exit_price"] - e_px) / risk if risk > 0 else 0.0
     out["hold_days"] = out["exit_offset"] - e_i
