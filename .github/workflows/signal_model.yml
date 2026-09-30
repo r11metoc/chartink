@@ -1,0 +1,91 @@
+name: Scanner signal model
+
+# mode=train: rebuild the trade dataset from data/backtest/*.csv with fresh
+#   Yahoo prices, retrain, and commit the dataset, model and report. Re-run
+#   after dropping new Chartink backtest exports into data/backtest/.
+# mode=predict: score scanner results (the symbols given, or else the latest
+#   dashboard scan in data/chartink.db) and send the setups to Telegram.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "train or predict"
+        type: choice
+        options: [predict, train]
+        default: predict
+      symbols:
+        description: "predict: comma-separated symbols (blank = latest dashboard scan)"
+        type: string
+        default: ""
+      scanner:
+        description: "predict: which scanner the symbols came from"
+        type: choice
+        options: [63_30_daily, Bullish_Scanner, Wkly_upswing]
+        default: 63_30_daily
+
+permissions:
+  contents: write
+
+concurrency:
+  group: signal-model
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements-train.txt pytest
+
+      - name: Offline tests
+        if: inputs.mode == 'train'
+        run: python -m pytest tests/ -q
+
+      - name: Build dataset (fetches prices)
+        if: inputs.mode == 'train'
+        working-directory: scripts
+        run: python build_dataset.py
+
+      - name: Train and report
+        if: inputs.mode == 'train'
+        working-directory: scripts
+        run: python signal_model.py train
+
+      - name: Commit dataset, model and report
+        if: inputs.mode == 'train'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/model reports/signal_model_report.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update signal model $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git pull --rebase origin "${{ github.ref_name }}"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
+
+      - name: Score scanner results
+        if: inputs.mode == 'predict'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SYMBOLS: ${{ inputs.symbols }}
+          SCANNER: ${{ inputs.scanner }}
+        working-directory: scripts
+        run: |
+          if [ -n "$SYMBOLS" ]; then
+            python signal_model.py predict --symbols "$SYMBOLS" --scanner "$SCANNER" --telegram
+          else
+            python signal_model.py predict --from-db --telegram
+          fi
