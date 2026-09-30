@@ -100,6 +100,50 @@ Chartink (re-import it first per the section above) or want updated price
 outcomes for symbols that have had more time to play out since the last
 run.
 
+**Superseded for `Wkly_upswing`:** that scanner's backtest dates are the
+*first day of the week*, but the signal needs the completed weekly candle, so
+measuring from the Monday close looks ahead at the rest of the week. That is
+why this report shows an impossible 82% win rate / +11.7% average for it. The
+signal model below handles this correctly.
+
+## Signal model: "buy when it crosses the trigger price"
+
+`.github/workflows/signal_model.yml` (Actions tab → "Scanner signal model")
+tests the actual trade and scores new scanner results:
+
+- **Trigger** = high of the signal candle (the completed week's candle for
+  `Wkly_upswing`). **Entry** = buy-stop at the trigger, valid 3 sessions
+  (5 for weekly); filled at the open on a gap-up. **Stop** = signal candle
+  low (2–8% below entry), **target** = 2× risk, else exit after 20 sessions.
+  After 0.25% round-trip costs. Logic in `scripts/breakout_sim.py`.
+- `mode=train`: `build_dataset.py` fetches Yahoo prices for every backtest
+  hit and stores features + the 40 sessions after each signal in
+  `data/model/`; `signal_model.py train` simulates every trade, compares it
+  with holding the Nifty 500, compares a fixed set of exit rules, and
+  walk-forward-validates a model that tries to pick the winning triggers.
+  Full results: `reports/signal_model_report.md`.
+- `mode=predict`: scores the symbols you type in (plus which scanner they
+  came from), or the latest dashboard scan if left blank, and sends each
+  setup to Telegram with its buy-above, stop and target levels, valid
+  window, and a status: `TRIGGERED` (already crossed), `EXPIRED` (window
+  passed), `MISSED` (already past the target).
+
+The model filter is only used if it beats "take every trigger"
+out of sample (walk-forward AUC ≥ 0.55 and a threshold that improves
+returns). Otherwise every setup is listed and the message says the filter is
+off. Training re-checks this every run.
+
+Locally (needs internet access to Yahoo Finance):
+
+```bash
+pip install -r requirements-train.txt
+cd scripts
+python build_dataset.py && python signal_model.py train
+python signal_model.py predict --input ~/Downloads/63_30_daily.csv --scanner 63_30_daily
+python signal_model.py predict --symbols KSB,ACI --scanner 63_30_daily
+python -m pytest ../tests    # offline tests, no network
+```
+
 ## Setup
 
 1. **Create a Telegram bot** (skip if you chose "no notifications" — you can

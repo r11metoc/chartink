@@ -122,6 +122,6 @@ def test_end_to_end_on_synthetic_prices(tmp_path, monkeypatch):
                         "marketcap": ["Midcap"] * 3, "sector": ["X"] * 3})
     monkeypatch.setattr(build_dataset, "load_hits", lambda *a, **k: hits.copy())
     res = signal_model.score_signals(new, prices, nifty)
-    assert set(res["action"]) <= {"BUY", "SKIP", "MISSED", "NO DATA"}
+    assert set(res["action"]) <= {"BUY", "SETUP", "SKIP", "TRIGGERED", "MISSED", "EXPIRED", "NO DATA"}
     assert res.loc[2, "action"] == "NO DATA"
     assert (res.loc[:1, "stop"] < res.loc[:1, "trigger"]).all()
