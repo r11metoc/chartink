@@ -25,7 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 import breakout_sim as bs
-from market_data import NIFTY_TICKER, fetch_daily
+from market_data import BENCHMARK_TICKERS, NIFTY_TICKER, fetch_daily
 
 ROOT = Path(__file__).resolve().parent.parent
 BACKTEST_DIR = ROOT / "data" / "backtest"
@@ -103,7 +103,8 @@ def main() -> int:
     print(f"{len(hits)} hits, {len(symbols)} symbols, prices from {start}")
 
     prices = fetch_daily(symbols, start)
-    nifty = fetch_daily([NIFTY_TICKER], start).get(NIFTY_TICKER)
+    indices = fetch_daily(BENCHMARK_TICKERS, start)
+    nifty = indices.get(NIFTY_TICKER)
     if nifty is None:
         print("WARNING: Nifty index data unavailable; market features will be blank")
 
@@ -111,6 +112,9 @@ def main() -> int:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     signals.to_csv(MODEL_DIR / "signals.csv", index=False, float_format="%.4f")
     paths.to_csv(MODEL_DIR / "paths.csv.gz", index=False, float_format="%.4f")
+    # Index closes, to judge trades against simply holding the market.
+    pd.DataFrame({t: df["Close"] for t, df in indices.items()}).rename_axis("date").to_csv(
+        MODEL_DIR / "index_closes.csv", float_format="%.2f")
     print(signals["data_status"].value_counts().to_string())
     print(f"Wrote {len(signals)} signals and {len(paths)} path rows to {MODEL_DIR}")
     return 0

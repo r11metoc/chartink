@@ -11,6 +11,8 @@ import time
 import pandas as pd
 
 NIFTY_TICKER = "^NSEI"
+# Nifty 50, Nifty 500, Nifty Midcap 50, Nifty Smallcap 100 (whichever Yahoo serves)
+BENCHMARK_TICKERS = [NIFTY_TICKER, "^CRSLDX", "^NSEMDCP50", "^CNXSC"]
 BATCH_SIZE = 50
 
 
