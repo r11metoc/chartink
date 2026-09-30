@@ -66,6 +66,19 @@ jobs:
         working-directory: scripts
         run: python horizon_returns.py
 
+      - name: Export daily prices after each signal (Excel)
+        if: inputs.mode == 'train'
+        working-directory: scripts
+        run: python export_daily_prices.py
+
+      - name: Upload the Excel file
+        if: inputs.mode == 'train'
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-prices-after-signal
+          path: reports/daily_prices_after_signal.xlsx
+          retention-days: 30
+
       - name: Commit dataset, model and report
         if: inputs.mode == 'train'
         run: |

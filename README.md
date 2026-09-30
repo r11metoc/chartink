@@ -127,6 +127,11 @@ tests the actual trade and scores new scanner results:
   Nifty 500, and compares 10/15/20% trailing stops with plain holding
   on the same trades: `reports/horizon_returns.md`, per-trade prices in
   `data/model/horizon_returns.csv`.
+  `export_daily_prices.py` writes `reports/daily_prices_after_signal.xlsx`:
+  every signal's trigger and entry, then daily Open/High/Low/Close for the
+  70 sessions after it (% vs trigger per day), plus a colour-coded grid of
+  closes. Train runs attach it to the run as the `daily-prices-after-signal`
+  artifact (Actions tab → the run → Artifacts); it isn't committed.
 - `mode=predict`: scores the symbols you type in (plus which scanner they
   came from), or the latest dashboard scan if left blank, and sends each
   setup to Telegram with its buy-above, stop and target levels, valid
