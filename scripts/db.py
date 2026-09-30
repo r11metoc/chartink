@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS breakouts (
 );
 CREATE INDEX IF NOT EXISTS idx_breakouts_detected_at ON breakouts(detected_at);
 
+CREATE TABLE IF NOT EXISTS slots (
+    slot TEXT PRIMARY KEY,          -- e.g. '2026-10-01 09:23' (IST)
+    run_id INTEGER NOT NULL REFERENCES runs(id)
+);
+
 CREATE TABLE IF NOT EXISTS backtest_hits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     scanner_name TEXT NOT NULL,
@@ -86,6 +91,14 @@ def connect() -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     _migrate(conn)
     return conn
+
+
+def slot_done(conn: sqlite3.Connection, slot: str) -> bool:
+    return conn.execute("SELECT 1 FROM slots WHERE slot = ?", (slot,)).fetchone() is not None
+
+
+def mark_slot_done(conn: sqlite3.Connection, slot: str, run_id: int) -> None:
+    conn.execute("INSERT OR IGNORE INTO slots (slot, run_id) VALUES (?, ?)", (slot, run_id))
 
 
 def create_run(conn: sqlite3.Connection) -> int:

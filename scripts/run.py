@@ -25,6 +25,16 @@ def main() -> int:
     send_snapshot = os.environ.get("CHARTINK_SEND_SNAPSHOT") == "1"
     send_digest = os.environ.get("CHARTINK_SEND_DIGEST") == "1"
     digest_days = int(os.environ.get("CHARTINK_DIGEST_DAYS") or "30")
+    slot = os.environ.get("CHARTINK_SLOT") or None
+
+    if slot:
+        # Two queued runs can pass the gate for the same slot; only the first scans.
+        conn = db.connect()
+        done = db.slot_done(conn, slot)
+        conn.close()
+        if done:
+            print(f"Slot {slot} was already scanned, skipping.")
+            return 0
 
     scans = scrape_dashboard(url, debug=debug)
     if not scans:
@@ -65,6 +75,8 @@ def main() -> int:
                 symbol = row["_symbol"]
                 trigger_lookup[(scan.scanner_name, symbol)] = db.trigger_row(conn, scan.scanner_name, symbol)
 
+    if slot:
+        db.mark_slot_done(conn, slot, run_id)
     conn.commit()
     conn.close()
 

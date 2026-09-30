@@ -2,11 +2,10 @@ name: Chartink breakout scan
 
 on:
   schedule:
-    # Mon-Fri 09:23, 12:23, 15:23 IST (03:53, 06:53, 09:53 UTC). Kept off the top
-    # of the hour, when GitHub's scheduler is busiest and delays runs the most.
-    - cron: "53 3 * * 1-5"
-    - cron: "53 6 * * 1-5"
-    - cron: "53 9 * * 1-5"
+    # GitHub starts scheduled runs hours late, so this fires every 15 minutes and
+    # scripts/slot_gate.py decides by the actual time: one scan per slot at
+    # 09:23, 12:23 and 15:23 IST, Mon-Fri. Every other run stops in seconds.
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       debug:
@@ -29,12 +28,34 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: chartink-scan
-  cancel-in-progress: false
-
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      slot: ${{ steps.gate.outputs.slot }}
+    steps:
+      - if: github.event_name == 'schedule'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          sparse-checkout: |
+            scripts
+            data
+
+      - id: gate
+        if: github.event_name == 'schedule'
+        working-directory: scripts
+        run: python3 slot_gate.py
+
   scan:
+    needs: gate
+    if: github.event_name != 'schedule' || needs.gate.outputs.slot != ''
+    # On the job, not the workflow, so the frequent gate runs never queue
+    # behind (or cancel) a real scan.
+    concurrency:
+      group: chartink-scan
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     # A normal run takes ~1 min. Without a limit, a hung apt/browser download
     # holds the concurrency group (and every queued scan) for GitHub's 6h default.
@@ -63,6 +84,7 @@ jobs:
           CHARTINK_SEND_SNAPSHOT: ${{ (github.event_name == 'schedule' || inputs.snap) && '1' || '0' }}
           CHARTINK_SEND_DIGEST: ${{ (github.event_name == 'schedule' || inputs.digest) && '1' || '0' }}
           CHARTINK_DIGEST_DAYS: ${{ inputs.days || '30' }}
+          CHARTINK_SLOT: ${{ needs.gate.outputs.slot }}
         working-directory: scripts
         run: python run.py
 

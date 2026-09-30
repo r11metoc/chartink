@@ -8,10 +8,11 @@ scanners (i.e. a fresh breakout).
 
 ## How it works
 
-- `.github/workflows/scan.yml` runs on a cron schedule (daily at 09:23,
-  12:23 and 15:23 IST, Mon–Fri) and can also be triggered manually from
-  the Actions tab. Every scheduled run automatically sends the breakout
-  alert (if any), the snapshot, sectors and digest, all together — no manual inputs needed for that. Manual runs still only
+- `.github/workflows/scan.yml` scans at 09:23, 12:23 and 15:23 IST, Mon–Fri
+  (see "Changing the schedule" for how) and can also be triggered manually
+  from the Actions tab. Every scheduled scan automatically sends the breakout
+  alert (if any), the snapshot, sectors and digest, all together — no manual
+  inputs needed for that. Manual runs still only
   send the extras you explicitly opt into via the `snap`/`digest` inputs,
   so you can trigger a quick breakout-only check without the noise.
 - `scripts/scrape_dashboard.py` opens the dashboard in a headless Chromium
@@ -203,9 +204,19 @@ characters to fit in a single Telegram message; narrow your query
 
 ## Changing the schedule
 
-Edit the `cron` entries in `.github/workflows/scan.yml`. They're in UTC;
-the defaults fire at 09:23, 12:23 and 15:23 IST on weekdays. They're kept
-off the top of the hour on purpose: GitHub queues scheduled runs and is
-busiest on the hour, so on-the-hour schedules tend to start later.
-Scheduled runs can still be late (sometimes by hours), and they only run
+GitHub starts scheduled runs late — often 5–8 hours late for this repo — so
+a plain cron at the scan times delivers everything after market close.
+Instead, the workflow's cron fires every 15 minutes and a small `gate` job
+(`scripts/slot_gate.py`) checks the actual time in IST:
+
+- inside a slot's window (09:23, 12:23 or 15:23 IST + 90 minutes, Mon–Fri)
+  and that slot hasn't been scanned yet → the `scan` job runs and records the
+  slot in the `slots` table
+- otherwise → the run stops after a few seconds and the `scan` job shows as
+  skipped
+
+So each slot is scanned once, by the first scheduled run to arrive in its
+window, however late GitHub is running. That also means the Actions tab
+shows many short gate-only runs; that's expected. To change the times, edit
+`SLOTS` (and `WINDOW`) in `scripts/slot_gate.py`. Scheduled runs only come
 from the repository's default branch.
