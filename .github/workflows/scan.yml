@@ -37,7 +37,11 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
+      # Branch head, not the triggering commit: a run queued behind another
+      # must start from the database that run just pushed.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
