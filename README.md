@@ -117,11 +117,15 @@ tests the actual trade and scores new scanner results:
   low (2–8% below entry), **target** = 2× risk, else exit after 20 sessions.
   After 0.25% round-trip costs. Logic in `scripts/breakout_sim.py`.
 - `mode=train`: `build_dataset.py` fetches Yahoo prices for every backtest
-  hit and stores features + the 40 sessions after each signal in
+  hit and stores features + the 70 sessions after each signal in
   `data/model/`; `signal_model.py train` simulates every trade, compares it
   with holding the Nifty 500, compares a fixed set of exit rules, and
   walk-forward-validates a model that tries to pick the winning triggers.
   Full results: `reports/signal_model_report.md`.
+  `horizon_returns.py` then shows where each stock was 2, 4, 6, 8 and 12
+  weeks after crossing the trigger (plain hold, no stop), against the
+  Nifty 500: `reports/horizon_returns.md`, per-trade prices in
+  `data/model/horizon_returns.csv`.
 - `mode=predict`: scores the symbols you type in (plus which scanner they
   came from), or the latest dashboard scan if left blank, and sends each
   setup to Telegram with its buy-above, stop and target levels, valid

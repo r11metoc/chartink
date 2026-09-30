@@ -117,6 +117,12 @@ def test_end_to_end_on_synthetic_prices(tmp_path, monkeypatch):
     assert signal_model.train() == 0
     assert "Does buying every trigger make money" in (tmp_path / "report.md").read_text()
 
+    import horizon_returns
+    horizon_df = horizon_returns.horizon_rows(signals, signal_model.load_dataset()[1], None)
+    assert len(horizon_df) > 0 and "ret_12w" in horizon_df
+    first = horizon_df.dropna(subset=["ret_2w"]).iloc[0]
+    assert np.isclose(first["ret_2w"], (first["price_2w"] / first["entry_price"] - 1) * 100)
+
     new = pd.DataFrame({"scanner_name": ["63_30_daily", "Wkly_upswing", "63_30_daily"],
                         "symbol": ["S1", "S2", "NOPE"], "hit_date": [pd.NaT] * 3,
                         "marketcap": ["Midcap"] * 3, "sector": ["X"] * 3})

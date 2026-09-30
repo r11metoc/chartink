@@ -32,7 +32,7 @@ import pandas as pd
 
 DAILY_ENTRY_WINDOW = 3
 WEEKLY_ENTRY_WINDOW = 5
-FORWARD_DAYS = 40          # sessions of price path stored after the signal bar
+FORWARD_DAYS = 70          # sessions stored after the signal bar (12 weeks after a late entry)
 COST_PCT = 0.25            # round-trip brokerage + taxes + slippage, in %
 
 WEEKLY_SCANNERS = {"Wkly_upswing"}

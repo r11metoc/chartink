@@ -61,12 +61,17 @@ jobs:
         working-directory: scripts
         run: python signal_model.py train
 
+      - name: Price 2-12 weeks after the trigger
+        if: inputs.mode == 'train'
+        working-directory: scripts
+        run: python horizon_returns.py
+
       - name: Commit dataset, model and report
         if: inputs.mode == 'train'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/model reports/signal_model_report.md
+          git add data/model reports/signal_model_report.md reports/horizon_returns.md
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
