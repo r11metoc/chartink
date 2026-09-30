@@ -1,0 +1,95 @@
+{
+  "trained_at": "2026-09-30T16:02:18+00:00",
+  "model_kind": "logreg",
+  "auc": {
+    "logreg": 0.4991437513532665,
+    "hgb": 0.48356068211194875
+  },
+  "threshold": 0.0,
+  "train_trades": 960,
+  "rule": {
+    "max_risk_pct": 8.0,
+    "min_risk_pct": 2.0,
+    "target_r": 2.0,
+    "max_hold": 20
+  },
+  "entry_window": {
+    "daily": 3,
+    "weekly": 5
+  },
+  "features": [
+    "ret_1d",
+    "ret_5d",
+    "ret_20d",
+    "ret_60d",
+    "dist_sma20",
+    "dist_sma50",
+    "dist_sma200",
+    "rsi14",
+    "atr_pct",
+    "vol_ratio",
+    "dist_52w_high",
+    "log_turnover",
+    "up_days_10",
+    "bar_range_pct",
+    "close_pos_in_bar",
+    "trigger_gap_pct",
+    "bar_risk_pct",
+    "nifty_ret_20d",
+    "nifty_dist_sma50",
+    "prior_hits_same_scanner_180d",
+    "other_scanner_hits_10d",
+    "scanner_name",
+    "marketcap"
+  ],
+  "raw_performance": {
+    "63_30_daily": {
+      "n": 273,
+      "win_rate": 0.37362637362637363,
+      "avg_ret": 0.026410095156183786,
+      "median_ret": -5.009269507470942,
+      "avg_win": 11.654191324987762,
+      "avg_loss": -6.909459410357389,
+      "profit_factor": 1.006102284237482,
+      "avg_r": 0.03845892706613609,
+      "avg_hold": 7.172161172161172,
+      "t_stat": 0.04440752854315939
+    },
+    "Bullish_Scanner": {
+      "n": 170,
+      "win_rate": 0.3941176470588235,
+      "avg_ret": 0.2808009421207766,
+      "median_ret": -3.2436012129427647,
+      "avg_win": 9.891235185848208,
+      "avg_loss": -5.970646575643668,
+      "profit_factor": 1.0776227264107106,
+      "avg_r": 0.09460762622865737,
+      "avg_hold": 8.717647058823529,
+      "t_stat": 0.41183916522193176
+    },
+    "Wkly_upswing": {
+      "n": 517,
+      "win_rate": 0.3655705996131528,
+      "avg_ret": -0.3423792099777461,
+      "median_ret": -8.249999999999986,
+      "avg_win": 12.428563787006487,
+      "avg_loss": -7.70124575397171,
+      "profit_factor": 0.9299250006327149,
+      "avg_r": -0.0035002389806924384,
+      "avg_hold": 9.164410058027078,
+      "t_stat": -0.7322014611405337
+    }
+  },
+  "oos_buy_performance": {
+    "n": 806,
+    "win_rate": 0.3759305210918114,
+    "avg_ret": -0.0660601585323625,
+    "median_ret": -5.006258130358848,
+    "avg_win": 11.529541701374866,
+    "avg_loss": -7.051084738158387,
+    "profit_factor": 0.9849875790221778,
+    "avg_r": 0.035344160109367806,
+    "avg_hold": 8.517369727047146,
+    "t_stat": -0.18951117947606944
+  }
+}
