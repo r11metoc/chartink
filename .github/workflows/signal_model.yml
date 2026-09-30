@@ -1,0 +1,64 @@
+name: Scanner signal model
+
+# Rebuilds the trade dataset from data/backtest/*.csv with fresh Yahoo prices,
+# retrains the signal model and commits the dataset, model and report.
+# Re-run after dropping new Chartink backtest exports into data/backtest/.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [claude/magical-faraday-zbb4zi]
+    paths:
+      - "scripts/breakout_sim.py"
+      - "scripts/build_dataset.py"
+      - "scripts/market_data.py"
+      - "scripts/signal_model.py"
+      - "data/backtest/**"
+      - ".github/workflows/signal_model.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: signal-model
+  cancel-in-progress: false
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements-train.txt pytest
+
+      - name: Offline tests
+        run: python -m pytest tests/ -q
+
+      - name: Build dataset (fetches prices)
+        working-directory: scripts
+        run: python build_dataset.py
+
+      - name: Train and report
+        working-directory: scripts
+        run: python signal_model.py train
+
+      - name: Commit dataset, model and report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/model reports/signal_model_report.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update signal model $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git pull --rebase origin "${{ github.ref_name }}"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
