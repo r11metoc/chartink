@@ -135,11 +135,11 @@ def _buy_hold_tables(items: list[dict]) -> str:
         if not group:
             continue
         group.sort(key=lambda i: move(i) if move(i) is not None else float("-inf"), reverse=True)
-        lines = [f"{'Symbol':<10} {'Trig':>8} {'Now':>8} {'Chg':>6}"]
+        lines = [f"{'Symbol':<10} {'Trig':>8} {'Now':>8} {'Chg':>7}"]
         for i in group:
             m = move(i)
-            chg = f"{m:+.1f}%" if m is not None else "-"
-            lines.append(f"{i['symbol'][:10]:<10} {_fmt_price(i['trig']):>8} {_fmt_price(i['now']):>8} {chg:>6}{i.get('mark', '')}")
+            chg = f"{m:+.2f}%" if m is not None else "-"
+            lines.append(f"{i['symbol'][:10]:<10} {_fmt_price(i['trig']):>8} {_fmt_price(i['now']):>8} {chg:>7}{i.get('mark', '')}")
         parts.append(f"{title} ({len(group)})\n<pre>" + html.escape("\n".join(lines)) + "</pre>")
     return "\n".join(parts)
 
