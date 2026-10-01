@@ -66,6 +66,17 @@ def test_stop_and_target_are_pessimistic():
     assert res["exit_reason"] == "stop_gap" and res["exit_price"] == 90
 
 
+def test_trailing_stop_ratchets_up_from_highest_close():
+    rule = bs.ExitRule(max_risk_pct=10, min_risk_pct=10, target_r=0, max_hold=10, trail_pct=10)
+    # Entry at 100, closes rise to 130, then a drop through 117 (10% below 130).
+    path = _frame([[99, 101, 99, 100], [100, 121, 100, 120], [120, 131, 120, 130],
+                   [130, 131, 118, 119], [119, 119, 110, 112]])
+    res = bs.simulate_trade(path, 100, 90, 3, rule)
+    assert res["exit_reason"] == "stop" and res["exit_offset"] == 4
+    assert np.isclose(res["exit_price"], 117)
+    assert res["stop"] == 90 and np.isclose(res["final_stop"], 117)
+
+
 def test_history_features_ignore_future_hits():
     hits = pd.DataFrame({
         "scanner_name": ["A", "A", "B", "A"],
@@ -116,6 +127,12 @@ def test_end_to_end_on_synthetic_prices(tmp_path, monkeypatch):
     paths.to_csv(tmp_path / "paths.csv.gz", index=False)
     assert signal_model.train() == 0
     assert "Does buying every trigger make money" in (tmp_path / "report.md").read_text()
+
+    import horizon_returns
+    horizon_df = horizon_returns.horizon_rows(signals, signal_model.load_dataset()[1], None)
+    assert len(horizon_df) > 0 and "ret_12w" in horizon_df
+    first = horizon_df.dropna(subset=["ret_2w"]).iloc[0]
+    assert np.isclose(first["ret_2w"], (first["price_2w"] / first["entry_price"] - 1) * 100)
 
     new = pd.DataFrame({"scanner_name": ["63_30_daily", "Wkly_upswing", "63_30_daily"],
                         "symbol": ["S1", "S2", "NOPE"], "hit_date": [pd.NaT] * 3,

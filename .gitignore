@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 debug/
 .venv/
+reports/daily_prices_after_signal.xlsx

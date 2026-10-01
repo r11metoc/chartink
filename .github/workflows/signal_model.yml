@@ -61,12 +61,30 @@ jobs:
         working-directory: scripts
         run: python signal_model.py train
 
+      - name: Price 2-12 weeks after the trigger
+        if: inputs.mode == 'train'
+        working-directory: scripts
+        run: python horizon_returns.py
+
+      - name: Export daily prices after each signal (Excel)
+        if: inputs.mode == 'train'
+        working-directory: scripts
+        run: python export_daily_prices.py
+
+      - name: Upload the Excel file
+        if: inputs.mode == 'train'
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-prices-after-signal
+          path: reports/daily_prices_after_signal.xlsx
+          retention-days: 30
+
       - name: Commit dataset, model and report
         if: inputs.mode == 'train'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/model reports/signal_model_report.md
+          git add data/model reports/signal_model_report.md reports/horizon_returns.md
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
