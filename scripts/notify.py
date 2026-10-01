@@ -99,6 +99,15 @@ def _stock_line(icon: str, symbol: str, row: dict) -> str:
     return line + (f" ₹{price:.2f}" if price is not None else "")
 
 
+def _track_line(track: dict | None) -> str:
+    """How similar setups did in the backtest (track_record.TrackRecord.lookup)."""
+    if not track:
+        return ""
+    vs = f", {track['vs_index']:+.1f}% vs Nifty 500" if track["vs_index"] is not None else ""
+    return ("     " + html.escape(f"📊 Past {track['group']}: {track['n']} trades, {track['win']}% won, "
+                                 f"avg {track['avg']:+.1f}%{vs}"))
+
+
 def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
     """breakouts: list of (scanner_name, kind, row) - row must include '_symbol'.
     kind is 'fresh' (never seen before) or 'retest' (re-triggered after a gap)."""
@@ -112,6 +121,7 @@ def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
         for kind, row in sorted(kind_rows, key=lambda kr: _num(_col(kr[1], "%")) or 0, reverse=True):
             lines.append(_stock_line(_KIND_ICON.get(kind, "🚀"), row["_symbol"], row))
             lines.append(_details(row, row.get("_backtest_hits")))
+            lines.append(_track_line(row.get("_track")))
         blocks.append("\n".join(filter(None, lines)))
     blocks.append("🚀 first time on this scanner · 🔁 back after dropping off")
     return "\n\n".join(blocks)
@@ -206,7 +216,33 @@ def _sector_momentum_block(m: dict, limit: int = 8) -> str:
     )
 
 
-def format_digest_message(entries: list[dict], days: int, sector_momentum: dict | None = None) -> str:
+def _paper_block(paper: dict) -> str:
+    """Compact table of paper.summarize(): closed trades, win rate, average
+    return and open trades per scanner, then rupee totals. paper =
+    {"start": ISO date, "stake": rupees, "summary": [...]}"""
+    summary = paper["summary"]
+    if not summary or not summary[0]["signals"]:
+        return ""
+    lines = [f"{'Scanner':<15}{'Done':>5}{'Won':>5}{'Avg':>7}{'Open':>5}"]
+    for g in summary:
+        name = "All" if g["group"] == "All scanners" else g["group"]
+        won = f"{g['win']}%" if g["win"] is not None else "-"
+        avg = f"{g['avg']:+.1f}%" if g["avg"] is not None else "-"
+        lines.append(f"{name[:15]:<15}{g['closed']:>5}{won:>5}{avg:>7}{g['open']:>5}")
+    total = summary[0]
+    vs = f" · vs Nifty 500 {total['vs_index']:+.1f}%" if total["vs_index"] is not None else ""
+    since = datetime.fromisoformat(paper["start"]).strftime("%d %b")
+    rupees = lambda v: f"{'+' if v > 0 else '−' if v < 0 else ''}₹{abs(v):,}"
+    return (
+        f"<b>📒 Paper portfolio</b> (since {since}, ₹{paper['stake'] / 100_000:g}L a trade)\n"
+        "<pre>" + html.escape("\n".join(lines)) + "</pre>\n"
+        + html.escape(f"Closed P&L {rupees(total['closed_pnl'])} · open {rupees(total['open_pnl'])}{vs} · "
+                      f"{total['waiting']} waiting for entry")
+    )
+
+
+def format_digest_message(entries: list[dict], days: int, sector_momentum: dict | None = None,
+                          paper: dict | None = None) -> str:
     """Stocks that triggered on a scanner in the last `days`, as BUY / HOLD
     tables per scanner, then the sector momentum table if given. entries come
     from db.breakouts_since() (newest first) with _current_row (latest scraped
@@ -230,6 +266,8 @@ def format_digest_message(entries: list[dict], days: int, sector_momentum: dict 
         blocks.append(f"<b>{html.escape(scanner_name)}</b> ({len(items)})\n{_buy_hold_tables(items)}")
     if any_off:
         blocks.append("<i>* no longer on the scanner - price is the latest daily close</i>")
+    if paper and (block := _paper_block(paper)):
+        blocks.append(block)
     if sector_momentum and (block := _sector_momentum_block(sector_momentum)):
         blocks.append(block)
     return "\n\n".join(blocks)

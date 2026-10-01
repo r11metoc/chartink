@@ -6,6 +6,9 @@ Three views:
              using daily prices (refresh_prices.py) when available, else the
              last scan price
   sectors    backtest picks per sector, last 7 and 30 days
+  paper      every trigger since paper.PAPER_START traded on paper under the
+             backtest's rule, with a summary per scanner
+  track      on stock rows: how similar past setups did in the backtest
   sector_momentum
              all scanners combined: distinct stocks picked per sector in the
              last 2 weeks vs the 2 before, scanners agreeing, average move
@@ -19,6 +22,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import db
+import paper
+import track_record
 from notify import _col, _num, _price
 from slot_gate import IST, SLOTS
 
@@ -51,7 +56,12 @@ def trigger_info(conn, scanner: str, symbol: str) -> tuple[dict | None, str | No
     return (db._load_row(r[0]), r[1]) if r else (None, None)
 
 
-def scanners_view(conn, latest_run: int) -> list[dict]:
+def track_for(conn, rec: track_record.TrackRecord, scanner: str, symbol: str, day: str,
+              mcap_cr: float | None = None) -> dict | None:
+    return rec.lookup(scanner, track_record.tier_of(conn, symbol, mcap_cr), track_record.regime_on(conn, day))
+
+
+def scanners_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[dict]:
     names = set(db.distinct_backtest_scanners(conn))
     names |= {n for (n,) in conn.execute("SELECT DISTINCT scanner_name FROM results WHERE run_id = ?", (latest_run,))}
     out = []
@@ -65,6 +75,7 @@ def scanners_view(conn, latest_run: int) -> list[dict]:
             chg = _pct(trig, now)
             rows.append({
                 "symbol": symbol,
+                "track": track_for(conn, rec, name, symbol, date.today().isoformat(), _num(_col(row, "mcap"))),
                 "industry": _col(row, "industry"),
                 "now": now,
                 "day_chg": _num(_col(row, "%")),
@@ -78,7 +89,7 @@ def scanners_view(conn, latest_run: int) -> list[dict]:
     return out
 
 
-def breakouts_view(conn, latest_run: int) -> list[dict]:
+def breakouts_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[dict]:
     since = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)).isoformat()
     on_scan = {(n, s) for n, s in conn.execute(
         "SELECT scanner_name, symbol FROM results WHERE run_id = ?", (latest_run,))}
@@ -117,6 +128,7 @@ def breakouts_view(conn, latest_run: int) -> list[dict]:
             "days": days,
             "on_scan": (name, symbol) in on_scan,
             "status": "BUY" if chg is not None and chg > 0 else "HOLD",
+            "track": track_for(conn, rec, name, symbol, when.date().isoformat(), _num(_col(e, "mcap"))),
         })
     return out
 
@@ -210,17 +222,21 @@ def sector_momentum_view(conn, today: date) -> dict:
 def main() -> int:
     conn = db.connect()
     latest_run, last_scan = conn.execute("SELECT id, run_at FROM runs ORDER BY id DESC LIMIT 1").fetchone()
-    breakouts = breakouts_view(conn, latest_run)
+    rec = track_record.TrackRecord()
+    breakouts = breakouts_view(conn, latest_run, rec)
+    trades = paper.paper_trades(conn)
     data = {
         "generated_at": datetime.now(IST).isoformat(timespec="minutes"),
         "last_scan": _ist(last_scan).isoformat(timespec="minutes"),
         "slots": list(SLOTS),
         "window_days": WINDOW_DAYS,
-        "scanners": scanners_view(conn, latest_run),
+        "scanners": scanners_view(conn, latest_run, rec),
         "breakouts": breakouts,
         "stats": stats_view(breakouts),
         "sectors": sectors_view(conn),
         "sector_momentum": sector_momentum_view(conn, datetime.now(IST).date()),
+        "paper": {"start": paper.PAPER_START, "stake": paper.STAKE,
+                  "summary": paper.summarize(trades), "trades": trades[::-1]},
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)

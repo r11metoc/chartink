@@ -81,6 +81,21 @@ after every scan (open it on your iPhone and use Share → Add to Home Screen):
   agree, the average move of those picks since they were picked, and an
   8-week bar chart; then the per-scanner backtest tables
 
+- **Paper**: the forward test. Every trigger since 25 Sep 2026 (live
+  triggers plus backtest-export hits from that date on) is traded on paper
+  with the backtest's own rule from `breakout_sim.py`: buy above the signal
+  candle's high within 3 sessions (5 after a weekly signal), stop at its low
+  (kept 2–8% below entry), target 2× the risk, out after 20 sessions, 0.25%
+  costs, ₹1L a trade. Shows each trade and, per scanner, win rate, average
+  return, return vs the Nifty 500 and P&L (`scripts/paper.py`).
+
+Every stock row (Now, Breakouts) and every Telegram breakout alert also shows
+**how similar past setups did** in the backtest (`scripts/track_record.py`,
+from `data/model/trades.csv`): same scanner, market-cap tier and market
+regime (Nifty 50 above/below its 50-day average), falling back to scanner ×
+tier and then the scanner alone when a group has fewer than 20 trades. The
+Telegram digest also carries a paper portfolio summary.
+
 Each scan runs `scripts/refresh_prices.py`, which fetches daily prices from
 Yahoo Finance (`daily_prices` table) for every stock that triggered in the
 last 120 days, so a stock keeps being tracked after it drops off its scanner.

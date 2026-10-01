@@ -1,7 +1,8 @@
 """Fetch daily prices from Yahoo Finance for every stock the dashboard tracks.
 
 Tracked = triggered on any scanner in the last TRACK_DAYS, everything on a
-scanner in the latest scan, and backtest picks from the last BACKTEST_DAYS.
+scanner in the latest scan, backtest picks from the last BACKTEST_DAYS, and
+the Nifty 50 / Nifty 500 indexes.
 Scan prices alone go stale once a stock drops off its scanner; these daily
 bars keep its performance current.
 """
@@ -14,8 +15,12 @@ import db
 from market_data import fetch_daily
 
 TRACK_DAYS = 120
-# Backtest picks feed the sector view's "average move since pick" (last 4 weeks).
-BACKTEST_DAYS = 35
+# Backtest picks feed the sector view's "average move since pick" and the paper
+# portfolio (3-5 session entry window + 20 session hold).
+BACKTEST_DAYS = 60
+# Nifty 50 for the market regime (50-day average), Nifty 500 for "vs index".
+BENCHMARKS = ["^NSEI", "^CRSLDX"]
+BENCHMARK_DAYS = 120
 
 
 def tracked_symbols(conn) -> tuple[list[str], str]:
@@ -38,7 +43,9 @@ def main() -> int:
         return 0
     print(f"Fetching daily prices for {len(symbols)} symbols since {start}")
     end = (date.today() + timedelta(days=1)).isoformat()  # yfinance's end is exclusive
-    for symbol, df in fetch_daily(symbols, start, end).items():
+    fetched = fetch_daily(symbols, start, end)
+    fetched.update(fetch_daily(BENCHMARKS, (date.today() - timedelta(days=BENCHMARK_DAYS)).isoformat(), end))
+    for symbol, df in fetched.items():
         bars = [(d.date().isoformat(), float(r.Open), float(r.High), float(r.Low), float(r.Close))
                 for d, r in df.iterrows()]
         db.save_daily_prices(conn, symbol, bars)

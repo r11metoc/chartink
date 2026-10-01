@@ -51,6 +51,8 @@
   .pill { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 8px; letter-spacing: .02em; }
   .pill.BUY { color: var(--buy); background: var(--buy-bg); }
   .pill.HOLD { color: var(--hold); background: var(--hold-bg); }
+  .pill.WAIT { color: var(--muted); background: var(--chip); }
+  .track { margin-top: 2px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
   .stat b { display: block; font-size: 13px; margin-bottom: 6px; }
@@ -87,6 +89,7 @@
   <button data-tab="now" class="on">Now</button>
   <button data-tab="breakouts">Breakouts</button>
   <button data-tab="sectors">Sectors</button>
+  <button data-tab="paper">Paper</button>
 </nav>
 <main id="view"></main>
 <footer>BUY = price above its trigger price · HOLD = at or below. A mechanical rule, not advice.</footer>
@@ -101,6 +104,48 @@ const cls = (v) => (v == null || v === 0 ? "" : v > 0 ? "up" : "down");
 const fmtDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 const fmtWhen = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
 
+function trackLine(t) {
+  if (!t) return "";
+  return `<div class="meta track">📊 Past ${esc(t.group)}: ${t.n} trades, ${t.win}% won, avg <span class="${cls(t.avg)}">${pct(t.avg)}</span></div>`;
+}
+
+const STATUS = { open: "OPEN", closed: "DONE", waiting: "WAIT", "not filled": "SKIP", "no prices yet": "WAIT" };
+const REASON = { stop: "stop", stop_gap: "stop (gap)", target: "target", target_gap: "target (gap)", time: "20 days", open: "now" };
+const rupees = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + "₹" + Math.abs(v).toLocaleString("en-IN");
+
+function renderPaper(d) {
+  const p = d.paper;
+  if (!p || !p.trades.length) return `<section class="card"><div class="empty">No paper trades yet.</div></section>`;
+  const cards = p.summary.map((g) => `
+    <div class="stat"><b>${esc(g.group)}</b>
+      <div><span>Closed</span><span>${g.closed}${g.win != null ? " · " + g.win + "% won" : ""}</span></div>
+      <div><span>Avg return</span><span class="${cls(g.avg)}">${pct(g.avg)}</span></div>
+      <div><span>vs Nifty 500</span><span class="${cls(g.vs_index)}">${pct(g.vs_index)}</span></div>
+      <div><span>Closed P&amp;L</span><span class="${cls(g.closed_pnl)}">${rupees(g.closed_pnl)}</span></div>
+      <div><span>Open (${g.open})</span><span class="${cls(g.open_pnl)}">${rupees(g.open_pnl)}</span></div>
+      <div><span>Waiting / skipped</span><span>${g.waiting} / ${g.not_filled}</span></div>
+    </div>`).join("");
+  const rows = p.trades.map((t) => {
+    const detail = t.entry != null
+      ? `bought ${money(t.entry)} ${fmtDate(t.entry_date)} → ${REASON[t.exit_reason] || t.exit_reason} ${money(t.exit)} · stop ${money(t.stop)} · target ${money(t.target)}`
+      : t.trigger != null ? `buy above ${money(t.trigger)}` : "waiting for prices";
+    return `
+      <div class="row">
+        <div><div class="sym">${esc(t.symbol)}</div>
+          <div class="meta">${esc(t.scanner)} · signal ${fmtDate(t.date)}${t.source !== "live" ? " · " + esc(t.source) : ""}</div>
+          <div class="meta">${detail}</div></div>
+        <div class="num">${t.ret != null ? `<div class="chg ${cls(t.ret)}">${pct(t.ret)}</div><div class="tiny ${cls(t.pnl)}">${rupees(t.pnl)}</div>` : ""}</div>
+        <span class="pill ${t.status === "open" || t.status === "closed" ? (t.ret > 0 ? "BUY" : "HOLD") : "WAIT"}">${STATUS[t.status] || esc(t.status)}</span>
+      </div>`;
+  }).join("");
+  return `
+    <section class="card"><div class="note" style="padding-top:12px">Every trigger since ${fmtDate(p.start)}, traded on paper with the backtest's rule:
+      buy above the signal candle's high within 3 sessions (5 for weekly), stop at its low (2–8%), target 2× the risk,
+      exit after 20 sessions. ₹${p.stake / 100000}L a trade, after 0.25% costs.</div></section>
+    <div class="stats">${cards}</div>
+    <section class="card"><h2>Trades <small>${p.trades.length}</small></h2>${rows}</section>`;
+}
+
 function renderNow(d) {
   return d.scanners.map((s) => `
     <section class="card">
@@ -108,7 +153,7 @@ function renderNow(d) {
       ${s.rows.length ? s.rows.map((r) => `
         <div class="row">
           <div><div class="sym">${esc(r.symbol)}</div>
-            <div class="meta">${money(r.now)} · trig ${money(r.trigger)}${r.trigger_date ? " on " + fmtDate(r.trigger_date) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div></div>
+            <div class="meta">${money(r.now)} · trig ${money(r.trigger)}${r.trigger_date ? " on " + fmtDate(r.trigger_date) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div>${trackLine(r.track)}</div>
           <div class="num chg ${cls(r.chg)}">${pct(r.chg)}</div>
           <span class="pill ${r.status}">${r.status}</span>
         </div>`).join("") : `<div class="empty">No stocks on this scanner right now.</div>`}
@@ -136,7 +181,7 @@ function renderBreakouts(d) {
       ${rows.length ? rows.map((b) => `
         <div class="row">
           <div><div class="sym">${esc(b.symbol)}${b.on_scan ? '<span class="dot" title="still on the scanner"></span>' : ""}</div>
-            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · ${money(b.trigger)} → ${money(b.now)}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div></div>
+            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · ${money(b.trigger)} → ${money(b.now)}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div>${trackLine(b.track)}</div>
           <div class="num chg ${cls(b.chg)}">${pct(b.chg)}</div>
           <span class="pill ${b.status}">${b.status}</span>
         </div>`).join("") : `<div class="empty">No triggers match.</div>`}
@@ -187,7 +232,7 @@ function renderSectors(d) {
 function render() {
   const d = state.data;
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
-  $("#view").innerHTML = { now: renderNow, breakouts: renderBreakouts, sectors: renderSectors }[state.tab](d);
+  $("#view").innerHTML = { now: renderNow, breakouts: renderBreakouts, sectors: renderSectors, paper: renderPaper }[state.tab](d);
 }
 
 document.addEventListener("click", (e) => {

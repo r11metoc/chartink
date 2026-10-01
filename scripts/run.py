@@ -8,13 +8,17 @@ from datetime import datetime, timedelta, timezone
 
 import db
 from notify import (
+    _col,
+    _num,
     format_breakout_message,
     format_digest_message,
     format_scan_message,
     format_sector_focus_message,
     send_telegram_message,
 )
-from export_dashboard import sector_momentum_view
+import paper
+import track_record
+from export_dashboard import sector_momentum_view, track_for
 from scrape_dashboard import scrape_dashboard
 from slot_gate import IST, current_slot
 
@@ -50,6 +54,8 @@ def main() -> int:
     run_id = db.create_run(conn)
 
     new_breakouts: list[tuple[str, str, dict]] = []
+    rec = track_record.TrackRecord()
+    today = datetime.now(IST).date().isoformat()
 
     for scan in scans:
         print(f"Scanner '{scan.scanner_name}': {len(scan.rows)} rows")
@@ -70,6 +76,7 @@ def main() -> int:
 
             row["_backtest_hits"] = db.backtest_history(conn, scan.scanner_name, symbol)
             db.record_breakout(conn, run_id, scan.scanner_name, symbol, row, kind=kind)
+            row["_track"] = track_for(conn, rec, scan.scanner_name, symbol, today, _num(_col(row, "mcap")))
             new_breakouts.append((scan.scanner_name, kind, row))
             print(f"  {kind}: {symbol}")
 
@@ -118,9 +125,11 @@ def main() -> int:
             }
 
         momentum = sector_momentum_view(digest_conn, datetime.now(IST).date())
+        book = {"start": paper.PAPER_START, "stake": paper.STAKE,
+                "summary": paper.summarize(paper.paper_trades(digest_conn))}
         digest_conn.close()
         send_telegram_message(format_sector_focus_message(sector_focus))
-        send_telegram_message(format_digest_message(entries, digest_days, momentum))
+        send_telegram_message(format_digest_message(entries, digest_days, momentum, book))
 
     return 0
 
