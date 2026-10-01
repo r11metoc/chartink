@@ -81,10 +81,14 @@ def breakouts_view(conn, latest_run: int) -> list[dict]:
         trig = _price(e)
         when = _ist(e["detected_at"])
         bars = db.daily_prices_since(conn, symbol, when.date().isoformat())
+        # Best/worst count from the next session: the trigger day's high or low
+        # may have come before the stock triggered.
+        after = [b for b in bars if b[0] > when.date().isoformat()]
         if bars:
             now, now_date = round(bars[-1][4], 2), bars[-1][0]
-            best, worst = max(b[2] for b in bars), min(b[3] for b in bars)
-            days = len(bars) - 1
+            best = max(b[2] for b in after) if after else None
+            worst = min(b[3] for b in after) if after else None
+            days = len(after)
         else:
             current = db.latest_row(conn, name, symbol)
             now, now_date = _price(current), None
