@@ -17,6 +17,7 @@ from notify import (
     send_telegram_message,
 )
 import paper
+import policy
 import track_record
 from export_dashboard import sector_momentum_view, track_for
 from scrape_dashboard import scrape_dashboard
@@ -77,6 +78,7 @@ def main() -> int:
             row["_backtest_hits"] = db.backtest_history(conn, scan.scanner_name, symbol)
             db.record_breakout(conn, run_id, scan.scanner_name, symbol, row, kind=kind)
             row["_track"] = track_for(conn, rec, scan.scanner_name, symbol, today, _num(_col(row, "mcap")))
+            row["_learned"] = policy.verdict(conn, scan.scanner_name, symbol, today, _num(_col(row, "mcap")))
             new_breakouts.append((scan.scanner_name, kind, row))
             print(f"  {kind}: {symbol}")
 
@@ -126,7 +128,9 @@ def main() -> int:
 
         momentum = sector_momentum_view(digest_conn, datetime.now(IST).date())
         book = {"start": paper.PAPER_START, "stake": paper.STAKE,
-                "summary": paper.summarize(paper.paper_trades(digest_conn))}
+                "summary": paper.summarize(paper.paper_trades(digest_conn)),
+                "learned": {"start": paper.learned_start(),
+                            "summary": paper.summarize(paper.paper_trades(digest_conn, "learned"))}}
         digest_conn.close()
         send_telegram_message(format_sector_focus_message(sector_focus))
         send_telegram_message(format_digest_message(entries, digest_days, momentum, book))

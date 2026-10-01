@@ -16,8 +16,8 @@ from market_data import fetch_daily
 
 TRACK_DAYS = 120
 # Backtest picks feed the sector view's "average move since pick" and the paper
-# portfolio (3-5 session entry window + 20 session hold).
-BACKTEST_DAYS = 60
+# portfolio (3-5 session entry window + up to 40 sessions held by a learned rule).
+BACKTEST_DAYS = 90
 # Nifty 50 for the market regime (50-day average), Nifty 500 for "vs index".
 BENCHMARKS = ["^NSEI", "^CRSLDX"]
 BENCHMARK_DAYS = 120

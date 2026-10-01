@@ -108,6 +108,16 @@ def _track_line(track: dict | None) -> str:
                                  f"avg {track['avg']:+.1f}%{vs}"))
 
 
+def _learned_line(learned: dict | None) -> str:
+    """The learned call on a signal (policy.verdict)."""
+    if not learned:
+        return ""
+    if not learned["take"]:
+        return "     " + html.escape(f"🧠 Skip: {learned['why']}")
+    note = f" ({learned['status']})" if learned["status"] in ("proven", "promising") else ""
+    return "     " + html.escape(f"🧠 Take: {learned['why']}{note}")
+
+
 def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
     """breakouts: list of (scanner_name, kind, row) - row must include '_symbol'.
     kind is 'fresh' (never seen before) or 'retest' (re-triggered after a gap)."""
@@ -122,6 +132,7 @@ def format_breakout_message(breakouts: list[tuple[str, str, dict]]) -> str:
             lines.append(_stock_line(_KIND_ICON.get(kind, "🚀"), row["_symbol"], row))
             lines.append(_details(row, row.get("_backtest_hits")))
             lines.append(_track_line(row.get("_track")))
+            lines.append(_learned_line(row.get("_learned")))
         blocks.append("\n".join(filter(None, lines)))
     blocks.append("🚀 first time on this scanner · 🔁 back after dropping off")
     return "\n\n".join(blocks)
@@ -233,12 +244,21 @@ def _paper_block(paper: dict) -> str:
     vs = f" · vs Nifty 500 {total['vs_index']:+.1f}%" if total["vs_index"] is not None else ""
     since = datetime.fromisoformat(paper["start"]).strftime("%d %b")
     rupees = lambda v: f"{'+' if v > 0 else '−' if v < 0 else ''}₹{abs(v):,}"
-    return (
+    block = (
         f"<b>📒 Paper portfolio</b> (since {since}, ₹{paper['stake'] / 100_000:g}L a trade)\n"
         "<pre>" + html.escape("\n".join(lines)) + "</pre>\n"
         + html.escape(f"Closed P&L {rupees(total['closed_pnl'])} · open {rupees(total['open_pnl'])}{vs} · "
                       f"{total['waiting']} waiting for entry")
     )
+    learned = paper.get("learned") or {}
+    if learned.get("summary"):
+        lt = learned["summary"][0]
+        won = f", {lt['win']}% won" if lt["win"] is not None else ""
+        block += "\n" + html.escape(
+            f"🧠 Learned book (since {datetime.fromisoformat(learned['start']).strftime('%d %b')}): "
+            f"{lt['closed']} done{won} · closed {rupees(lt['closed_pnl'])} · open {rupees(lt['open_pnl'])} · "
+            f"{lt['waiting']} waiting · {lt['skipped']} skipped")
+    return block
 
 
 def format_digest_message(entries: list[dict], days: int, sector_momentum: dict | None = None,

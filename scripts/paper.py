@@ -1,9 +1,15 @@
 """Paper portfolio: every trigger since PAPER_START traded on paper under the
 backtest's own rule (breakout_sim), so live results compare like for like.
 
+Two books. "base" trades every signal since PAPER_START with the fixed rule
+below. "learned" trades the signals since the first learn.py run with the
+setup that was in force on each signal's date (policy.json): it skips the
+setups learned to lose and exits with the rule learned for that scanner, so
+it is a true forward test of what the system learned.
+
 Signals are the bot's live triggers plus any Chartink backtest-export hits
-dated on or after PAPER_START (same scanner definitions, so still forward
-data). Rule: buy-stop at the signal candle's high for 3 sessions (5 after a
+dated on or after the start (same scanner definitions, so still forward
+data). Base rule: buy-stop at the signal candle's high for 3 sessions (5 after a
 weekly signal), stop at the candle's low (kept 2-8% below entry), target 2x
 that risk, out after 20 sessions; 0.25% round-trip costs. Recomputed from
 daily prices on every run, so nothing is stored and a corrected price fixes
@@ -18,6 +24,8 @@ import pandas as pd
 
 import breakout_sim as bs
 import db
+import policy
+import track_record
 from slot_gate import IST
 
 PAPER_START = "2026-09-25"
@@ -33,17 +41,26 @@ def _frame(conn, symbol: str, since: str) -> pd.DataFrame:
     return df
 
 
-def _signals(conn) -> list[tuple[str, str, str, str]]:
+def live_hit_date(detected_at: str) -> str:
+    """The session a live trigger belongs to: before the open the scanner
+    still shows the previous session's result."""
+    t = datetime.fromisoformat(detected_at).astimezone(IST)
+    return (t - timedelta(days=1) if (t.hour, t.minute) < MARKET_OPEN else t).date().isoformat()
+
+
+def learned_start() -> str | None:
+    hist = policy.current().get("history", [])
+    return max(PAPER_START, hist[0]["from"]) if hist else None
+
+
+def _signals(conn, start_day: str) -> list[tuple[str, str, str, str]]:
     """(hit_date, scanner, symbol, source), one per scanner/symbol/day."""
     seen: dict[tuple[str, str, str], str] = {}
-    start = datetime.fromisoformat(PAPER_START).replace(tzinfo=IST)
+    start = datetime.fromisoformat(start_day).replace(tzinfo=IST)
     for e in db.breakouts_since(conn, start.isoformat()):
-        t = datetime.fromisoformat(e["detected_at"]).astimezone(IST)
-        # Before the open the scanner still shows the previous session's result.
-        day = (t - timedelta(days=1) if (t.hour, t.minute) < MARKET_OPEN else t).date().isoformat()
-        seen.setdefault((day, e["scanner_name"], e["symbol"]), "live")
+        seen.setdefault((live_hit_date(e["detected_at"]), e["scanner_name"], e["symbol"]), "live")
     for scanner, symbol, day in conn.execute(
-            "SELECT scanner_name, symbol, hit_date FROM backtest_hits WHERE hit_date >= ?", (PAPER_START,)):
+            "SELECT scanner_name, symbol, hit_date FROM backtest_hits WHERE hit_date >= ?", (start_day,)):
         seen.setdefault((day, scanner, symbol), "backtest export")
     return sorted((d, sc, sym, src) for (d, sc, sym), src in seen.items())
 
@@ -58,12 +75,25 @@ def _bench_return(bench: pd.DataFrame, entry: pd.Timestamp, exit_: pd.Timestamp)
     return (after.iloc[-1] / before.iloc[-1] - 1) * 100
 
 
-def paper_trades(conn) -> list[dict]:
-    lookback = (datetime.fromisoformat(PAPER_START) - timedelta(days=14)).date().isoformat()
+def paper_trades(conn, book: str = "base") -> list[dict]:
+    """book: "base" (fixed rule, every signal) or "learned" (policy.json)."""
+    start = PAPER_START if book == "base" else learned_start()
+    if start is None:
+        return []
+    lookback = (datetime.fromisoformat(start) - timedelta(days=14)).date().isoformat()
     bench = _frame(conn, BENCHMARK, lookback)
     out = []
-    for day, scanner, symbol, source in _signals(conn):
+    for day, scanner, symbol, source in _signals(conn, start):
         trade = {"scanner": scanner, "symbol": symbol, "date": day, "source": source}
+        rule = bs.DEFAULT_RULE
+        if book == "learned":
+            d = policy.decide(policy.in_force(policy.current(), day), scanner,
+                              track_record.tier_of(conn, symbol), track_record.regime_on(conn, day))
+            if d and not d["take"]:
+                out.append({**trade, "status": "skipped", "why": d["why"]})
+                continue
+            rule = d["rule"] if d else rule
+            trade["rule"] = policy.describe(rule)
         df = _frame(conn, symbol, lookback)
         # A daily hit on a non-trading day (weekend, holiday) belongs to the last
         # session before it; one simply not in the data yet waits for its candle.
@@ -77,7 +107,7 @@ def paper_trades(conn) -> list[dict]:
             out.append({**trade, "status": "no prices yet"})
             continue
         path = df.iloc[sig["end_pos"] + 1:]
-        res = bs.simulate_trade(path, sig["trigger"], sig["bar_low"], bs.entry_window_for(scanner))
+        res = bs.simulate_trade(path, sig["trigger"], sig["bar_low"], bs.entry_window_for(scanner), rule)
         trade["trigger"] = round(sig["trigger"], 2)
         if "entry_price" not in res:
             out.append({**trade, "status": "waiting" if res["status"] == "pending" else "not filled"})
@@ -117,6 +147,7 @@ def summarize(trades: list[dict]) -> list[dict]:
             "signals": len(ts),
             "waiting": sum(t["status"] in ("waiting", "no prices yet") for t in ts),
             "not_filled": sum(t["status"] == "not filled" for t in ts),
+            "skipped": sum(t["status"] == "skipped" for t in ts),
             "open": len(open_),
             "open_pnl": sum(t["pnl"] for t in open_),
             "closed": len(closed),

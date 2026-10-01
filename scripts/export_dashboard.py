@@ -7,8 +7,11 @@ Three views:
              last scan price
   sectors    backtest picks per sector, last 7 and 30 days
   paper      every trigger since paper.PAPER_START traded on paper under the
-             backtest's rule, with a summary per scanner
+             backtest's rule, and the "learned" book traded with policy.json,
+             each with a summary per scanner
   track      on stock rows: how similar past setups did in the backtest
+  learned    on stock rows: the learned call (take / skip, exit rule)
+  policy     what learn.py chose per scanner, with its walk-forward evidence
   sector_momentum
              all scanners combined: distinct stocks picked per sector in the
              last 2 weeks vs the 2 before, scanners agreeing, average move
@@ -23,6 +26,7 @@ from pathlib import Path
 
 import db
 import paper
+import policy
 import track_record
 from notify import _col, _num, _price
 from slot_gate import IST, SLOTS
@@ -76,6 +80,7 @@ def scanners_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[
             rows.append({
                 "symbol": symbol,
                 "track": track_for(conn, rec, name, symbol, date.today().isoformat(), _num(_col(row, "mcap"))),
+                "learned": policy.verdict(conn, name, symbol, date.today().isoformat(), _num(_col(row, "mcap"))),
                 "industry": _col(row, "industry"),
                 "now": now,
                 "day_chg": _num(_col(row, "%")),
@@ -129,6 +134,7 @@ def breakouts_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list
             "on_scan": (name, symbol) in on_scan,
             "status": "BUY" if chg is not None and chg > 0 else "HOLD",
             "track": track_for(conn, rec, name, symbol, when.date().isoformat(), _num(_col(e, "mcap"))),
+            "learned": policy.verdict(conn, name, symbol, when.date().isoformat(), _num(_col(e, "mcap"))),
         })
     return out
 
@@ -219,12 +225,34 @@ def sector_momentum_view(conn, today: date) -> dict:
             "scanner_count": len(db.distinct_backtest_scanners(conn)), "rows": rows}
 
 
+def policy_view() -> dict | None:
+    """The current learned setup per scanner, in words, with the walk-forward
+    result of the base rule and of the learned setup on the same signals."""
+    entry = policy.in_force(policy.current())
+    if not entry:
+        return None
+    rows = []
+    for name, s in entry["scanners"].items():
+        wf = s.get("walk_forward") or {}
+        learned = wf.get("rule+filter") if s.get("skip") else wf.get("rule")
+        rows.append({
+            "scanner": name,
+            "status": s["status"],
+            "rule": policy.describe(policy.rule_from_dict(s["rule"])) if "rule" in s else None,
+            "skip": [f"{g['tier']} in a {g['regime']} market" for g in s.get("skip", [])],
+            "base": wf.get("base"),
+            "learned": learned,
+        })
+    return {"from": entry["from"], "updated": policy.current().get("updated"), "rows": rows}
+
+
 def main() -> int:
     conn = db.connect()
     latest_run, last_scan = conn.execute("SELECT id, run_at FROM runs ORDER BY id DESC LIMIT 1").fetchone()
     rec = track_record.TrackRecord()
     breakouts = breakouts_view(conn, latest_run, rec)
     trades = paper.paper_trades(conn)
+    learned = paper.paper_trades(conn, "learned")
     data = {
         "generated_at": datetime.now(IST).isoformat(timespec="minutes"),
         "last_scan": _ist(last_scan).isoformat(timespec="minutes"),
@@ -236,7 +264,10 @@ def main() -> int:
         "sectors": sectors_view(conn),
         "sector_momentum": sector_momentum_view(conn, datetime.now(IST).date()),
         "paper": {"start": paper.PAPER_START, "stake": paper.STAKE,
-                  "summary": paper.summarize(trades), "trades": trades[::-1]},
+                  "summary": paper.summarize(trades), "trades": trades[::-1],
+                  "learned": {"start": paper.learned_start(), "summary": paper.summarize(learned),
+                              "trades": learned[::-1]}},
+        "policy": policy_view(),
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)

@@ -95,7 +95,7 @@
 <footer>BUY = price above its trigger price · HOLD = at or below. A mechanical rule, not advice.</footer>
 
 <script>
-const state = { tab: "now", scanner: "All", status: "All", data: null };
+const state = { tab: "now", scanner: "All", status: "All", book: "base", data: null };
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -104,18 +104,47 @@ const cls = (v) => (v == null || v === 0 ? "" : v > 0 ? "up" : "down");
 const fmtDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 const fmtWhen = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
 
-function trackLine(t) {
-  if (!t) return "";
-  return `<div class="meta track">📊 Past ${esc(t.group)}: ${t.n} trades, ${t.win}% won, avg <span class="${cls(t.avg)}">${pct(t.avg)}</span></div>`;
+function trackLine(t, l) {
+  const past = t ? `<div class="meta track">📊 Past ${esc(t.group)}: ${t.n} trades, ${t.win}% won, avg <span class="${cls(t.avg)}">${pct(t.avg)}</span></div>` : "";
+  const note = l && l.take && (l.status === "proven" || l.status === "promising") ? ` (${l.status})` : "";
+  const learned = l ? `<div class="meta track">🧠 <b class="${l.take ? "up" : "down"}">${l.take ? "Take" : "Skip"}</b>: ${esc(l.why)}${note}</div>` : "";
+  return past + learned;
 }
 
-const STATUS = { open: "OPEN", closed: "DONE", waiting: "WAIT", "not filled": "SKIP", "no prices yet": "WAIT" };
-const REASON = { stop: "stop", stop_gap: "stop (gap)", target: "target", target_gap: "target (gap)", time: "20 days", open: "now" };
+const STATUS = { open: "OPEN", closed: "DONE", waiting: "WAIT", "not filled": "MISS", "no prices yet": "WAIT", skipped: "SKIP" };
+const REASON = { stop: "stop", stop_gap: "stop (gap)", target: "target", target_gap: "target (gap)", time: "time limit", open: "now" };
 const rupees = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + "₹" + Math.abs(v).toLocaleString("en-IN");
 
+function renderPolicy(pol) {
+  if (!pol) return "";
+  const res = (s) => s && s.n ? `${s.n} trades, avg <span class="${cls(s.avg)}">${pct(s.avg)}</span>` : "–";
+  const rows = pol.rows.map((r) => `
+    <div class="row srow" style="grid-template-columns:1fr auto">
+      <div><div class="sym">${esc(r.scanner)}</div>
+        ${r.rule ? `<div class="meta">${esc(r.rule)}${r.skip.length ? " · skips " + esc(r.skip.join(", ")) : ""}</div>
+        <div class="meta">Unseen months: base ${res(r.base)} · learned ${res(r.learned)}</div>` : `<div class="meta">Still learning: not enough closed trades.</div>`}</div>
+      <span class="pill ${r.status === "proven" ? "BUY" : r.status === "promising" ? "HOLD" : "WAIT"}">${esc(r.status)}</span>
+    </div>`).join("");
+  return `<section class="card"><h2>🧠 What it learned <small>updated ${fmtDate(pol.updated)}</small></h2>
+    <div class="note">Every week the system tries 144 exit rules on each scanner and skips setups that lost money.
+      It only counts results on months it had not seen (walk-forward). <b>proven</b> = beat the base rule beyond luck,
+      <b>promising</b> = ahead but could be luck, <b>not better</b> = base rule kept.</div>${rows}</section>`;
+}
+
 function renderPaper(d) {
-  const p = d.paper;
-  if (!p || !p.trades.length) return `<section class="card"><div class="empty">No paper trades yet.</div></section>`;
+  const learnedBook = state.book === "learned";
+  const p = learnedBook ? { ...d.paper, ...(d.paper.learned || { trades: [], summary: [] }) } : d.paper;
+  const toggle = `<div class="filters" style="margin:12px 0 0">
+    <button data-book="base" class="${learnedBook ? "" : "on"}">Base rule</button>
+    <button data-book="learned" class="${learnedBook ? "on" : ""}">Learned</button></div>`;
+  const intro = learnedBook
+    ? `Signals since ${p.start ? fmtDate(p.start) : "the first weekly learning run"}, traded with what the system had learned by each signal's date:
+      setups it learned to lose are skipped, the rest use the exit rule learned for that scanner. ₹${d.paper.stake / 100000}L a trade, after 0.25% costs.`
+    : `Every trigger since ${fmtDate(p.start)}, traded on paper with the backtest's rule:
+      buy above the signal candle's high within 3 sessions (5 for weekly), stop at its low (2–8%), target 2× the risk,
+      exit after 20 sessions. ₹${p.stake / 100000}L a trade, after 0.25% costs.`;
+  if (!p || !p.trades.length) return `${toggle}<section class="card"><div class="note" style="padding-top:12px">${intro}</div>
+    <div class="empty">No paper trades yet.</div></section>${renderPolicy(d.policy)}`;
   const cards = p.summary.map((g) => `
     <div class="stat"><b>${esc(g.group)}</b>
       <div><span>Closed</span><span>${g.closed}${g.win != null ? " · " + g.win + "% won" : ""}</span></div>
@@ -123,27 +152,27 @@ function renderPaper(d) {
       <div><span>vs Nifty 500</span><span class="${cls(g.vs_index)}">${pct(g.vs_index)}</span></div>
       <div><span>Closed P&amp;L</span><span class="${cls(g.closed_pnl)}">${rupees(g.closed_pnl)}</span></div>
       <div><span>Open (${g.open})</span><span class="${cls(g.open_pnl)}">${rupees(g.open_pnl)}</span></div>
-      <div><span>Waiting / skipped</span><span>${g.waiting} / ${g.not_filled}</span></div>
+      <div><span>Wait / miss / skip</span><span>${g.waiting} / ${g.not_filled} / ${g.skipped ?? 0}</span></div>
     </div>`).join("");
   const rows = p.trades.map((t) => {
     const detail = t.entry != null
       ? `bought ${money(t.entry)} ${fmtDate(t.entry_date)} → ${REASON[t.exit_reason] || t.exit_reason} ${money(t.exit)} · stop ${money(t.stop)} · target ${money(t.target)}`
+      : t.status === "skipped" ? `skipped: ${esc(t.why)}`
       : t.trigger != null ? `buy above ${money(t.trigger)}` : "waiting for prices";
     return `
       <div class="row">
         <div><div class="sym">${esc(t.symbol)}</div>
           <div class="meta">${esc(t.scanner)} · signal ${fmtDate(t.date)}${t.source !== "live" ? " · " + esc(t.source) : ""}</div>
-          <div class="meta">${detail}</div></div>
+          <div class="meta">${detail}</div>${t.rule ? `<div class="meta">${esc(t.rule)}</div>` : ""}</div>
         <div class="num">${t.ret != null ? `<div class="chg ${cls(t.ret)}">${pct(t.ret)}</div><div class="tiny ${cls(t.pnl)}">${rupees(t.pnl)}</div>` : ""}</div>
         <span class="pill ${t.status === "open" || t.status === "closed" ? (t.ret > 0 ? "BUY" : "HOLD") : "WAIT"}">${STATUS[t.status] || esc(t.status)}</span>
       </div>`;
   }).join("");
-  return `
-    <section class="card"><div class="note" style="padding-top:12px">Every trigger since ${fmtDate(p.start)}, traded on paper with the backtest's rule:
-      buy above the signal candle's high within 3 sessions (5 for weekly), stop at its low (2–8%), target 2× the risk,
-      exit after 20 sessions. ₹${p.stake / 100000}L a trade, after 0.25% costs.</div></section>
+  return `${toggle}
+    <section class="card"><div class="note" style="padding-top:12px">${intro}</div></section>
     <div class="stats">${cards}</div>
-    <section class="card"><h2>Trades <small>${p.trades.length}</small></h2>${rows}</section>`;
+    <section class="card"><h2>Trades <small>${p.trades.length}</small></h2>${rows}</section>
+    ${renderPolicy(d.policy)}`;
 }
 
 function renderNow(d) {
@@ -153,7 +182,7 @@ function renderNow(d) {
       ${s.rows.length ? s.rows.map((r) => `
         <div class="row">
           <div><div class="sym">${esc(r.symbol)}</div>
-            <div class="meta">${money(r.now)} · trig ${money(r.trigger)}${r.trigger_date ? " on " + fmtDate(r.trigger_date) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div>${trackLine(r.track)}</div>
+            <div class="meta">${money(r.now)} · trig ${money(r.trigger)}${r.trigger_date ? " on " + fmtDate(r.trigger_date) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div>${trackLine(r.track, r.learned)}</div>
           <div class="num chg ${cls(r.chg)}">${pct(r.chg)}</div>
           <span class="pill ${r.status}">${r.status}</span>
         </div>`).join("") : `<div class="empty">No stocks on this scanner right now.</div>`}
@@ -181,7 +210,7 @@ function renderBreakouts(d) {
       ${rows.length ? rows.map((b) => `
         <div class="row">
           <div><div class="sym">${esc(b.symbol)}${b.on_scan ? '<span class="dot" title="still on the scanner"></span>' : ""}</div>
-            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · ${money(b.trigger)} → ${money(b.now)}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div>${trackLine(b.track)}</div>
+            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · ${money(b.trigger)} → ${money(b.now)}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div>${trackLine(b.track, b.learned)}</div>
           <div class="num chg ${cls(b.chg)}">${pct(b.chg)}</div>
           <span class="pill ${b.status}">${b.status}</span>
         </div>`).join("") : `<div class="empty">No triggers match.</div>`}
@@ -241,6 +270,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.tab) state.tab = t.dataset.tab;
   else if (t.dataset.scanner) state.scanner = t.dataset.scanner;
   else if (t.dataset.status) state.status = t.dataset.status;
+  else if (t.dataset.book) state.book = t.dataset.book;
   else return;
   render();
 });

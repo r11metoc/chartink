@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 import db  # noqa: E402
 import paper  # noqa: E402
+import policy  # noqa: E402
 
 
 @pytest.fixture()
@@ -64,3 +65,37 @@ def test_weekend_hit_uses_previous_session(conn):
     add_hit(conn, "63_30_daily", "2026-09-05", "CCC")
     (t,) = paper.paper_trades(conn)
     assert t["trigger"] == 104.0 and t["entry_date"] == "2026-09-07"
+
+
+def _policy(monkeypatch, scanners, start="2026-09-01"):
+    monkeypatch.setattr(policy, "_doc", {"history": [{"from": start, "scanners": scanners}]})
+
+
+def test_learned_book_uses_learned_rule(conn, monkeypatch):
+    # Learned: fixed 6% stop, no target, out after 3 days -> exits on time, not at the 2R target.
+    _policy(monkeypatch, {"63_30_daily": {"status": "promising", "skip": [], "rule": {
+        "min_risk_pct": 6, "max_risk_pct": 6, "target_r": 0, "trail_pct": 0, "max_hold": 3}}})
+    db.save_daily_prices(conn, "AAA", bars("2026-09-01", [100, 102, 104, 106, 108, 112, 115]))
+    add_hit(conn, "63_30_daily", "2026-09-01", "AAA")
+    (t,) = paper.paper_trades(conn, "learned")
+    assert t["status"] == "closed" and t["exit_reason"] == "time"
+    assert t["stop"] == pytest.approx(101 * 0.94, abs=0.01) and t["exit"] == 108.0
+    assert t["rule"].startswith("6% stop")
+
+
+def test_learned_book_skips_losing_setup(conn, monkeypatch):
+    _policy(monkeypatch, {"63_30_daily": {"status": "proven", "rule": {
+        "min_risk_pct": 2, "max_risk_pct": 8, "target_r": 2, "trail_pct": 0, "max_hold": 20},
+        "skip": [{"tier": "Smallcap", "regime": None, "avg": -2.1, "n": 67}]}})
+    db.save_daily_prices(conn, "AAA", bars("2026-09-01", [100, 102, 104]))
+    conn.execute("INSERT INTO backtest_hits (scanner_name, hit_date, symbol, marketcap, sector) "
+                 "VALUES ('63_30_daily', '2026-09-01', 'AAA', 'Smallcap', '')")
+    (t,) = paper.paper_trades(conn, "learned")
+    assert t["status"] == "skipped" and "Smallcap" in t["why"]
+    assert paper.summarize([t])[0]["skipped"] == 1
+
+
+def test_no_learned_book_before_first_learning(conn, monkeypatch):
+    monkeypatch.setattr(policy, "_doc", {"history": []})
+    add_hit(conn, "63_30_daily", "2026-09-01", "AAA")
+    assert paper.paper_trades(conn, "learned") == []

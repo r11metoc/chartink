@@ -87,14 +87,39 @@ after every scan (open it on your iPhone and use Share → Add to Home Screen):
   candle's high within 3 sessions (5 after a weekly signal), stop at its low
   (kept 2–8% below entry), target 2× the risk, out after 20 sessions, 0.25%
   costs, ₹1L a trade. Shows each trade and, per scanner, win rate, average
-  return, return vs the Nifty 500 and P&L (`scripts/paper.py`).
+  return, return vs the Nifty 500 and P&L (`scripts/paper.py`). The
+  **Learned** switch shows the second book, traded with what the system had
+  learned by each signal's date (below), and a card with what it learned.
 
 Every stock row (Now, Breakouts) and every Telegram breakout alert also shows
 **how similar past setups did** in the backtest (`scripts/track_record.py`,
 from `data/model/trades.csv`): same scanner, market-cap tier and market
 regime (Nifty 50 above/below its 50-day average), falling back to scanner ×
 tier and then the scanner alone when a group has fewer than 20 trades. The
-Telegram digest also carries a paper portfolio summary.
+Telegram digest also carries a paper portfolio summary, with both books.
+
+### Self-learning
+
+Every Saturday `signal_model.yml` rebuilds the trade dataset (the Chartink
+backtest exports **plus every trigger the bot caught live**, so it keeps
+growing), and `scripts/learn.py` re-learns the trading setup per scanner:
+
+- it tries 144 exit rules (stop at the candle low or a fixed 4–12%, target
+  1.5–3× the risk or none, optional 8% trailing stop, out after 10/20/40
+  sessions) and a filter that skips market-cap × market-regime groups that
+  lost money (20+ trades);
+- it is judged **walk-forward**: each month the rule and filter are picked
+  using only trades that had already closed, then used on that month's
+  signals, and compared with the base rule on the same signals;
+- *proven* = ahead of the base rule by at least 1.65 standard errors,
+  *promising* = ahead but could be luck, *not better* = the base rule is
+  kept. The filter is kept only if it helped out of sample.
+
+The choice goes to `data/model/policy.json` (with every earlier choice, so
+the Learned paper book uses what was known at each signal's date) and the
+evidence to `reports/learning_report.md`. Every breakout alert and dashboard
+row carries the learned call: 🧠 *Take* with the exit rule to use, or
+*Skip* with the reason.
 
 Each scan runs `scripts/refresh_prices.py`, which fetches daily prices from
 Yahoo Finance (`daily_prices` table) for every stock that triggered in the
