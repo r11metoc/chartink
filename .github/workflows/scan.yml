@@ -76,6 +76,15 @@ jobs:
           pip install -r requirements.txt "yfinance>=0.2.40,<1" "pandas>=2.0,<3"
           playwright install --with-deps chromium
 
+      # Before the scan, so the digest's sector averages use today's prices.
+      - name: Import backtest exports and refresh prices
+        working-directory: scripts
+        run: |
+          # New Chartink backtest exports in data/backtest/ feed the sector view.
+          python import_backtest.py
+          # Yahoo hiccups shouldn't cost the scan; the dashboard falls back to scan prices.
+          python refresh_prices.py || echo "Price refresh failed, using scan prices."
+
       - name: Run scan
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -88,14 +97,9 @@ jobs:
         working-directory: scripts
         run: python run.py
 
-      - name: Refresh prices and build the dashboard
+      - name: Build the dashboard
         working-directory: scripts
-        run: |
-          # New Chartink backtest exports in data/backtest/ feed the sector view.
-          python import_backtest.py
-          # Yahoo hiccups shouldn't cost the scan; the dashboard falls back to scan prices.
-          python refresh_prices.py || echo "Price refresh failed, using scan prices."
-          python export_dashboard.py
+        run: python export_dashboard.py
 
       - name: Upload debug artifact
         if: ${{ inputs.debug }}

@@ -187,14 +187,33 @@ def format_sector_focus_message(sector_focus: dict) -> str:
     return "\n\n".join(blocks)
 
 
-def format_digest_message(entries: list[dict], days: int) -> str:
+def _sector_momentum_block(m: dict, limit: int = 8) -> str:
+    """Compact table of export_dashboard.sector_momentum_view(): stocks picked
+    in the last m['days'] days across all scanners, change vs the period
+    before, scanners agreeing, average move since pick."""
+    rows = [r for r in m["rows"] if r["cur"]][:limit]
+    if not rows:
+        return ""
+    lines = [f"{'Sector':<16}{'Now':>4}{'Chg':>5}{'Sc':>4}{'Avg':>8}"]
+    for r in rows:
+        avg = f"{r['avg_move']:+.1f}%" if r["avg_move"] is not None else "-"
+        lines.append(f"{r['sector'][:16]:<16}{r['cur']:>4}{r['cur'] - r['prev']:>+5}{len(r['scanners']):>4}{avg:>8}")
+    return (
+        f"<b>📈 Sector momentum</b> (last {m['days']}d, all scanners)\n"
+        "<pre>" + html.escape("\n".join(lines)) + "</pre>\n"
+        f"<i>Now = stocks picked · Chg = vs the {m['days']}d before · Sc = scanners agreeing · "
+        "Avg = move since picked</i>"
+    )
+
+
+def format_digest_message(entries: list[dict], days: int, sector_momentum: dict | None = None) -> str:
     """Stocks that triggered on a scanner in the last `days`, as BUY / HOLD
-    tables per scanner. entries come from db.breakouts_since() (newest first)
-    with _current_row (latest scraped row) and _on_scan (still on the scanner)."""
+    tables per scanner, then the sector momentum table if given. entries come
+    from db.breakouts_since() (newest first) with _current_row (latest scraped
+    row) and _on_scan (still on the scanner)."""
     blocks = [f"<b>📊 Digest</b> · triggers in last {days}d · {_now_ist()}\n{RULE_LINE}"]
     if not entries:
         blocks.append("No new triggers in this window.")
-        return "\n\n".join(blocks)
 
     latest: dict[str, dict[str, dict]] = {}
     for e in entries:  # newest first, so the first event per stock is its latest trigger
@@ -210,5 +229,7 @@ def format_digest_message(entries: list[dict], days: int) -> str:
                           "mark": " *" if off else ""})
         blocks.append(f"<b>{html.escape(scanner_name)}</b> ({len(items)})\n{_buy_hold_tables(items)}")
     if any_off:
-        blocks.append("<i>* no longer on the scanner - last seen price</i>")
+        blocks.append("<i>* no longer on the scanner - price is the latest daily close</i>")
+    if sector_momentum and (block := _sector_momentum_block(sector_momentum)):
+        blocks.append(block)
     return "\n\n".join(blocks)

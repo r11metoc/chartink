@@ -14,6 +14,7 @@ from notify import (
     format_sector_focus_message,
     send_telegram_message,
 )
+from export_dashboard import sector_momentum_view
 from scrape_dashboard import scrape_dashboard
 from slot_gate import IST, current_slot
 
@@ -100,6 +101,11 @@ def main() -> int:
         for entry in entries:
             entry["_current_row"] = db.latest_row(digest_conn, entry["scanner_name"], entry["symbol"])
             entry["_on_scan"] = entry["symbol"] in on_scan.get(entry["scanner_name"], set())
+            if not entry["_on_scan"]:
+                # Off the scanner, the last scan price is stale; use the latest daily close.
+                bars = db.daily_prices_since(digest_conn, entry["symbol"], entry["detected_at"][:10])
+                if bars:
+                    entry["_current_row"] = {"Price": f"{bars[-1][4]:.2f}"}
 
         today = datetime.now(timezone.utc).date()
         weekly_since = (today - timedelta(days=7)).isoformat()
@@ -111,9 +117,10 @@ def main() -> int:
                 "monthly": db.sector_counts_since(digest_conn, scanner_name, monthly_since),
             }
 
+        momentum = sector_momentum_view(digest_conn, datetime.now(IST).date())
         digest_conn.close()
         send_telegram_message(format_sector_focus_message(sector_focus))
-        send_telegram_message(format_digest_message(entries, digest_days))
+        send_telegram_message(format_digest_message(entries, digest_days, momentum))
 
     return 0
 
