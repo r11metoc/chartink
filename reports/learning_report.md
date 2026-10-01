@@ -39,5 +39,5 @@ Updated 2026-10-01. For each scanner 144 exit rules were tried; the setup filter
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
 | Base rule, every signal | 386 | 36% | -0.49% | -0.54% | -189,100 |  |
-| Learned rule | 386 | 39% | +0.57% | +0.28% | +219,800 | +1.06% (t 1.6) |
+| Learned rule | 386 | 39% | +0.57% | +0.28% | +218,500 | +1.06% (t 1.6) |
 | Learned rule + filter | 341 | 39% | +0.41% | +0.19% | +140,400 | +0.85% (t 1.3) |

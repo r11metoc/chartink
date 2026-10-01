@@ -1,6 +1,6 @@
 # Price after the trigger: 2 to 12 weeks
 
-Generated 2026-09-30 18:20 UTC by `scripts/horizon_returns.py`.
+Generated 2026-10-01 18:50 UTC by `scripts/horizon_returns.py`.
 
 Buy when price crosses the trigger (the signal candle's high; the completed week's candle for `Wkly_upswing`) within 3 sessions (5 for weekly), then just hold. No stop-loss, no target, no costs deducted. **Up** = share of trades above the entry price at that point. **Best / worst close** = the highest and lowest close reached at any time up to that point, averaged across trades. **Beat Nifty 500** = share of trades that did better than the index over the same days. Recent signals only count for horizons that have fully passed, so longer horizons have fewer trades and lean towards older signals.
 
@@ -20,7 +20,7 @@ Per-trade prices: `data/model/horizon_returns.csv`.
 
 ## Bullish_Scanner
 
-244 signals, 182 crossed the trigger (04 Feb 2026 to 29 Sep 2026).
+245 signals, 182 crossed the trigger (04 Feb 2026 to 29 Sep 2026).
 
 | Horizon | Trades | Up | Avg | Median | Avg best / worst close | Nifty 500 avg | Beat Nifty 500 |
 |---|---|---|---|---|---|---|---|
@@ -32,7 +32,7 @@ Per-trade prices: `data/model/horizon_returns.csv`.
 
 ## Wkly_upswing
 
-765 signals, 521 crossed the trigger (08 Sep 2023 to 25 Sep 2026).
+766 signals, 521 crossed the trigger (08 Sep 2023 to 25 Sep 2026).
 
 | Horizon | Trades | Up | Avg | Median | Avg best / worst close | Nifty 500 avg | Beat Nifty 500 |
 |---|---|---|---|---|---|---|---|

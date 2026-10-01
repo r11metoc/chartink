@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-09-30T18:17:37+00:00",
+  "trained_at": "2026-10-01T18:50:16+00:00",
   "model_kind": "logreg",
   "auc": {
     "logreg": 0.4991437513532665,
@@ -13,7 +13,8 @@
     "max_risk_pct": 8.0,
     "min_risk_pct": 2.0,
     "target_r": 2.0,
-    "max_hold": 20
+    "max_hold": 20,
+    "trail_pct": 0.0
   },
   "entry_window": {
     "daily": 3,

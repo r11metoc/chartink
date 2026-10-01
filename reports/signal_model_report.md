@@ -1,6 +1,6 @@
 # Scanner signal model report
 
-Generated 2026-09-30 18:17 UTC by `scripts/signal_model.py train`.
+Generated 2026-10-01 18:50 UTC by `scripts/signal_model.py train`.
 
 ## The rule being tested
 
@@ -15,8 +15,8 @@ Generated 2026-09-30 18:17 UTC by `scripts/signal_model.py train`.
 | Scanner | Hits | With prices | Triggered & closed | Not triggered | Still open / pending |
 |---|---|---|---|---|---|
 | 63_30_daily | 426 | 425 | 273 | 143 | 9 |
-| Bullish_Scanner | 244 | 244 | 170 | 61 | 13 |
-| Wkly_upswing | 765 | 764 | 517 | 241 | 6 |
+| Bullish_Scanner | 245 | 244 | 170 | 61 | 13 |
+| Wkly_upswing | 766 | 765 | 517 | 241 | 7 |
 
 ## 1. Does buying every trigger make money?
 
