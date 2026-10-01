@@ -75,7 +75,11 @@ after every scan (open it on your iPhone and use Share → Add to Home Screen):
 - **Breakouts**: every trigger in the last 90 days with its move since the
   trigger, best move so far and days held, filterable by scanner and BUY/HOLD,
   plus per-scanner totals (how many are above their trigger, average move)
-- **Sectors**: the backtest sector table
+- **Sectors**: **sector momentum** across all scanners combined: stocks
+  picked in the last 14 days (each counted once, from the backtest exports
+  plus the bot's own live triggers) vs the 14 days before, how many scanners
+  agree, the average move of those picks since they were picked, and an
+  8-week bar chart; then the per-scanner backtest tables
 
 Each scan runs `scripts/refresh_prices.py`, which fetches daily prices from
 Yahoo Finance (`daily_prices` table) for every stock that triggered in the

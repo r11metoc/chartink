@@ -1,8 +1,9 @@
 """Fetch daily prices from Yahoo Finance for every stock the dashboard tracks.
 
-Tracked = triggered on any scanner in the last TRACK_DAYS, plus everything on
-a scanner in the latest scan. Scan prices alone go stale once a stock drops
-off its scanner; these daily bars keep its performance current.
+Tracked = triggered on any scanner in the last TRACK_DAYS, everything on a
+scanner in the latest scan, and backtest picks from the last BACKTEST_DAYS.
+Scan prices alone go stale once a stock drops off its scanner; these daily
+bars keep its performance current.
 """
 
 from __future__ import annotations
@@ -13,15 +14,19 @@ import db
 from market_data import fetch_daily
 
 TRACK_DAYS = 120
+# Backtest picks feed the sector view's "average move since pick" (last 4 weeks).
+BACKTEST_DAYS = 35
 
 
 def tracked_symbols(conn) -> tuple[list[str], str]:
     since = (datetime.now(timezone.utc) - timedelta(days=TRACK_DAYS)).isoformat()
+    bt_since = (date.today() - timedelta(days=BACKTEST_DAYS)).isoformat()
     symbols = {s for (s,) in conn.execute("SELECT DISTINCT symbol FROM breakouts WHERE detected_at >= ?", (since,))}
     symbols |= {s for (s,) in conn.execute(
         "SELECT DISTINCT symbol FROM results WHERE run_id = (SELECT MAX(id) FROM runs)")}
+    symbols |= {s for (s,) in conn.execute("SELECT DISTINCT symbol FROM backtest_hits WHERE hit_date >= ?", (bt_since,))}
     first = conn.execute("SELECT MIN(detected_at) FROM breakouts WHERE detected_at >= ?", (since,)).fetchone()[0]
-    start = (date.fromisoformat(first[:10]) if first else date.today()) - timedelta(days=7)
+    start = min(date.fromisoformat(first[:10]) if first else date.today(), date.fromisoformat(bt_since)) - timedelta(days=7)
     return sorted(symbols), start.isoformat()
 
 

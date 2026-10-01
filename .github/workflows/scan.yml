@@ -91,6 +91,8 @@ jobs:
       - name: Refresh prices and build the dashboard
         working-directory: scripts
         run: |
+          # New Chartink backtest exports in data/backtest/ feed the sector view.
+          python import_backtest.py
           # Yahoo hiccups shouldn't cost the scan; the dashboard falls back to scan prices.
           python refresh_prices.py || echo "Price refresh failed, using scan prices."
           python export_dashboard.py
