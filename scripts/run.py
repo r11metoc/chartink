@@ -15,6 +15,7 @@ from notify import (
     send_telegram_message,
 )
 from scrape_dashboard import scrape_dashboard
+from slot_gate import IST, current_slot
 
 DEFAULT_URL = "https://chartink.com/dashboard/45863"
 
@@ -25,15 +26,18 @@ def main() -> int:
     send_snapshot = os.environ.get("CHARTINK_SEND_SNAPSHOT") == "1"
     send_digest = os.environ.get("CHARTINK_SEND_DIGEST") == "1"
     digest_days = int(os.environ.get("CHARTINK_DIGEST_DAYS") or "30")
-    slot = os.environ.get("CHARTINK_SLOT") or None
+    gate_slot = os.environ.get("CHARTINK_SLOT") or None
+    # A manual scan that sends the messages inside a slot window fills that
+    # slot too, so a late scheduled run doesn't send the same messages again.
+    slot = gate_slot or (current_slot(datetime.now(IST)) if send_snapshot or send_digest else None)
 
-    if slot:
+    if gate_slot:
         # Two queued runs can pass the gate for the same slot; only the first scans.
         conn = db.connect()
-        done = db.slot_done(conn, slot)
+        done = db.slot_done(conn, gate_slot)
         conn.close()
         if done:
-            print(f"Slot {slot} was already scanned, skipping.")
+            print(f"Slot {gate_slot} was already scanned, skipping.")
             return 0
 
     scans = scrape_dashboard(url, debug=debug)
