@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Scanner">
+<meta name="robots" content="noindex">
+<title>Scanner Tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M12 44l12-12 9 9 19-21' stroke='white' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #0f766e; --buy: #15803d; --buy-bg: #dcfce7; --hold: #92400e; --hold-bg: #fef3c7;
+    --up: #15803d; --down: #b91c1c; --chip: #eef2f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f14; --card: #151b23; --text: #e5e7eb; --muted: #9aa4b2; --line: #263040;
+      --accent: #2dd4bf; --buy: #4ade80; --buy-bg: #12301f; --hold: #fbbf24; --hold-bg: #33270d;
+      --up: #4ade80; --down: #f87171; --chip: #1e2733;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  header { padding: 18px 16px 8px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  nav { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 8px 16px; display: flex; gap: 6px; }
+  nav button {
+    flex: 1; border: 0; border-radius: 10px; padding: 9px 0; font: inherit; font-weight: 600;
+    background: var(--chip); color: var(--muted); cursor: pointer;
+  }
+  nav button.on { background: var(--accent); color: #fff; }
+  main { padding: 4px 16px 32px; max-width: 760px; margin: 0 auto; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin: 12px 0; overflow: hidden; }
+  .card h2 { font-size: 16px; margin: 0; padding: 12px 14px 8px; display: flex; justify-content: space-between; align-items: baseline; }
+  .card h2 small { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .empty { color: var(--muted); padding: 4px 14px 14px; }
+  .row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .sym { font-weight: 650; }
+  .meta { color: var(--muted); font-size: 12.5px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .chg { font-weight: 650; }
+  .up { color: var(--up); } .down { color: var(--down); }
+  .pill { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 8px; letter-spacing: .02em; }
+  .pill.BUY { color: var(--buy); background: var(--buy-bg); }
+  .pill.HOLD { color: var(--hold); background: var(--hold-bg); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 13px; margin-bottom: 6px; }
+  .stat div { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+  .stat div span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 0; }
+  .filters button {
+    border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px;
+    padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .filters button.on { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--up); margin-left: 4px; vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 14px; border-top: 1px solid var(--line); text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 16px 24px; }
+  .err { color: var(--down); padding: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scanner Tracker</h1>
+  <div class="sub" id="updated">Loading…</div>
+</header>
+<nav>
+  <button data-tab="now" class="on">Now</button>
+  <button data-tab="breakouts">Breakouts</button>
+  <button data-tab="sectors">Sectors</button>
+</nav>
+<main id="view"></main>
+<footer>BUY = price above its trigger price · HOLD = at or below. A mechanical rule, not advice.</footer>
+
+<script>
+const state = { tab: "now", scanner: "All", status: "All", data: null };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const pct = (v) => (v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(2) + "%");
+const cls = (v) => (v == null || v === 0 ? "" : v > 0 ? "up" : "down");
+const fmtDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+const fmtWhen = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
+
+function renderNow(d) {
+  return d.scanners.map((s) => `
+    <section class="card">
+      <h2>${esc(s.name)} <small>${s.rows.length} stock${s.rows.length === 1 ? "" : "s"}</small></h2>
+      ${s.rows.length ? s.rows.map((r) => `
+        <div class="row">
+          <div><div class="sym">${esc(r.symbol)}</div>
+            <div class="meta">${money(r.now)} · trig ${money(r.trigger)}${r.trigger_date ? " on " + fmtDate(r.trigger_date) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div></div>
+          <div class="num chg ${cls(r.chg)}">${pct(r.chg)}</div>
+          <span class="pill ${r.status}">${r.status}</span>
+        </div>`).join("") : `<div class="empty">No stocks on this scanner right now.</div>`}
+    </section>`).join("");
+}
+
+function renderBreakouts(d) {
+  const names = ["All", ...new Set(d.breakouts.map((b) => b.scanner))];
+  const rows = d.breakouts.filter((b) =>
+    (state.scanner === "All" || b.scanner === state.scanner) && (state.status === "All" || b.status === state.status));
+  const stats = d.stats.map((s) => `
+    <div class="stat"><b>${esc(s.scanner)}</b>
+      <div><span>Triggers</span><span>${s.count}</span></div>
+      <div><span>Above trigger</span><span>${s.above} (${Math.round((s.above / s.count) * 100)}%)</span></div>
+      <div><span>Avg move</span><span class="${cls(s.avg_chg)}">${pct(s.avg_chg)}</span></div>
+      <div><span>Avg best</span><span class="${cls(s.avg_best)}">${pct(s.avg_best)}</span></div>
+    </div>`).join("");
+  const chip = (group, v) => `<button data-${group}="${esc(v)}" class="${state[group] === v ? "on" : ""}">${esc(v)}</button>`;
+  return `
+    <div class="stats">${stats}</div>
+    <div class="filters">${names.map((n) => chip("scanner", n)).join("")}</div>
+    <div class="filters">${["All", "BUY", "HOLD"].map((v) => chip("status", v)).join("")}</div>
+    <section class="card">
+      <h2>Triggers, last ${d.window_days} days <small>${rows.length}</small></h2>
+      ${rows.length ? rows.map((b) => `
+        <div class="row">
+          <div><div class="sym">${esc(b.symbol)}${b.on_scan ? '<span class="dot" title="still on the scanner"></span>' : ""}</div>
+            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · ${money(b.trigger)} → ${money(b.now)}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div></div>
+          <div class="num chg ${cls(b.chg)}">${pct(b.chg)}</div>
+          <span class="pill ${b.status}">${b.status}</span>
+        </div>`).join("") : `<div class="empty">No triggers match.</div>`}
+    </section>
+    <footer>● still on the scanner · best = highest price since the trigger</footer>`;
+}
+
+function renderSectors(d) {
+  return Object.entries(d.sectors).map(([name, rows]) => `
+    <section class="card">
+      <h2>${esc(name)} <small>backtest picks</small></h2>
+      ${rows.length ? `<table><tr><th>Sector</th><th class="n">7d</th><th class="n">30d</th></tr>
+        ${rows.map(([s, w, m]) => `<tr><td>${esc(s)}</td><td class="n">${w}</td><td class="n">${m}</td></tr>`).join("")}</table>`
+        : `<div class="empty">No picks in the last 30 days.</div>`}
+    </section>`).join("");
+}
+
+function render() {
+  const d = state.data;
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
+  $("#view").innerHTML = { now: renderNow, breakouts: renderBreakouts, sectors: renderSectors }[state.tab](d);
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  if (t.dataset.tab) state.tab = t.dataset.tab;
+  else if (t.dataset.scanner) state.scanner = t.dataset.scanner;
+  else if (t.dataset.status) state.status = t.dataset.status;
+  else return;
+  render();
+});
+
+fetch("data.json", { cache: "no-store" })
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then((d) => {
+    state.data = d;
+    $("#updated").textContent = `Last scan ${fmtWhen(d.last_scan)} · scans ${d.slots.join(", ")} IST, Mon–Fri`;
+    render();
+  })
+  .catch((e) => { $("#view").innerHTML = `<div class="err">Couldn't load the data (${esc(e.message)}). Pull down to refresh.</div>`; });
+</script>
+</body>
+</html>

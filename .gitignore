@@ -3,3 +3,4 @@ __pycache__/
 debug/
 .venv/
 reports/daily_prices_after_signal.xlsx
+site/data.json

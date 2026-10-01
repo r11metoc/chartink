@@ -66,6 +66,27 @@ For a custom lookback, trigger the workflow manually with `digest` set to
 Telegram's 4096-character limit is split at section boundaries, and a
 message Telegram rejects is resent as plain text rather than dropped.
 
+## Web dashboard
+
+`site/index.html` is a phone-friendly dashboard, published to GitHub Pages
+after every scan (open it on your iPhone and use Share → Add to Home Screen):
+
+- **Now**: every stock on each scanner, its price vs its trigger price, BUY/HOLD
+- **Breakouts**: every trigger in the last 90 days with its move since the
+  trigger, best move so far and days held, filterable by scanner and BUY/HOLD,
+  plus per-scanner totals (how many are above their trigger, average move)
+- **Sectors**: the backtest sector table
+
+Each scan runs `scripts/refresh_prices.py`, which fetches daily prices from
+Yahoo Finance (`daily_prices` table) for every stock that triggered in the
+last 120 days, so a stock keeps being tracked after it drops off its scanner.
+`scripts/export_dashboard.py` then writes `site/data.json`. If Yahoo is down
+the dashboard falls back to the last scan price.
+
+One-time setup: Settings → Pages → Build and deployment → Source: **GitHub
+Actions**. The dashboard is then at `https://r11metoc.github.io/chartink/`.
+Like the repository itself, it is public to anyone who has the link.
+
 ## Backtest model: is a trigger a real breakout or a fake one?
 
 The descriptive backtest context above (seen-before counts, sector focus)

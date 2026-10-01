@@ -42,6 +42,16 @@ CREATE TABLE IF NOT EXISTS breakouts (
 );
 CREATE INDEX IF NOT EXISTS idx_breakouts_detected_at ON breakouts(detected_at);
 
+CREATE TABLE IF NOT EXISTS daily_prices (
+    symbol TEXT NOT NULL,
+    date TEXT NOT NULL,             -- trading day, YYYY-MM-DD
+    open REAL NOT NULL,
+    high REAL NOT NULL,
+    low REAL NOT NULL,
+    close REAL NOT NULL,
+    PRIMARY KEY (symbol, date)
+);
+
 CREATE TABLE IF NOT EXISTS slots (
     slot TEXT PRIMARY KEY,          -- e.g. '2026-10-01 09:23' (IST)
     run_id INTEGER NOT NULL REFERENCES runs(id)
@@ -91,6 +101,22 @@ def connect() -> sqlite3.Connection:
     conn.executescript(SCHEMA)
     _migrate(conn)
     return conn
+
+
+def save_daily_prices(conn: sqlite3.Connection, symbol: str, bars: list[tuple[str, float, float, float, float]]) -> None:
+    """bars: (date, open, high, low, close). Re-saving a date overwrites it, so
+    today's still-forming bar is replaced by the later, more complete one."""
+    conn.executemany(
+        "INSERT OR REPLACE INTO daily_prices (symbol, date, open, high, low, close) VALUES (?, ?, ?, ?, ?, ?)",
+        [(symbol, *bar) for bar in bars],
+    )
+
+
+def daily_prices_since(conn: sqlite3.Connection, symbol: str, since_date: str) -> list[tuple[str, float, float, float, float]]:
+    return conn.execute(
+        "SELECT date, open, high, low, close FROM daily_prices WHERE symbol = ? AND date >= ? ORDER BY date",
+        (symbol, since_date),
+    ).fetchall()
 
 
 def slot_done(conn: sqlite3.Connection, slot: str) -> bool:

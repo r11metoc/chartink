@@ -73,7 +73,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.txt "yfinance>=0.2.40,<1" "pandas>=2.0,<3"
           playwright install --with-deps chromium
 
       - name: Run scan
@@ -87,6 +87,13 @@ jobs:
           CHARTINK_SLOT: ${{ needs.gate.outputs.slot }}
         working-directory: scripts
         run: python run.py
+
+      - name: Refresh prices and build the dashboard
+        working-directory: scripts
+        run: |
+          # Yahoo hiccups shouldn't cost the scan; the dashboard falls back to scan prices.
+          python refresh_prices.py || echo "Price refresh failed, using scan prices."
+          python export_dashboard.py
 
       - name: Upload debug artifact
         if: ${{ inputs.debug }}
@@ -107,3 +114,24 @@ jobs:
             git commit -m "Update scan data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             git push
           fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # Publishes site/ (index.html + the data.json built above) to GitHub Pages.
+  # Needs Settings -> Pages -> Source: "GitHub Actions" (one-time).
+  pages:
+    needs: scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
