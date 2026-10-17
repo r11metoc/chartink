@@ -157,7 +157,165 @@
      }
     }
    }
+  },
+  {
+   "from": "2026-10-17",
+   "scanners": {
+    "63_30_daily": {
+     "status": "not better",
+     "rule": {
+      "min_risk_pct": 2.0,
+      "max_risk_pct": 8.0,
+      "target_r": 2.0,
+      "trail_pct": 0.0,
+      "max_hold": 20
+     },
+     "skip": [],
+     "candidate": {
+      "min_risk_pct": 12.0,
+      "max_risk_pct": 12.0,
+      "target_r": 3.0,
+      "trail_pct": 0.0,
+      "max_hold": 40
+     },
+     "train": {
+      "n": 273,
+      "avg": 1.79
+     },
+     "walk_forward": {
+      "base": {
+       "n": 80,
+       "win": 21,
+       "avg": -3.41,
+       "vs_index": -2.42,
+       "total": -273.1,
+       "gain": 0.0,
+       "t": null
+      },
+      "rule": {
+       "n": 80,
+       "win": 22,
+       "avg": -5.74,
+       "vs_index": -3.62,
+       "total": -459.4,
+       "gain": -2.33,
+       "t": -1.97
+      },
+      "rule+filter": {
+       "n": 57,
+       "win": 23,
+       "avg": -6.36,
+       "vs_index": -3.93,
+       "total": -362.6,
+       "gain": -1.12,
+       "t": -1.02
+      }
+     }
+    },
+    "Bullish_Scanner": {
+     "status": "promising",
+     "rule": {
+      "min_risk_pct": 12.0,
+      "max_risk_pct": 12.0,
+      "target_r": 0.0,
+      "trail_pct": 0.0,
+      "max_hold": 40
+     },
+     "skip": [],
+     "candidate": {
+      "min_risk_pct": 12.0,
+      "max_risk_pct": 12.0,
+      "target_r": 0.0,
+      "trail_pct": 0.0,
+      "max_hold": 40
+     },
+     "train": {
+      "n": 158,
+      "avg": 2.77
+     },
+     "walk_forward": {
+      "base": {
+       "n": 91,
+       "win": 41,
+       "avg": 0.66,
+       "vs_index": 1.72,
+       "total": 59.6,
+       "gain": 0.0,
+       "t": null
+      },
+      "rule": {
+       "n": 91,
+       "win": 46,
+       "avg": 0.87,
+       "vs_index": 4.12,
+       "total": 79.3,
+       "gain": 0.22,
+       "t": 0.17
+      },
+      "rule+filter": {
+       "n": 91,
+       "win": 46,
+       "avg": 0.87,
+       "vs_index": 4.12,
+       "total": 79.3,
+       "gain": 0.22,
+       "t": 0.17
+      }
+     }
+    },
+    "Wkly_upswing": {
+     "status": "proven",
+     "rule": {
+      "min_risk_pct": 12.0,
+      "max_risk_pct": 12.0,
+      "target_r": 3.0,
+      "trail_pct": 0.0,
+      "max_hold": 40
+     },
+     "skip": [],
+     "candidate": {
+      "min_risk_pct": 12.0,
+      "max_risk_pct": 12.0,
+      "target_r": 3.0,
+      "trail_pct": 0.0,
+      "max_hold": 40
+     },
+     "train": {
+      "n": 515,
+      "avg": 2.05
+     },
+     "walk_forward": {
+      "base": {
+       "n": 389,
+       "win": 37,
+       "avg": -0.49,
+       "vs_index": -0.53,
+       "total": -189.9,
+       "gain": 0.0,
+       "t": null
+      },
+      "rule": {
+       "n": 389,
+       "win": 39,
+       "avg": 0.65,
+       "vs_index": 0.36,
+       "total": 251.4,
+       "gain": 1.13,
+       "t": 1.71
+      },
+      "rule+filter": {
+       "n": 341,
+       "win": 39,
+       "avg": 0.46,
+       "vs_index": 0.25,
+       "total": 155.3,
+       "gain": 0.89,
+       "t": 1.36
+      }
+     }
+    }
+   }
   }
  ],
- "updated": "2026-10-10"
+ "updated": "2026-10-17"
 }
