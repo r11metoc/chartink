@@ -21,6 +21,7 @@ Writes:
   data/model/stock_outcomes.csv      one row per trade
   data/model/stock_summary.csv       one row per scanner x stock
   data/model/reentry_trades.csv      trigger-price stop with re-entry, one row per signal
+  data/model/pullback_rules.csv      pullback buy rules (scripts/pullback.py), one row per signal x rule
 
 Usage: python stock_outcomes.py
 """
@@ -34,6 +35,7 @@ import numpy as np
 import pandas as pd
 
 import breakout_sim as bs
+import pullback
 from build_dataset import load_hits
 from market_data import fetch_daily
 
@@ -42,6 +44,7 @@ REPORT = ROOT / "reports" / "stock_outcomes.md"
 TRADES_CSV = ROOT / "data" / "model" / "stock_outcomes.csv"
 SUMMARY_CSV = ROOT / "data" / "model" / "stock_summary.csv"
 REENTRY_CSV = ROOT / "data" / "model" / "reentry_trades.csv"
+PULLBACK_CSV = ROOT / "data" / "model" / "pullback_rules.csv"
 
 HORIZONS = [("2w", 10, "Short"), ("1m", 21, "Short"), ("3m", 63, "Medium"),
             ("6m", 126, "Medium"), ("1y", 252, "Long"), ("2y", 504, "Long")]
@@ -293,7 +296,8 @@ def best_trades(b: pd.DataFrame, key: str = "1y", n: int = 10) -> list[str]:
     return L
 
 
-def build_report(t: pd.DataFrame, s: pd.DataFrame, rt: pd.DataFrame | None = None) -> str:
+def build_report(t: pd.DataFrame, s: pd.DataFrame, rt: pd.DataFrame | None = None,
+                 pb: tuple | None = None) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     b = t[t["status"] == "bought"].copy()
     if not b.empty:
@@ -339,6 +343,8 @@ def build_report(t: pd.DataFrame, s: pd.DataFrame, rt: pd.DataFrame | None = Non
 
     if rt is not None:
         L += reentry_section(rt)
+    if pb is not None:
+        L += pullback.section(*pb)
 
     L += ["", "## Reading this", "",
           "- Average vs median: a high average with a low median means a few big winners carry the result; "
@@ -370,7 +376,9 @@ def main() -> int:
     s.to_csv(SUMMARY_CSV, index=False)
     rt = reentry_trades(hits, prices, bench)
     rt.to_csv(REENTRY_CSV, index=False)
-    REPORT.write_text(build_report(t, s, rt), encoding="utf-8")
+    pb = pullback.analyse(hits, prices)
+    pb[0].to_csv(PULLBACK_CSV, index=False)
+    REPORT.write_text(build_report(t, s, rt, pb), encoding="utf-8")
     print(f"Wrote {REPORT} ({len(b)} bought of {len(t)} signals)")
     return 0
 
