@@ -2,10 +2,7 @@
 
 **What runs:** `scan.yml` (3 scans a day, Mon–Fri, Telegram + dashboard) and
 `signal_model.yml` (Saturday retrain / re-learn for all three scanners:
-`Wkly_upswing`, `63_30_daily`, `Bullish_Scanner`). Retired manual workflows
-and scripts (the old backtest-outcome model and the SQL-query workflow) are
-in `_archive/`. Local swing tools are in `market_trend/` and `google_sheet/`
-(see "Local swing tools").
+`Wkly_upswing`, `63_30_daily`, `Bullish_Scanner`).
 
 Scrapes the three scanner widgets on the public dashboard
 [chartink.com/dashboard/45863](https://chartink.com/dashboard/45863) on a
@@ -185,19 +182,6 @@ python signal_model.py predict --input ~/Downloads/63_30_daily.csv --scanner 63_
 python signal_model.py predict --symbols KSB,ACI --scanner 63_30_daily
 python -m pytest ../tests    # offline tests, no network
 ```
-
-## Local swing tools (run on your PC, not by GitHub)
-
-- `market_trend/` - Nifty market-breadth and reversal models for 2-10 day
-  swing trades. Run `python daily_report.py` from that folder before 9:15 IST
-  for the morning bias, key levels and chart (`swing_report.png`). The other
-  scripts (`market_breadth.py`, `breadth_signals.py`, `breadth_model.py`,
-  `reversal_model.py`) build the pieces it uses. Charts and CSVs they write
-  stay local (gitignored).
-- `google_sheet/chartink_GoogleExcel.py` - the older Chartink-to-Google-Sheets
-  export. Needs the service-account key in `key/` (gitignored, never pushed).
-
-Install: `pip install -r requirements-swing.txt`.
 
 ## Setup
 

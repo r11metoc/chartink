@@ -5,13 +5,3 @@ debug/
 reports/daily_prices_after_signal.xlsx
 site/data.json
 
-# Local-only swing tools: secrets and generated outputs
-key/
-*credentials*.json
-*service-account*.json
-zippy-parity-*.json
-.chartink_state.json
-chartink_out/
-chartink_inputs/
-market_trend/*.png
-market_trend/*.csv
