@@ -23,6 +23,7 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 import breakout_sim as bs
@@ -118,7 +119,7 @@ def build(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], nifty: pd.DataFra
                               "open": bar["Open"], "high": bar["High"],
                               "low": bar["Low"], "close": bar["Close"]})
 
-    signals = pd.DataFrame(signal_rows)
+    signals = pd.DataFrame(signal_rows).replace([np.inf, -np.inf], np.nan)
     signals[["prior_hits_same_scanner_180d", "other_scanner_hits_10d"]] = bs.history_features(signals)
     return signals, pd.DataFrame(path_rows)
 

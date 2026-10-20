@@ -192,7 +192,8 @@ def indicator_frame(df: pd.DataFrame) -> pd.DataFrame:
     f["dist_52w_high"] = (c / h.rolling(252, min_periods=120).max() - 1) * 100
     f["log_turnover"] = np.log10((c * v).rolling(20).mean().clip(lower=1))
     f["up_days_10"] = (c > prev_c).rolling(10).sum()
-    return f
+    # Zero-volume or zero-price bars in old data give inf; the model imputes NaN.
+    return f.replace([np.inf, -np.inf], np.nan)
 
 
 FEATURE_COLUMNS = [

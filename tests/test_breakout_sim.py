@@ -142,3 +142,12 @@ def test_end_to_end_on_synthetic_prices(tmp_path, monkeypatch):
     assert set(res["action"]) <= {"BUY", "SETUP", "SKIP", "TRIGGERED", "MISSED", "EXPIRED", "NO DATA"}
     assert res.loc[2, "action"] == "NO DATA"
     assert (res.loc[:1, "stop"] < res.loc[:1, "trigger"]).all()
+
+
+def test_indicator_frame_has_no_infinities_on_zero_volume():
+    import numpy as np
+    idx = pd.bdate_range("2024-01-01", periods=60)
+    df = pd.DataFrame({"Open": 10.0, "High": 11.0, "Low": 9.0, "Close": 10.0, "Volume": 0.0}, index=idx)
+    df.loc[idx[-1], "Volume"] = 1000.0  # after 20 zero-volume days: v / 0
+    f = bs.indicator_frame(df)
+    assert not np.isinf(f.to_numpy(dtype=float)).any()
