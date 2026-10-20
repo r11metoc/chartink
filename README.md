@@ -135,6 +135,24 @@ One-time setup: Settings → Pages → Build and deployment → Source: **GitHub
 Actions**. The dashboard is then at `https://r11metoc.github.io/chartink/`.
 Like the repository itself, it is public to anyone who has the link.
 
+## Buy-the-dip alerts (live)
+
+`scripts/dipzone.py` watches every signal since 25 Sep 2026 and, on every scan,
+sends a Telegram alert when:
+
+- **BUY ZONE**: after the breakout above the trigger (the signal candle's
+  high), a daily close is 3% below the highest close since the breakout (5%
+  for `Wkly_upswing`), within 20 sessions and no more than 5% below the
+  trigger. Buy at the next open, with a +5% target, a 12% stop and an exit
+  after 8 weeks (all shown in the alert).
+- **CLOSED**: a trade hits its target, its stop or the 8-week limit.
+
+Only completed daily candles are used, so a morning alert means "buy at
+today's open". Each alert is sent once (`dip_alerts` table). The digest adds
+a paper book for this rule, and the Saturday report
+(`reports/stock_outcomes.md`, "Buy-the-dip rule") backtests the same rule on
+the full history. Settings are at the top of `scripts/dipzone.py`.
+
 ## If I had bought every scanner stock
 
 `scripts/stock_outcomes.py` (part of the Saturday `signal_model.yml` run, and

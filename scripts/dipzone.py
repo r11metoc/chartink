@@ -1,0 +1,247 @@
+"""Buy-the-dip rule: wait for the pullback after a breakout, buy it, take +5%.
+
+For every signal (the scanner's trigger = the signal candle's high):
+1. breakout : price crosses above the trigger within 3 sessions (5 after a
+              weekly signal)
+2. buy zone : within 20 sessions of the breakout, a daily close at least
+              DIP% below the highest close since the breakout, while the close
+              is still no more than 5% below the trigger -> buy at the next open
+3. exit     : +5% target, 12% stop below the buy price, or the close after
+              40 sessions (8 weeks), whichever comes first
+
+Used live by run.py (Telegram alerts on every scan) and in the weekly
+backtest report (stock_outcomes.py). Decisions use completed daily candles
+only, so a buy-zone alert in the morning means "buy at today's open".
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+
+import numpy as np
+import pandas as pd
+
+import breakout_sim as bs
+import db
+from slot_gate import IST
+
+DIP_PCT = {"63_30_daily": 3.0, "Bullish_Scanner": 3.0, "Wkly_upswing": 5.0}
+DEFAULT_DIP = 3.0
+FLOOR_PCT = 5.0       # the dip close must stay within 5% below the trigger
+ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
+TARGET_PCT = 5.0
+STOP_PCT = 12.0
+MAX_HOLD = 40         # sessions (8 weeks)
+START = "2026-09-25"  # live signals from this date are tracked
+ALERT_DAYS = 4        # only alert on events this recent (no flood on the first run)
+STAKE = 100_000
+MARKET_CLOSE = (15, 30)
+
+
+def dip_for(scanner: str) -> float:
+    return DIP_PCT.get(scanner, DEFAULT_DIP)
+
+
+def simulate(fwd: pd.DataFrame, trigger: float, scanner: str) -> dict:
+    """Run the rule over the daily bars after the signal bar."""
+    o, h, l, c = (fwd[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
+    dates = fwd.index
+    n = len(c)
+    window = bs.entry_window_for(scanner)
+    out = {"trigger": trigger, "dip_pct": dip_for(scanner)}
+    b = next((i for i in range(min(window, n)) if h[i] > trigger), None)
+    if b is None:
+        out["status"] = "waiting for breakout" if n < window else "no breakout"
+        return out
+    out["breakout_date"] = dates[b]
+    floor = trigger * (1 - FLOOR_PCT / 100)
+    hi = c[b]
+    dip_i = None
+    for i in range(b + 1, min(n, b + 1 + ZONE_DAYS)):
+        hi = max(hi, c[i - 1])
+        if c[i] <= hi * (1 - out["dip_pct"] / 100) and c[i] >= floor:
+            dip_i = i
+            break
+    if dip_i is None:
+        out["status"] = "watching for dip" if n < b + 1 + ZONE_DAYS else "no dip"
+        out["high_close"] = float(max(c[b:]))
+        out["buy_below"] = round(out["high_close"] * (1 - out["dip_pct"] / 100), 2)
+        return out
+    out.update(dip_date=dates[dip_i], dip_close=float(c[dip_i]), high_close=float(hi))
+    e = dip_i + 1
+    if e >= n:
+        out["status"] = "buy zone"  # buy at the next open
+        return out
+    ep = float(o[e])
+    tgt, stp = ep * (1 + TARGET_PCT / 100), ep * (1 - STOP_PCT / 100)
+    out.update(entry_date=dates[e], entry=ep, target=tgt, stop=stp)
+    last = min(n - 1, e + MAX_HOLD)
+    for i in range(e, last + 1):
+        if i > e and o[i] <= stp:
+            return {**out, "status": "stop", "exit_date": dates[i], "exit": float(o[i])} | _ret(ep, o[i])
+        if l[i] <= stp:
+            return {**out, "status": "stop", "exit_date": dates[i], "exit": stp} | _ret(ep, stp)
+        if i > e and o[i] >= tgt:
+            return {**out, "status": "target", "exit_date": dates[i], "exit": float(o[i])} | _ret(ep, o[i])
+        if h[i] >= tgt:
+            return {**out, "status": "target", "exit_date": dates[i], "exit": tgt} | _ret(ep, tgt)
+    if e + MAX_HOLD <= n - 1:
+        return {**out, "status": "time", "exit_date": dates[last], "exit": float(c[last])} | _ret(ep, c[last])
+    return {**out, "status": "holding", "now": float(c[-1]), "sessions_left": e + MAX_HOLD - (n - 1)} | _ret(ep, c[-1])
+
+
+def _ret(entry: float, exit_: float) -> dict:
+    return {"ret": round((float(exit_) / entry - 1) * 100 - bs.COST_PCT, 2)}
+
+
+# ----------------------------------------------------------------- live use
+
+def _completed(df: pd.DataFrame, now: datetime) -> pd.DataFrame:
+    """Drop today's candle while the market is still open."""
+    if df.empty:
+        return df
+    today = pd.Timestamp(now.date())
+    if df.index[-1] == today and (now.hour, now.minute) < MARKET_CLOSE:
+        return df.iloc[:-1]
+    return df
+
+
+def live_states(conn, now: datetime | None = None) -> list[dict]:
+    import paper  # local import: paper imports policy/track_record
+    now = now or datetime.now(IST)
+    lookback = (date.fromisoformat(START) - timedelta(days=14)).isoformat()
+    out = []
+    for day, scanner, symbol, source in paper._signals(conn, START):
+        df = _completed(paper._frame(conn, symbol, lookback), now)
+        hit = pd.Timestamp(day)
+        if not bs.is_weekly(scanner) and not df.empty and hit not in df.index and df.index[-1] > hit:
+            earlier = df.index[df.index <= hit]
+            hit = earlier[-1] if len(earlier) else hit
+        sig = bs.signal_bar(df, hit, bs.is_weekly(scanner)) if not df.empty else None
+        base = {"scanner": scanner, "symbol": symbol, "date": day, "source": source}
+        if sig is None:
+            out.append({**base, "status": "no prices yet"})
+            continue
+        out.append({**base, **simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner)})
+    return out
+
+
+def _d(x) -> str:
+    return pd.Timestamp(x).strftime("%d %b")
+
+
+def _exit_by(s: dict) -> str:
+    return _d(pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(MAX_HOLD)) if "entry_date" in s else "–"
+
+
+def events(states: list[dict], now: datetime) -> list[tuple[str, dict, str]]:
+    """(key, state, kind) for buy-zone / exit events dated in the last ALERT_DAYS."""
+    since = pd.Timestamp(now.date()) - pd.Timedelta(days=ALERT_DAYS)
+    ev = []
+    for s in states:
+        if "dip_date" in s and s["dip_date"] >= since:
+            ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|buy", s, "buy"))
+        if s.get("status") in ("target", "stop", "time") and s["exit_date"] >= since:
+            ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|exit", s, s["status"]))
+    return ev
+
+
+def new_events(conn, states: list[dict], now: datetime) -> list[tuple[str, dict, str]]:
+    conn.execute("CREATE TABLE IF NOT EXISTS dip_alerts (key TEXT PRIMARY KEY, sent_at TEXT NOT NULL)")
+    fresh = []
+    for key, s, kind in events(states, now):
+        if conn.execute("SELECT 1 FROM dip_alerts WHERE key = ?", (key,)).fetchone():
+            continue
+        conn.execute("INSERT INTO dip_alerts (key, sent_at) VALUES (?, ?)", (key, now.isoformat()))
+        fresh.append((key, s, kind))
+    conn.commit()
+    return fresh
+
+
+def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
+    if not fresh:
+        return None
+    lines = ["🎯 <b>Buy-the-dip alerts</b>"]
+    buys = [s for _, s, k in fresh if k == "buy"]
+    if buys:
+        lines += ["", "<b>BUY ZONE</b> (buy at the next open):"]
+        for s in buys:
+            ref = s.get("entry", s["dip_close"])
+            lines.append(f"🟢 <b>{s['symbol']}</b> ({s['scanner']}) dipped {s['dip_pct']:g}% to {s['dip_close']:.2f} "
+                         f"(trigger {s['trigger']:.2f}). Buy ~{ref:.2f}, target {ref * (1 + TARGET_PCT / 100):.2f} "
+                         f"(+{TARGET_PCT:g}%), stop {ref * (1 - STOP_PCT / 100):.2f} (-{STOP_PCT:g}%), "
+                         f"exit by {_exit_by(s) if 'entry_date' in s else 'day 40'}")
+    icon = {"target": "✅", "stop": "🛑", "time": "⏱"}
+    label = {"target": "target hit", "stop": "stopped", "time": "8 weeks up, sold"}
+    exits = [(s, k) for _, s, k in fresh if k != "buy"]
+    if exits:
+        lines += ["", "<b>CLOSED</b>:"]
+        for s, k in exits:
+            lines.append(f"{icon[k]} <b>{s['symbol']}</b> ({s['scanner']}) {label[k]} {_d(s['exit_date'])}: "
+                         f"{s['entry']:.2f} → {s['exit']:.2f} ({s['ret']:+.1f}%)")
+    lines += ["", f"<i>Rule: after the breakout, buy a {DIP_PCT['63_30_daily']:g}% dip "
+                  f"({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing) that stays within {FLOOR_PCT:g}% of the trigger; "
+                  f"+{TARGET_PCT:g}% target, -{STOP_PCT:g}% stop, out after 8 weeks. Backtest, not advice.</i>"]
+    return "\n".join(lines)
+
+
+def summary(states: list[dict]) -> dict:
+    groups: dict[str, list[dict]] = {"All scanners": states}
+    for s in states:
+        groups.setdefault(s["scanner"], []).append(s)
+    out = []
+    for g, xs in groups.items():
+        closed = [x for x in xs if x.get("status") in ("target", "stop", "time")]
+        hold = [x for x in xs if x.get("status") == "holding"]
+        rets = [x["ret"] for x in closed]
+        out.append({"group": g, "signals": len(xs),
+                    "watching": sum(x.get("status") in ("waiting for breakout", "watching for dip", "buy zone") for x in xs),
+                    "holding": len(hold), "closed": len(closed),
+                    "win": round(100 * np.mean([r > 0 for r in rets])) if rets else None,
+                    "pnl": int(sum(r / 100 * STAKE for r in rets)),
+                    "open_pnl": int(sum(x["ret"] / 100 * STAKE for x in hold))})
+    return {"start": START, "rows": out}
+
+
+def format_summary(book: dict) -> str:
+    lines = [f"🎯 <b>Buy-the-dip paper book</b> (since {book['start']}, ₹1L a trade)", "<pre>",
+             f"{'':16}{'Watch':>6}{'Hold':>5}{'Done':>5}{'Win':>5}{'P&L':>9}{'Open':>8}"]
+    for r in book["rows"]:
+        win = f"{r['win']}%" if r["win"] is not None else "–"
+        lines.append(f"{r['group'][:16]:16}{r['watching']:>6}{r['holding']:>5}{r['closed']:>5}{win:>5}"
+                     f"{r['pnl']:>9,}{r['open_pnl']:>8,}")
+    lines.append("</pre>")
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------ backtest report
+
+def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> list[str]:
+    rows = []
+    for _, h in hits.iterrows():
+        df = prices.get(h["symbol"])
+        sig = bs.signal_bar(df, h["hit_date"], bs.is_weekly(h["scanner_name"])) if df is not None else None
+        if sig is None:
+            continue
+        s = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"])
+        if s["status"] in ("target", "stop", "time"):
+            rows.append({"scanner": h["scanner_name"], "cap": h["marketcap"], "status": s["status"], "ret": s["ret"],
+                         "days": int(np.busday_count(pd.Timestamp(s["entry_date"]).date(),
+                                                     pd.Timestamp(s["exit_date"]).date())) + 1})
+    if not rows:
+        return []
+    d = pd.DataFrame(rows)
+    L = ["", "## Buy-the-dip rule (the live alert rule)", "",
+         f"After the breakout, buy at the next open once a close is {DIP_PCT['63_30_daily']:g}% below the highest close "
+         f"since the breakout ({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing), within {ZONE_DAYS} sessions and no more than "
+         f"{FLOOR_PCT:g}% below the trigger. Exit at +{TARGET_PCT:g}%, a {STOP_PCT:g}% stop, or after {MAX_HOLD} sessions. "
+         f"{bs.COST_PCT}% costs.", "",
+         "| Group | Trades | Win rate | Avg | Avg win / loss | Target / stop / time | Avg days | ₹ on ₹1L a trade |",
+         "|---|---|---|---|---|---|---|---|"]
+    groups = [(k, g) for k, g in d.groupby("scanner")] + [(f"{k}", g) for k, g in d.groupby("cap") if k] + [("**All**", d)]
+    for name, x in groups:
+        r = x["ret"]
+        L.append(f"| {name} | {len(x)} | {(r > 0).mean():.0%} | {r.mean():+.2f}% | {r[r > 0].mean():+.1f}% / "
+                 f"{r[r <= 0].mean():+.1f}% | {(x.status == 'target').mean():.0%} / {(x.status == 'stop').mean():.0%} / "
+                 f"{(x.status == 'time').mean():.0%} | {x['days'].mean():.0f} | {r.sum() * 1000:,.0f} |")
+    return L

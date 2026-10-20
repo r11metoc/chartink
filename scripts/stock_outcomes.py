@@ -35,6 +35,7 @@ import numpy as np
 import pandas as pd
 
 import breakout_sim as bs
+import dipzone
 import pullback
 from build_dataset import load_hits
 from market_data import fetch_daily
@@ -297,7 +298,7 @@ def best_trades(b: pd.DataFrame, key: str = "1y", n: int = 10) -> list[str]:
 
 
 def build_report(t: pd.DataFrame, s: pd.DataFrame, rt: pd.DataFrame | None = None,
-                 pb: tuple | None = None) -> str:
+                 pb: tuple | None = None, dz: list[str] | None = None) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     b = t[t["status"] == "bought"].copy()
     if not b.empty:
@@ -345,6 +346,8 @@ def build_report(t: pd.DataFrame, s: pd.DataFrame, rt: pd.DataFrame | None = Non
         L += reentry_section(rt)
     if pb is not None:
         L += pullback.section(*pb)
+    if dz is not None:
+        L += dz
 
     L += ["", "## Reading this", "",
           "- Average vs median: a high average with a low median means a few big winners carry the result; "
@@ -378,7 +381,8 @@ def main() -> int:
     rt.to_csv(REENTRY_CSV, index=False)
     pb = pullback.analyse(hits, prices)
     pb[0].to_csv(PULLBACK_CSV, index=False)
-    REPORT.write_text(build_report(t, s, rt, pb), encoding="utf-8")
+    dz = dipzone.backtest_section(hits, prices)
+    REPORT.write_text(build_report(t, s, rt, pb, dz), encoding="utf-8")
     print(f"Wrote {REPORT} ({len(b)} bought of {len(t)} signals)")
     return 0
 

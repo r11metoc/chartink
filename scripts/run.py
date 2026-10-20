@@ -16,6 +16,7 @@ from notify import (
     format_sector_focus_message,
     send_telegram_message,
 )
+import dipzone
 import paper
 import policy
 import track_record
@@ -102,6 +103,20 @@ def main() -> int:
     if send_snapshot:
         send_telegram_message(format_scan_message(scans, trigger_lookup))
 
+    # Buy-the-dip alerts: new buy zones and closed trades since the last run.
+    dip_states, alert = [], None
+    dip_conn = db.connect()
+    try:
+        now = datetime.now(IST)
+        dip_states = dipzone.live_states(dip_conn, now)
+        alert = dipzone.format_alerts(dipzone.new_events(dip_conn, dip_states, now))
+    except Exception as e:  # never let the dip alerts cost the scan
+        print(f"Buy-the-dip alerts failed: {e}")
+    finally:
+        dip_conn.close()
+    if alert:
+        send_telegram_message(alert)
+
     if send_digest:
         since = (datetime.now(timezone.utc) - timedelta(days=digest_days)).isoformat()
         digest_conn = db.connect()
@@ -134,6 +149,7 @@ def main() -> int:
         digest_conn.close()
         send_telegram_message(format_sector_focus_message(sector_focus))
         send_telegram_message(format_digest_message(entries, digest_days, momentum, book))
+        send_telegram_message(dipzone.format_summary(dipzone.summary(dip_states)))
 
     return 0
 
