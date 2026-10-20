@@ -52,6 +52,11 @@
   .pill.BUY { color: var(--buy); background: var(--buy-bg); }
   .pill.HOLD { color: var(--hold); background: var(--hold-bg); }
   .pill.WAIT { color: var(--muted); background: var(--chip); }
+  .pill.SELL { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+  .lv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0 14px 10px; font-size: 12.5px; }
+  .lv div { background: var(--chip); border-radius: 8px; padding: 5px 8px; }
+  .lv span { display: block; color: var(--muted); font-size: 11px; }
+  .lv b { font-variant-numeric: tabular-nums; }
   .track { margin-top: 2px; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
   .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
@@ -86,7 +91,8 @@
   <div class="sub" id="updated">Loading…</div>
 </header>
 <nav>
-  <button data-tab="now" class="on">Now</button>
+  <button data-tab="dip" class="on">Dip</button>
+  <button data-tab="now">Now</button>
   <button data-tab="breakouts">Breakouts</button>
   <button data-tab="sectors">Sectors</button>
   <button data-tab="paper">Paper</button>
@@ -95,7 +101,7 @@
 <footer>BUY = price above its trigger price · HOLD = at or below. A mechanical rule, not advice.</footer>
 
 <script>
-const state = { tab: "now", scanner: "All", status: "All", book: "base", data: null };
+const state = { tab: "dip", scanner: "All", status: "All", book: "base", data: null };
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -173,6 +179,65 @@ function renderPaper(d) {
     <div class="stats">${cards}</div>
     <section class="card"><h2>Trades <small>${p.trades.length}</small></h2>${rows}</section>
     ${renderPolicy(d.policy)}`;
+}
+
+
+const STAGE = {
+  zone: ["BUY", "BUY ZONE"],
+  dip: ["HOLD", "WAIT DIP"],
+  breakout: ["WAIT", "WAIT B/O"],
+};
+const SELL = { target: "target", stop: "stop", time: "8 weeks" };
+
+function renderDip(d) {
+  const z = d.dip;
+  if (!z) return `<section class="card"><div class="empty">The buy-the-dip data isn't in this scan yet.</div></section>`;
+  const r = z.rule;
+  const intro = `After the breakout above the trigger, buy at the next open when a close is ${r.dip["63_30_daily"]}% below the highest close
+    since the breakout (${r.dip["Wkly_upswing"]}% for Wkly_upswing), within ${r.zone_days} sessions and no more than ${r.floor}% below the trigger.
+    Sell at <b>+${r.target}%</b>, a <b>${r.stop}% stop</b>, or after 8 weeks. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`;
+  const cards = z.summary.rows.map((g) => `
+    <div class="stat"><b>${esc(g.group)}</b>
+      <div><span>Watching</span><span>${g.watching}</span></div>
+      <div><span>Holding</span><span>${g.holding}</span></div>
+      <div><span>Closed</span><span>${g.closed}${g.win != null ? " · " + g.win + "% won" : ""}</span></div>
+      <div><span>Closed P&amp;L</span><span class="${cls(g.pnl)}">${rupees(g.pnl)}</span></div>
+      <div><span>Open P&amp;L</span><span class="${cls(g.open_pnl)}">${rupees(g.open_pnl)}</span></div>
+    </div>`).join("");
+  const lv = (items) => `<div class="lv">${items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
+  const buyRows = z.buy_list.map((b) => {
+    const [pill, label] = STAGE[b.stage];
+    const what = b.stage === "zone" ? `Dipped ${b.dip_pct}%: buy at the next open`
+      : b.stage === "dip" ? `Broke out ${fmtDate(b.breakout)} · waiting for a ${b.dip_pct}% dip${b.now != null && b.now < b.floor ? " · now below the floor, not a buy unless it closes back above it" : ""}`
+      : `Waiting for price to cross the trigger`;
+    const levels = b.stage === "zone" ? [["Buy ~", money(b.level)], ["Target", money(b.target)], ["Stop", money(b.stop)]]
+      : b.stage === "dip" ? [["Buy at or below", money(b.level)], ["High close", money(b.high_close)], ["Not below", money(b.floor)]]
+      : [["Trigger", money(b.trigger)], ["Now", money(b.now)], ["Signal", fmtDate(b.signal)]];
+    return `<div class="row" style="border-bottom:0"><div><div class="sym">${esc(b.symbol)}</div>
+        <div class="meta">${esc(b.scanner)} · signal ${fmtDate(b.signal)} · now ${money(b.now)}</div><div class="meta">${what}</div></div>
+        <div></div><span class="pill ${pill}">${label}</span></div>${lv(levels)}`;
+  }).join("");
+  const holdRows = z.holding.map((h) => `
+    <div class="row" style="border-bottom:0"><div><div class="sym">${esc(h.symbol)}</div>
+      <div class="meta">${esc(h.scanner)} · bought ${fmtDate(h.entry_date)} at ${money(h.entry)} · now ${money(h.now)}</div></div>
+      <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div>
+      <span class="pill ${h.ret > 0 ? "BUY" : "HOLD"}">HOLD</span></div>
+    ${lv([["Target", money(h.target)], ["Stop", money(h.stop)], ["Exit by", fmtDate(h.exit_by)]])}`).join("");
+  const actRows = z.activity.map((a) => `
+    <div class="row"><div><div class="sym">${esc(a.symbol)}</div>
+      <div class="meta">${fmtDate(a.when)} · ${esc(a.scanner)} · ${a.side === "BUY" ? "bought" : "sold (" + SELL[a.reason] + ")"} at ${money(a.price)}
+        ${a.side === "SELL" ? " · bought " + money(a.entry) : " · target " + money(a.target) + " · stop " + money(a.stop)}</div></div>
+      <div class="num">${a.side === "SELL" ? `<div class="chg ${cls(a.ret)}">${pct(a.ret)}</div><div class="tiny ${cls(a.pnl)}">${rupees(a.pnl)}</div>` : ""}</div>
+      <span class="pill ${a.side === "BUY" ? "BUY" : "SELL"}">${a.side}</span></div>`).join("");
+  return `
+    <section class="card"><div class="note" style="padding-top:12px">${intro}</div></section>
+    <div class="stats">${cards}</div>
+    <section class="card"><h2>🛒 Buy list <small>${z.buy_list.length}</small></h2>
+      ${buyRows || `<div class="empty">Nothing waiting to be bought.</div>`}</section>
+    <section class="card"><h2>📦 Holding <small>${z.holding.length}</small></h2>
+      ${holdRows || `<div class="empty">No open positions.</div>`}</section>
+    <section class="card"><h2>🧾 Recent buys and sells <small>last 60 days</small></h2>
+      ${actRows || `<div class="empty">No trades yet.</div>`}</section>`;
 }
 
 function renderNow(d) {
@@ -261,7 +326,7 @@ function renderSectors(d) {
 function render() {
   const d = state.data;
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
-  $("#view").innerHTML = { now: renderNow, breakouts: renderBreakouts, sectors: renderSectors, paper: renderPaper }[state.tab](d);
+  $("#view").innerHTML = { dip: renderDip, now: renderNow, breakouts: renderBreakouts, sectors: renderSectors, paper: renderPaper }[state.tab](d);
 }
 
 document.addEventListener("click", (e) => {

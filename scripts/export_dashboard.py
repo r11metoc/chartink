@@ -26,6 +26,7 @@ from pathlib import Path
 
 import db
 import paper
+import dipzone
 import policy
 import track_record
 from notify import _col, _num, _price
@@ -268,6 +269,7 @@ def main() -> int:
                   "learned": {"start": paper.learned_start(), "summary": paper.summarize(learned),
                               "trades": learned[::-1]}},
         "policy": policy_view(),
+        "dip": dipzone.dashboard_view(dipzone.live_states(conn)),
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)

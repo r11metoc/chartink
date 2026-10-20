@@ -21,10 +21,11 @@ BREAKOUT = [(99, 104, 98, 103), (103, 106, 102, 105)]  # trigger 100, high close
 def test_dip_then_target():
     rows = BREAKOUT + [(104, 104, 101, 101.5),   # 3.3% below 105, above 95 -> buy next open
                        (101, 103, 100.5, 102),   # bought at 101
-                       (102, 107, 101.5, 106)]   # +5% = 106.05 reached
+                       (102, 112, 101.5, 111)]   # target reached
     s = dz.simulate(frame(rows), 100.0, "63_30_daily")
     assert s["status"] == "target" and s["entry"] == 101.0
-    assert abs(s["exit"] - 106.05) < 1e-9 and s["ret"] == round(5 - 0.25, 2)
+    assert abs(s["exit"] - 101 * (1 + dz.TARGET_PCT / 100)) < 1e-9
+    assert s["ret"] == round(dz.TARGET_PCT - 0.25, 2)
 
 
 def test_twelve_percent_stop():

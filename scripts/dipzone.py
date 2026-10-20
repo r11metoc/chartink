@@ -1,4 +1,4 @@
-"""Buy-the-dip rule: wait for the pullback after a breakout, buy it, take +5%.
+"""Buy-the-dip rule: wait for the pullback after a breakout, buy it, take +8%.
 
 For every signal (the scanner's trigger = the signal candle's high):
 1. breakout : price crosses above the trigger within 3 sessions (5 after a
@@ -6,7 +6,7 @@ For every signal (the scanner's trigger = the signal candle's high):
 2. buy zone : within 20 sessions of the breakout, a daily close at least
               DIP% below the highest close since the breakout, while the close
               is still no more than 5% below the trigger -> buy at the next open
-3. exit     : +5% target, 12% stop below the buy price, or the close after
+3. exit     : +8% target, 12% stop below the buy price, or the close after
               40 sessions (8 weeks), whichever comes first
 
 Used live by run.py (Telegram alerts on every scan) and in the weekly
@@ -29,7 +29,7 @@ DIP_PCT = {"63_30_daily": 3.0, "Bullish_Scanner": 3.0, "Wkly_upswing": 5.0}
 DEFAULT_DIP = 3.0
 FLOOR_PCT = 5.0       # the dip close must stay within 5% below the trigger
 ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
-TARGET_PCT = 5.0
+TARGET_PCT = 8.0
 STOP_PCT = 12.0
 MAX_HOLD = 40         # sessions (8 weeks)
 START = "2026-09-25"  # live signals from this date are tracked
@@ -122,7 +122,8 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
         if sig is None:
             out.append({**base, "status": "no prices yet"})
             continue
-        out.append({**base, **simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner)})
+        st = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner)
+        out.append({**base, **st, "last_close": float(df["Close"].iloc[-1]), "last_date": df.index[-1]})
     return out
 
 
@@ -212,6 +213,54 @@ def format_summary(book: dict) -> str:
                      f"{r['pnl']:>9,}{r['open_pnl']:>8,}")
     lines.append("</pre>")
     return "\n".join(lines)
+
+
+# ----------------------------------------------------------------- dashboard
+
+def _iso(x) -> str | None:
+    return None if x is None else pd.Timestamp(x).date().isoformat()
+
+
+def _r(x) -> float | None:
+    return None if x is None else round(float(x), 2)
+
+
+def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
+    """JSON for site/data.json: buy list, holdings, recent buys and sells."""
+    buy_list, holding, activity = [], [], []
+    cutoff = pd.Timestamp(date.today()) - pd.Timedelta(days=activity_days)
+    for s in states:
+        base = {"scanner": s["scanner"], "symbol": s["symbol"], "signal": s["date"],
+                "trigger": _r(s.get("trigger")), "now": _r(s.get("last_close")), "now_date": _iso(s.get("last_date"))}
+        st = s.get("status")
+        if st == "waiting for breakout":
+            buy_list.append({**base, "stage": "breakout", "level": _r(s["trigger"])})
+        elif st == "watching for dip":
+            buy_list.append({**base, "stage": "dip", "level": s["buy_below"], "high_close": _r(s["high_close"]),
+                             "floor": _r(s["trigger"] * (1 - FLOOR_PCT / 100)), "dip_pct": s["dip_pct"],
+                             "breakout": _iso(s["breakout_date"])})
+        elif st == "buy zone":
+            ref = s["dip_close"]
+            buy_list.append({**base, "stage": "zone", "level": _r(ref), "dip_pct": s["dip_pct"],
+                             "target": _r(ref * (1 + TARGET_PCT / 100)), "stop": _r(ref * (1 - STOP_PCT / 100))})
+        if "entry_date" in s:
+            trade = {**base, "entry_date": _iso(s["entry_date"]), "entry": _r(s["entry"]),
+                     "target": _r(s["target"]), "stop": _r(s["stop"]), "exit_by": _iso(
+                         pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(MAX_HOLD)), "ret": s.get("ret")}
+            if st == "holding":
+                holding.append({**trade, "pnl": int(s["ret"] / 100 * STAKE)})
+            if pd.Timestamp(s["entry_date"]) >= cutoff:
+                activity.append({**trade, "side": "BUY", "when": trade["entry_date"], "price": trade["entry"]})
+            if st in ("target", "stop", "time") and pd.Timestamp(s["exit_date"]) >= cutoff:
+                activity.append({**trade, "side": "SELL", "when": _iso(s["exit_date"]), "price": _r(s["exit"]),
+                                 "reason": st, "pnl": int(s["ret"] / 100 * STAKE)})
+    order = {"zone": 0, "dip": 1, "breakout": 2}
+    buy_list.sort(key=lambda x: (order[x["stage"]], x["signal"]), reverse=False)
+    holding.sort(key=lambda x: x["entry_date"], reverse=True)
+    activity.sort(key=lambda x: (x["when"], x["side"] == "SELL"), reverse=True)
+    return {"rule": {"dip": DIP_PCT, "floor": FLOOR_PCT, "zone_days": ZONE_DAYS, "target": TARGET_PCT,
+                     "stop": STOP_PCT, "max_hold": MAX_HOLD, "stake": STAKE},
+            "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity}
 
 
 # ------------------------------------------------------------ backtest report

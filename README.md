@@ -72,6 +72,13 @@ message Telegram rejects is resent as plain text rather than dropped.
 
 ## Web dashboard
 
+**Dip** (first tab): the buy-the-dip paper book: a 🛒 *Buy list* (signals
+waiting for the breakout, waiting for the dip with the price to buy at or
+below, or in the buy zone with buy / target / stop), 📦 *Holding* (entry,
+target, stop, exit-by date, P&L now) and 🧾 *Recent buys and sells* (last
+60 days), plus totals per scanner. Built by `dipzone.dashboard_view()` into
+`site/data.json` on every scan.
+
 `site/index.html` is a phone-friendly dashboard, published to GitHub Pages
 after every scan (open it on your iPhone and use Share → Add to Home Screen):
 
@@ -143,7 +150,7 @@ sends a Telegram alert when:
 - **BUY ZONE**: after the breakout above the trigger (the signal candle's
   high), a daily close is 3% below the highest close since the breakout (5%
   for `Wkly_upswing`), within 20 sessions and no more than 5% below the
-  trigger. Buy at the next open, with a +5% target, a 12% stop and an exit
+  trigger. Buy at the next open, with a +8% target, a 12% stop and an exit
   after 8 weeks (all shown in the alert).
 - **CLOSED**: a trade hits its target, its stop or the 8-week limit.
 
