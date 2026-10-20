@@ -135,6 +135,18 @@ One-time setup: Settings → Pages → Build and deployment → Source: **GitHub
 Actions**. The dashboard is then at `https://r11metoc.github.io/chartink/`.
 Like the repository itself, it is public to anyone who has the link.
 
+## If I had bought every scanner stock
+
+`scripts/stock_outcomes.py` (part of the Saturday `signal_model.yml` run, and
+of any manual run with `mode=train`) buys every backtest and live hit with the
+bot's own entry rule (price crosses the signal candle's high within 3
+sessions, 5 for the weekly scanner) and then just holds, reporting the return
+after 2 weeks and 1 month (short), 3 and 6 months (medium), 1 and 2 years
+(long), each against the Nifty 500, by scanner, market cap, year and sector,
+plus the best and worst repeat stocks. Report: `reports/stock_outcomes.md`;
+data: `data/model/stock_outcomes.csv` (per buy) and
+`data/model/stock_summary.csv` (per stock).
+
 ## Signal model: "buy when it crosses the trigger price"
 
 `.github/workflows/signal_model.yml` (Actions tab → "Scanner signal model")
