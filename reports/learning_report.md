@@ -1,6 +1,6 @@
 # What the system learned
 
-Updated 2026-10-17. For each scanner 144 exit rules were tried; the setup filter skips market-cap x market-regime groups that lost money (at least 20 trades).
+Updated 2026-10-20. For each scanner 144 exit rules were tried; the setup filter skips market-cap x market-regime groups that lost money (at least 20 trades).
 
 **Walk-forward test:** every month the rule and filter were picked using only trades that had already closed, then used on that month's signals. These are the only numbers that count; the in-sample best always looks better than it is. Trades still open are valued at the last close.
 
@@ -8,36 +8,36 @@ Updated 2026-10-17. For each scanner 144 exit rules were tried; the setup filter
 
 ## 63_30_daily
 
-- **Best candidate:** 12% stop, target 3x risk, out after 40 days - did worse on unseen months, so the base rule is kept: stop at candle low (2-8%), target 2x risk, out after 20 days
+- **Learned rule:** 12% stop, no target, out after 40 days
 - **Skips:** nothing
-- **Status:** not better (best candidate in sample: 273 trades, avg +1.79%)
+- **Status:** proven (best candidate in sample: 2111 trades, avg +2.41%)
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 80 | 21% | -3.41% | -2.42% | -273,100 |  |
-| Learned rule | 80 | 22% | -5.74% | -3.62% | -459,400 | -2.33% (t -2.0) |
-| Learned rule + filter | 57 | 23% | -6.36% | -3.93% | -362,600 | -1.12% (t -1.0) |
+| Base rule, every signal | 1963 | 36% | -0.31% | -0.68% | -607,300 |  |
+| Learned rule | 1963 | 43% | +1.98% | +0.98% | +3,883,400 | +2.29% (t 5.9) |
+| Learned rule + filter | 1687 | 44% | +2.00% | +0.91% | +3,378,300 | +2.03% (t 5.5) |
 
 ## Bullish_Scanner
 
-- **Learned rule:** 12% stop, no target, out after 40 days
+- **Learned rule:** 12% stop, target 3x risk, out after 40 days
 - **Skips:** nothing
-- **Status:** promising (best candidate in sample: 158 trades, avg +2.77%)
+- **Status:** proven (best candidate in sample: 1303 trades, avg +1.83%)
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 91 | 41% | +0.66% | +1.72% | +59,600 |  |
-| Learned rule | 91 | 46% | +0.87% | +4.12% | +79,300 | +0.22% (t 0.2) |
-| Learned rule + filter | 91 | 46% | +0.87% | +4.12% | +79,300 | +0.22% (t 0.2) |
+| Base rule, every signal | 1224 | 38% | -0.26% | -0.87% | -323,100 |  |
+| Learned rule | 1224 | 46% | +1.23% | -0.10% | +1,509,600 | +1.50% (t 4.3) |
+| Learned rule + filter | 1081 | 47% | +1.19% | -0.14% | +1,281,800 | +1.31% (t 4.0) |
 
 ## Wkly_upswing
 
-- **Learned rule:** 12% stop, target 3x risk, out after 40 days
+- **Learned rule:** 12% stop, no target, out after 40 days
 - **Skips:** nothing
-- **Status:** proven (best candidate in sample: 515 trades, avg +2.05%)
+- **Status:** proven (best candidate in sample: 1208 trades, avg +2.58%)
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 389 | 37% | -0.49% | -0.53% | -189,900 |  |
-| Learned rule | 389 | 39% | +0.65% | +0.36% | +251,400 | +1.13% (t 1.7) |
-| Learned rule + filter | 341 | 39% | +0.46% | +0.25% | +155,300 | +0.89% (t 1.4) |
+| Base rule, every signal | 1125 | 38% | -0.10% | -0.66% | -111,600 |  |
+| Learned rule | 1125 | 39% | +1.49% | +0.64% | +1,675,100 | +1.59% (t 3.1) |
+| Learned rule + filter | 823 | 41% | +1.72% | +0.66% | +1,412,000 | +1.35% (t 3.0) |
