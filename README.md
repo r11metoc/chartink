@@ -1,5 +1,11 @@
 # Chartink breakout tracker
 
+**What runs:** `scan.yml` (3 scans a day, Mon–Fri, Telegram + dashboard) and
+`signal_model.yml` (Saturday retrain / re-learn for all three scanners:
+`Wkly_upswing`, `63_30_daily`, `Bullish_Scanner`). Retired manual workflows
+and scripts (the old backtest-outcome model and the SQL-query workflow) are
+in `_archive/`.
+
 Scrapes the three scanner widgets on the public dashboard
 [chartink.com/dashboard/45863](https://chartink.com/dashboard/45863) on a
 schedule, stores every result in a SQLite database committed to this repo,
@@ -130,46 +136,6 @@ the dashboard falls back to the last scan price.
 One-time setup: Settings → Pages → Build and deployment → Source: **GitHub
 Actions**. The dashboard is then at `https://r11metoc.github.io/chartink/`.
 Like the repository itself, it is public to anyone who has the link.
-
-## Backtest model: is a trigger a real breakout or a fake one?
-
-The descriptive backtest context above (seen-before counts, sector focus)
-doesn't say whether a scanner's trigger actually led anywhere - it has no
-price data. `.github/workflows/train_model.yml` (manual only, Actions tab →
-"Chartink backtest model training" → Run workflow) fills that gap:
-
-1. `scripts/fetch_price_outcomes.py` fetches historical NSE prices from
-   Yahoo Finance for every symbol in `backtest_hits`, and labels each
-   historical trigger a **real breakout** if price closed at least **+3%**
-   above the trigger-day close within **5 trading days**, otherwise a
-   **fake trigger** (hold). Stored in a `backtest_outcomes` table.
-2. `scripts/train_report.py` builds, **separately per scanner** (they're
-   different strategies, not pooled):
-   - overall win rate, with a 95% confidence interval
-   - win rate by sector and by market-cap tier (min sample size enforced)
-   - a logistic regression (sector + market-cap tier → probability of a
-     real breakout), validated on a time-ordered holdout to avoid
-     lookahead bias
-   - writes the full tables to `reports/model_report.md` and a compact
-     summary to Telegram
-
-Read the "Methodology" section at the top of `reports/model_report.md`
-before trusting any number in it — small sample sizes, survivorship bias
-(delisted symbols just get skipped), and categorical-only features (no
-price/volume patterns) all limit how much weight these results should
-carry. The win-rate tables are more defensible than the logistic
-regression's coefficients given how little data each scanner has.
-
-This only needs re-running when you get a fresh backtest export from
-Chartink (re-import it first per the section above) or want updated price
-outcomes for symbols that have had more time to play out since the last
-run.
-
-**Superseded for `Wkly_upswing`:** that scanner's backtest dates are the
-*first day of the week*, but the signal needs the completed weekly candle, so
-measuring from the Monday close looks ahead at the rest of the week. That is
-why this report shows an impossible 82% win rate / +11.7% average for it. The
-signal model below handles this correctly.
 
 ## Signal model: "buy when it crosses the trigger price"
 
@@ -310,16 +276,6 @@ symbol/sector before.
 sqlite3 data/chartink.db "select * from breakouts order by detected_at desc limit 20;"
 sqlite3 data/chartink.db "select scanner_name, count(*) from results where run_id = (select max(id) from runs) group by scanner_name;"
 ```
-
-Or without touching git/sqlite at all: Actions tab → **"Chartink database query"** →
-Run workflow → paste a `SELECT` statement into the `sql` field → the result
-comes back as a message in Telegram (you still trigger it from GitHub, not
-by typing into Telegram itself — this bot can only send messages, not
-receive them). The connection is opened read-only at the SQLite level, so
-`INSERT`/`UPDATE`/`DELETE`/`DROP`/etc. fail outright rather than risk
-corrupting your tracked history. Results are capped at 50 rows and ~3800
-characters to fit in a single Telegram message; narrow your query
-(`LIMIT`, fewer columns) if it gets truncated.
 
 ## Changing the schedule
 
