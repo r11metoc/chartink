@@ -1,6 +1,6 @@
 # If I had bought every scanner stock
 
-Generated 2026-10-20 17:38 UTC by `scripts/stock_outcomes.py` from `data/backtest/*.csv` plus the bot's live triggers.
+Generated 2026-10-20 18:17 UTC by `scripts/stock_outcomes.py` from `data/backtest/*.csv` plus the bot's live triggers.
 
 **Rule:** buy when price crosses the signal candle's high within 3 sessions (5 for `Wkly_upswing`), filled at the trigger or at the open on a gap-up; then hold. No stop, no target, no costs. **Short** = 2 weeks / 1 month, **Medium** = 3 / 6 months, **Long** = 1 / 2 years. **Beat Nifty 500** = share of buys that did better than the index over the same days. Recent buys only count for horizons that have fully passed.
 
@@ -387,6 +387,82 @@ Return = all the buys and sells of one signal compounded. Nifty 500 = from the f
 | 5 | 460 | 17% | +39.2% |
 | 6+ | 3061 | 12% | +8.0% |
 
+
+## The pullback after the breakout
+
+For every signal that crossed its trigger, the 20 sessions after the first crossing. **Back at the trigger** = the low came within 2% of the trigger (or below).
+
+| Scanner | Breakouts | Back at the trigger | Median days to get there | Closed below the trigger | Closed 5%+ below | Median dip from the high | 3 months later: retested / not |
+|---|---|---|---|---|---|---|---|
+| 63_30_daily | 2749 | 96% | 1 | 84% | 55% | -14.3% | +5.3% / +35.6% |
+| Bullish_Scanner | 1561 | 97% | 1 | 85% | 50% | -12.3% | +4.9% / +30.9% |
+| Wkly_upswing | 1634 | 93% | 1 | 82% | 57% | -15.9% | +5.7% / +48.4% |
+| **All** | 5944 | 95% | 1 | 84% | 54% | -14.1% | +5.3% / +40.0% |
+
+## Why a stop at the buy price still loses
+
+Every round trip of the *breakout* rule (buy above the trigger, sell after a close below it). Entry and exit are shown against the trigger price.
+
+| Scanner | Stopped round trips | Avg bought above trigger | Avg sold below trigger | Costs | Avg loss per stop | Bought on a gap-up | Sold 3%+ below trigger | Avg days held |
+|---|---|---|---|---|---|---|---|---|
+| 63_30_daily | 14291 | +0.2% | -1.5% | -0.25% | -2.0% | 11% | 16% | 13 |
+| Bullish_Scanner | 8466 | +0.2% | -1.4% | -0.25% | -1.8% | 10% | 14% | 14 |
+| Wkly_upswing | 8257 | +0.3% | -1.6% | -0.25% | -2.2% | 16% | 20% | 14 |
+| **All** | 31014 | +0.2% | -1.5% | -0.25% | -2.0% | 12% | 16% | 14 |
+
+Signals are bought 5.4 times on average under this rule, so the small loss per stop (-2.0%) repeats: 5 stops in a row is about -9.5%.
+
+
+## Buying the pullback: rules compared
+
+Same signals, every market cap, no target, no time limit, new buys for 3 months after the signal, 0.25% costs per round trip, open positions valued at the latest close.
+
+- **breakout**: Buy above the trigger, sell on a close below it, buy again above it
+- **breakout5**: Same, stop on a close 5% below the trigger
+- **retest**: Buy the dip back to the trigger (within 2%) that closes above it; stop 5% below
+- **dip5**: Buy a 5% dip from the post-breakout high; stop 5% below the trigger
+- **ema20**: Buy the dip to the 20-day average that closes above it; stop 5% below the trigger
+
+| Rule | Scanner | Signals bought | Buys per signal | Profitable | Avg return | Median | Worst 10% avg | Avg days invested |
+|---|---|---|---|---|---|---|---|---|
+| breakout | 63_30_daily | 2765 | 5.4 | 19% | +28.8% | -7.3% | -26.3% | 195 |
+| breakout | Bullish_Scanner | 1588 | 5.6 | 21% | +15.6% | -7.0% | -24.2% | 180 |
+| breakout | Wkly_upswing | 1645 | 5.2 | 18% | +46.5% | -8.2% | -27.0% | 227 |
+| breakout | **All** | 5998 | 5.4 | 19% | +30.1% | -7.4% | -26.0% | 200 |
+| breakout5 | 63_30_daily | 2765 | 1.7 | 22% | +33.1% | -7.7% | -26.5% | 231 |
+| breakout5 | Bullish_Scanner | 1588 | 1.7 | 26% | +18.9% | -7.0% | -25.1% | 221 |
+| breakout5 | Wkly_upswing | 1645 | 1.7 | 20% | +54.2% | -9.0% | -28.3% | 269 |
+| breakout5 | **All** | 5998 | 1.7 | 22% | +35.1% | -7.8% | -26.7% | 239 |
+| retest | 63_30_daily | 2354 | 1.4 | 23% | +34.1% | -8.8% | -27.3% | 242 |
+| retest | Bullish_Scanner | 1387 | 1.4 | 27% | +20.4% | -8.0% | -25.5% | 231 |
+| retest | Wkly_upswing | 1364 | 1.4 | 21% | +48.4% | -9.5% | -29.2% | 276 |
+| retest | **All** | 5105 | 1.4 | 24% | +34.2% | -8.7% | -27.5% | 248 |
+| dip5 | 63_30_daily | 2330 | 1.8 | 24% | +35.0% | -7.8% | -30.8% | 242 |
+| dip5 | Bullish_Scanner | 1335 | 1.8 | 27% | +19.8% | -6.6% | -27.1% | 225 |
+| dip5 | Wkly_upswing | 1403 | 1.8 | 22% | +57.7% | -8.7% | -32.9% | 293 |
+| dip5 | **All** | 5068 | 1.8 | 24% | +37.3% | -7.7% | -30.6% | 252 |
+| ema20 | 63_30_daily | 2529 | 1.7 | 23% | +33.1% | -8.3% | -28.4% | 236 |
+| ema20 | Bullish_Scanner | 1475 | 1.7 | 26% | +20.0% | -7.3% | -25.8% | 221 |
+| ema20 | Wkly_upswing | 1423 | 1.6 | 22% | +51.8% | -8.9% | -30.3% | 282 |
+| ema20 | **All** | 5427 | 1.7 | 23% | +34.4% | -8.2% | -28.3% | 244 |
+
+| Rule | Cap | Signals bought | Profitable | Avg return | Median |
+|---|---|---|---|---|---|
+| breakout | Largecap | 1604 | 29% | +63.6% | -5.0% |
+| breakout | Midcap | 1640 | 23% | +41.5% | -6.6% |
+| breakout | Smallcap | 2754 | 11% | +3.9% | -9.4% |
+| breakout5 | Largecap | 1604 | 36% | +74.2% | -5.8% |
+| breakout5 | Midcap | 1640 | 25% | +46.6% | -7.0% |
+| breakout5 | Smallcap | 2754 | 13% | +5.5% | -10.8% |
+| dip5 | Largecap | 1374 | 38% | +78.1% | -4.0% |
+| dip5 | Midcap | 1399 | 27% | +50.9% | -7.3% |
+| dip5 | Smallcap | 2295 | 15% | +4.5% | -10.5% |
+| ema20 | Largecap | 1504 | 36% | +74.7% | -5.6% |
+| ema20 | Midcap | 1530 | 27% | +42.7% | -7.6% |
+| ema20 | Smallcap | 2393 | 13% | +3.8% | -10.7% |
+| retest | Largecap | 1438 | 37% | +74.8% | -6.8% |
+| retest | Midcap | 1428 | 26% | +44.0% | -8.4% |
+| retest | Smallcap | 2239 | 13% | +1.9% | -11.3% |
 
 ## Reading this
 
