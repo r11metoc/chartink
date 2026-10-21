@@ -35,6 +35,7 @@ import numpy as np
 import pandas as pd
 
 import breakout_sim as bs
+import candidates
 import dipzone
 import pullback
 from build_dataset import load_hits
@@ -365,6 +366,10 @@ def main() -> int:
     symbols = sorted(hits["symbol"].unique())
     start = (hits["hit_date"].min() - timedelta(days=30)).date().isoformat()
     print(f"{len(hits)} hits, {len(symbols)} symbols, prices from {start}")
+    cand = candidates.candidate_hits()
+    if not cand.empty:  # candidate scanner versions need their prices too
+        symbols = sorted(set(symbols) | set(cand["symbol"]))
+        start = min(start, (cand["hit_date"].min() - timedelta(days=30)).date().isoformat())
     prices = fetch_daily(symbols, start)
     idx = fetch_daily(BENCH_TICKERS, start)
     bench = next((idx[k]["Close"] for k in BENCH_TICKERS if k in idx), None)
@@ -381,7 +386,7 @@ def main() -> int:
     rt.to_csv(REENTRY_CSV, index=False)
     pb = pullback.analyse(hits, prices)
     pb[0].to_csv(PULLBACK_CSV, index=False)
-    dz = dipzone.backtest_section(hits, prices)
+    dz = dipzone.backtest_section(hits, prices) + candidates.section(hits, prices)
     REPORT.write_text(build_report(t, s, rt, pb, dz), encoding="utf-8")
     print(f"Wrote {REPORT} ({len(b)} bought of {len(t)} signals)")
     return 0
