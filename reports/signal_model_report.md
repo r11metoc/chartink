@@ -1,6 +1,6 @@
 # Scanner signal model report
 
-Generated 2026-10-20 18:11 UTC by `scripts/signal_model.py train`.
+Generated 2026-10-21 08:18 UTC by `scripts/signal_model.py train`.
 
 ## The rule being tested
 
@@ -16,7 +16,7 @@ Generated 2026-10-20 18:11 UTC by `scripts/signal_model.py train`.
 |---|---|---|---|---|---|
 | 63_30_daily | 2998 | 2992 | 2122 | 869 | 1 |
 | Bullish_Scanner | 1701 | 1692 | 1323 | 356 | 13 |
-| Wkly_upswing | 1838 | 1836 | 1217 | 614 | 5 |
+| Wkly_upswing | 1838 | 1836 | 1218 | 614 | 4 |
 
 ## 1. Does buying every trigger make money?
 
@@ -24,8 +24,8 @@ Generated 2026-10-20 18:11 UTC by `scripts/signal_model.py train`.
 |---|---|---|---|---|---|---|---|---|---|
 | 63_30_daily | 2122 | 36% | -0.29% | +10.77% / -6.54% | 0.93 | -0.00 | 8.0 | -1.5 | -0.71% (t -3.8) |
 | Bullish_Scanner | 1323 | 38% | -0.22% | +9.55% / -6.13% | 0.94 | +0.00 | 9.5 | -0.9 | -0.75% (t -3.2) |
-| Wkly_upswing | 1217 | 38% | -0.12% | +12.33% / -7.66% | 0.97 | +0.02 | 8.9 | -0.4 | -0.65% (t -2.2) |
-| **All scanners** | 4662 | 37% | -0.22% | +10.84% / -6.71% | 0.95 | +0.00 | 8.6 | -1.6 | -0.71% (t -5.3) |
+| Wkly_upswing | 1218 | 38% | -0.13% | +12.33% / -7.66% | 0.97 | +0.02 | 8.9 | -0.4 | -0.66% (t -2.2) |
+| **All scanners** | 4663 | 37% | -0.23% | +10.84% / -6.72% | 0.95 | +0.00 | 8.6 | -1.6 | -0.71% (t -5.3) |
 
 t-stat: average return divided by its standard error; below ~2 the average could easily be noise. **vs index**: average return minus what the Nifty 500 did over the same days. A scanner that only matches the index adds nothing over buying an index fund.
 
@@ -41,7 +41,7 @@ t-stat: average return divided by its standard error; below ~2 the average could
 | Bullish_Scanner · Smallcap | 436 | 31% | -1.43% | +11.74% / -7.34% | 0.72 | -0.17 | 8.6 | -2.9 | -1.96% (t -4.1) |
 | Wkly_upswing · Largecap | 295 | 49% | +1.24% | +9.31% / -6.47% | 1.37 | +0.19 | 12.8 | +2.3 | +0.40% (t +0.8) |
 | Wkly_upswing · Midcap | 274 | 43% | +1.14% | +12.68% / -7.45% | 1.27 | +0.18 | 9.9 | +1.8 | +0.57% (t +0.9) |
-| Wkly_upswing · Smallcap | 648 | 31% | -1.27% | +14.33% / -8.14% | 0.77 | -0.13 | 6.6 | -3.0 | -1.64% (t -3.9) |
+| Wkly_upswing · Smallcap | 649 | 31% | -1.28% | +14.33% / -8.14% | 0.77 | -0.13 | 6.6 | -3.0 | -1.65% (t -3.9) |
 
 ### By market regime at signal time (Nifty vs its 50-day average)
 
@@ -52,7 +52,7 @@ t-stat: average return divided by its standard error; below ~2 the average could
 | Bullish_Scanner · Nifty above 50DMA | 1030 | 37% | -0.45% | +9.18% / -6.18% | 0.88 | -0.02 | 9.5 | -1.7 | -1.03% (t -3.9) |
 | Bullish_Scanner · Nifty below 50DMA | 293 | 39% | +0.62% | +10.81% / -5.96% | 1.17 | +0.09 | 9.6 | +1.2 | +0.24% (t +0.5) |
 | Wkly_upswing · Nifty above 50DMA | 992 | 39% | +0.03% | +12.33% / -7.68% | 1.01 | +0.04 | 8.9 | +0.1 | -0.55% (t -1.7) |
-| Wkly_upswing · Nifty below 50DMA | 225 | 34% | -0.77% | +12.37% / -7.61% | 0.85 | -0.06 | 8.9 | -1.1 | -1.09% (t -1.6) |
+| Wkly_upswing · Nifty below 50DMA | 226 | 34% | -0.81% | +12.37% / -7.62% | 0.84 | -0.06 | 8.8 | -1.2 | -1.12% (t -1.6) |
 
 ### Exit reasons
 
@@ -68,15 +68,15 @@ Fixed set of alternatives, not optimized. Cells: trades · avg return · vs inde
 
 | Exit rule | 63_30_daily | Bullish_Scanner | Wkly_upswing |
 |---|---|---|---|
-| Candle-low stop, 2R target, 20d | 2122 · -0.29% · -0.71% (t -3.8) | 1323 · -0.22% · -0.75% (t -3.2) | 1217 · -0.12% · -0.65% (t -2.2) |
-| Candle-low stop, no target, 20d | 2121 · +0.01% · -0.55% (t -2.0) | 1319 · -0.29% · -0.99% (t -3.6) | 1217 · +0.76% · -0.02% (t -0.0) |
-| Wide stop (≤15%), no target, 20d | 2118 · +0.15% · -0.43% (t -1.5) | 1317 · -0.06% · -0.85% (t -2.9) | 1214 · +1.26% · +0.26% (t +0.5) |
-| No stop, exit after 10d | 2118 · +0.06% · -0.50% (t -2.2) | 1323 · +0.26% · -0.24% (t -1.0) | 1216 · +0.59% · -0.12% (t -0.3) |
-| No stop, exit after 20d | 2111 · +1.46% · +0.46% (t +1.4) | 1308 · +1.13% · -0.06% (t -0.2) | 1211 · +1.94% · +0.81% (t +1.5) |
+| Candle-low stop, 2R target, 20d | 2122 · -0.29% · -0.71% (t -3.8) | 1323 · -0.22% · -0.75% (t -3.2) | 1218 · -0.13% · -0.66% (t -2.2) |
+| Candle-low stop, no target, 20d | 2121 · +0.01% · -0.55% (t -2.0) | 1320 · -0.30% · -0.99% (t -3.6) | 1218 · +0.75% · -0.03% (t -0.1) |
+| Wide stop (≤15%), no target, 20d | 2121 · +0.13% · -0.44% (t -1.5) | 1317 · -0.06% · -0.85% (t -2.9) | 1214 · +1.26% · +0.26% (t +0.5) |
+| No stop, exit after 10d | 2119 · +0.05% · -0.51% (t -2.2) | 1323 · +0.26% · -0.24% (t -1.0) | 1216 · +0.59% · -0.12% (t -0.3) |
+| No stop, exit after 20d | 2112 · +1.45% · +0.46% (t +1.4) | 1308 · +1.13% · -0.06% (t -0.2) | 1211 · +1.94% · +0.81% (t +1.5) |
 
 ## 2. Model: which triggers to take
 
-Model: `logreg` predicting P(trade ends in profit) from price/volume features at the signal candle, market regime, repeat/confluence counts, scanner and market-cap tier. Validated **walk-forward**: each month is scored by a model trained only on trades that had closed before that month, so these are honest out-of-sample numbers (4507 scored trades from May 2019).
+Model: `logreg` predicting P(trade ends in profit) from price/volume features at the signal candle, market regime, repeat/confluence counts, scanner and market-cap tier. Validated **walk-forward**: each month is scored by a model trained only on trades that had closed before that month, so these are honest out-of-sample numbers (4508 scored trades from May 2019).
 
 - Walk-forward ROC-AUC: logistic regression 0.55, gradient boosting 0.53 (0.50 = coin flip; the filter is only switched on at ≥ 0.55).
 - **Not validated: the model could not tell winning triggers from losing ones out of sample**, so it is *not* used to filter. `predict` lists every setup with its levels and says the filter is off. Training re-checks this every run, so the filter switches itself on if enough new history makes it work.
@@ -87,7 +87,7 @@ Model: `logreg` predicting P(trade ends in profit) from price/volume features at
 |---|---|---|---|---|
 | Q1 | 0.08–0.30 | 902 | 32% | -1.12% |
 | Q2 | 0.30–0.35 | 901 | 34% | -0.34% |
-| Q3 | 0.35–0.39 | 901 | 37% | -0.16% |
+| Q3 | 0.35–0.39 | 902 | 37% | -0.17% |
 | Q4 | 0.39–0.44 | 901 | 39% | +0.18% |
 | Q5 | 0.44–0.77 | 902 | 42% | +0.39% |
 
