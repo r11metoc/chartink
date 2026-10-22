@@ -154,6 +154,8 @@ sends a Telegram alert when:
   after 8 weeks (all shown in the alert).
 - **CLOSED**: a trade hits its target, its stop or the 8-week limit.
 
+Wkly_upswing signals are only taken when the daily ATR(14) is under 4% of the
+close, with a 15% stop instead of 12% (`ATR_MAX_PCT`, `STOP_BY_SCANNER`).
 63_30_daily signals are only taken when the signal-day close is within 10%
 of the 52-week high (`NEAR_HIGH_PCT`), and signals another scanner flagged in
 the 10 days before are tagged ⭐. Only completed daily candles are used, so a morning alert means "buy at

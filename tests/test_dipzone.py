@@ -89,3 +89,13 @@ def test_summary_ignores_duplicates():
               {"scanner": "A", "symbol": "X", "status": "duplicate"}]
     row = dz.summary(states)["rows"][0]
     assert row["signals"] == 1 and row["holding"] == 1
+
+
+def test_weekly_atr_filter_and_wider_stop():
+    assert dz.stop_for("Wkly_upswing") == 15.0 and dz.stop_for("63_30_daily") == dz.STOP_PCT
+    assert not dz.passes_filter("Wkly_upswing", -2.0, 5.5)
+    assert dz.passes_filter("Wkly_upswing", -2.0, 3.0)
+    assert dz.passes_filter("Bullish_Scanner", None, 9.0)
+    assert "too volatile" in dz.skip_reason("Wkly_upswing", -2.0, 5.5)
+    rows = BREAKOUT + [(104, 104, 99, 99.5), (99.5, 100, 99, 99.6), (99.6, 99.6, 86, 87)]   # bought 99.5; 12% would stop, 15% (84.6) not
+    assert dz.simulate(frame(rows), 100.0, "Wkly_upswing")["status"] == "holding"

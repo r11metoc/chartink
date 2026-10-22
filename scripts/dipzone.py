@@ -8,6 +8,7 @@ For every signal (the scanner's trigger = the signal candle's high):
               is still no more than 5% below the trigger -> buy at the next open
 3. exit     : +8% target, 12% stop below the buy price, or the close after
               40 sessions (8 weeks), whichever comes first
+Wkly_upswing: only when daily ATR(14) < 4% of the close, with a 15% stop.
 Filters: 63_30_daily signals are only taken when the signal-day close is
 within 10% of the 52-week high (NEAR_HIGH_PCT; backtest 2024-26: 72% wins
 vs 66%). Signals another scanner also flagged in the 10 days before are
@@ -35,6 +36,8 @@ FLOOR_PCT = 5.0       # the dip close must stay within 5% below the trigger
 ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
 TARGET_PCT = 8.0
 STOP_PCT = 12.0
+STOP_BY_SCANNER = {"Wkly_upswing": 15.0}  # weekly picks swing more (backtest: 70% wins vs 68% at 12%)
+ATR_MAX_PCT = {"Wkly_upswing": 4.0}       # daily ATR(14) under 4% of the close (2023-26: 74% wins vs 68%)
 MAX_HOLD = 40         # sessions (8 weeks)
 NEAR_HIGH_PCT = {"63_30_daily": 10.0}  # only take signals within this % of the 52-week high
 CONFIRM_DAYS = 10     # another scanner within this many days before = confirmed
@@ -59,9 +62,34 @@ def dist_52w_high(df: pd.DataFrame, end_pos: int) -> float | None:
     return round((float(df["Close"].iloc[end_pos]) / float(win["High"].max()) - 1) * 100, 2)
 
 
-def passes_filter(scanner: str, dist: float | None) -> bool:
+def stop_for(scanner: str) -> float:
+    return STOP_BY_SCANNER.get(scanner, STOP_PCT)
+
+
+def atr_pct(df: pd.DataFrame, end_pos: int) -> float | None:
+    """Daily ATR(14) as % of the close at the signal bar."""
+    if end_pos < 14:
+        return None
+    w = df.iloc[max(0, end_pos - 40):end_pos + 1]
+    prev = w["Close"].shift(1)
+    tr = pd.concat([w["High"] - w["Low"], (w["High"] - prev).abs(), (w["Low"] - prev).abs()], axis=1).max(axis=1)
+    v = tr.rolling(14).mean().iloc[-1] / w["Close"].iloc[-1] * 100  # same as breakout_sim's atr_pct
+    return None if pd.isna(v) else round(float(v), 2)
+
+
+def passes_filter(scanner: str, dist: float | None, atr: float | None = None) -> bool:
     lim = NEAR_HIGH_PCT.get(scanner)
-    return lim is None or dist is None or dist >= -lim
+    if lim is not None and dist is not None and dist < -lim:
+        return False
+    amax = ATR_MAX_PCT.get(scanner)
+    return amax is None or atr is None or atr < amax
+
+
+def skip_reason(scanner: str, dist: float | None, atr: float | None) -> str:
+    lim = NEAR_HIGH_PCT.get(scanner)
+    if lim is not None and dist is not None and dist < -lim:
+        return f"{-dist:.0f}% below its 52-week high (limit {lim:g}%)"
+    return f"too volatile: daily ATR {atr:.1f}% of price (limit {ATR_MAX_PCT[scanner]:g}%)"
 
 
 def simulate(fwd: pd.DataFrame, trigger: float, scanner: str) -> dict:
@@ -95,7 +123,7 @@ def simulate(fwd: pd.DataFrame, trigger: float, scanner: str) -> dict:
         out["status"] = "buy zone"  # buy at the next open
         return out
     ep = float(o[e])
-    tgt, stp = ep * (1 + TARGET_PCT / 100), ep * (1 - STOP_PCT / 100)
+    tgt, stp = ep * (1 + TARGET_PCT / 100), ep * (1 - stop_for(scanner) / 100)
     out.update(entry_date=dates[e], entry=ep, target=tgt, stop=stp)
     last = min(n - 1, e + MAX_HOLD)
     for i in range(e, last + 1):
@@ -157,9 +185,10 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
             out.append({**base, "status": "no prices yet"})
             continue
         base["dist_52w_high"] = dist_52w_high(df, sig["end_pos"])
-        if not passes_filter(scanner, base["dist_52w_high"]):
+        base["atr_pct"] = atr_pct(df, sig["end_pos"])
+        if not passes_filter(scanner, base["dist_52w_high"], base["atr_pct"]):
             out.append({**base, "status": "skipped", "trigger": sig["trigger"],
-                        "why": f"{-base['dist_52w_high']:.0f}% below its 52-week high (limit {NEAR_HIGH_PCT[scanner]:g}%)"})
+                        "why": skip_reason(scanner, base["dist_52w_high"], base["atr_pct"])})
             continue
         st = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner)
         if st["status"] in ACTIVE:
@@ -220,7 +249,7 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
             ref = s.get("entry", s["dip_close"])
             lines.append(f"🟢 <b>{s['symbol']}</b> ({s['scanner']}){_tags(s)} dipped {s['dip_pct']:g}% to {s['dip_close']:.2f} "
                          f"(trigger {s['trigger']:.2f}). Buy ~{ref:.2f}, target {ref * (1 + TARGET_PCT / 100):.2f} "
-                         f"(+{TARGET_PCT:g}%), stop {ref * (1 - STOP_PCT / 100):.2f} (-{STOP_PCT:g}%), "
+                         f"(+{TARGET_PCT:g}%), stop {ref * (1 - stop_for(s['scanner']) / 100):.2f} (-{stop_for(s['scanner']):g}%), "
                          f"exit by {_exit_by(s) if 'entry_date' in s else 'day 40'}")
     icon = {"target": "✅", "stop": "🛑", "time": "⏱"}
     label = {"target": "target hit", "stop": "stopped", "time": "8 weeks up, sold"}
@@ -232,7 +261,8 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
                          f"{s['entry']:.2f} → {s['exit']:.2f} ({s['ret']:+.1f}%)")
     lines += ["", f"<i>Rule: after the breakout, buy a {DIP_PCT['63_30_daily']:g}% dip "
                   f"({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing) that stays within {FLOOR_PCT:g}% of the trigger; "
-                  f"+{TARGET_PCT:g}% target, -{STOP_PCT:g}% stop, out after 8 weeks. Backtest, not advice.</i>"]
+                  f"+{TARGET_PCT:g}% target, -{STOP_PCT:g}% stop (-{STOP_BY_SCANNER.get('Wkly_upswing', STOP_PCT):g}% weekly), "
+                  f"out after 8 weeks. Backtest, not advice.</i>"]
     return "\n".join(lines)
 
 
@@ -294,7 +324,7 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
         elif st == "buy zone":
             ref = s["dip_close"]
             buy_list.append({**base, "stage": "zone", "level": _r(ref), "dip_pct": s["dip_pct"],
-                             "target": _r(ref * (1 + TARGET_PCT / 100)), "stop": _r(ref * (1 - STOP_PCT / 100))})
+                             "target": _r(ref * (1 + TARGET_PCT / 100)), "stop": _r(ref * (1 - stop_for(s["scanner"]) / 100))})
         if "entry_date" in s:
             trade = {**base, "entry_date": _iso(s["entry_date"]), "entry": _r(s["entry"]),
                      "target": _r(s["target"]), "stop": _r(s["stop"]), "exit_by": _iso(
@@ -312,7 +342,8 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     activity.sort(key=lambda x: (x["when"], x["side"] == "SELL"), reverse=True)
     skipped = sum(s.get("status") == "skipped" for s in states)
     return {"rule": {"dip": DIP_PCT, "floor": FLOOR_PCT, "zone_days": ZONE_DAYS, "target": TARGET_PCT,
-                     "stop": STOP_PCT, "max_hold": MAX_HOLD, "stake": STAKE, "near_high": NEAR_HIGH_PCT},
+                     "stop": STOP_PCT, "stop_by": STOP_BY_SCANNER, "atr_max": ATR_MAX_PCT, "max_hold": MAX_HOLD, "stake": STAKE,
+                     "near_high": NEAR_HIGH_PCT},
             "skipped": skipped,
             "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity}
 
@@ -326,7 +357,7 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> lis
         sig = bs.signal_bar(df, h["hit_date"], bs.is_weekly(h["scanner_name"])) if df is not None else None
         if sig is None:
             continue
-        if not passes_filter(h["scanner_name"], dist_52w_high(df, sig["end_pos"])):
+        if not passes_filter(h["scanner_name"], dist_52w_high(df, sig["end_pos"]), atr_pct(df, sig["end_pos"])):
             continue
         s = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"])
         if s["status"] in ("target", "stop", "time"):
@@ -339,7 +370,9 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> lis
     L = ["", "## Buy-the-dip rule (the live alert rule)", "",
          f"After the breakout, buy at the next open once a close is {DIP_PCT['63_30_daily']:g}% below the highest close "
          f"since the breakout ({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing), within {ZONE_DAYS} sessions and no more than "
-         f"{FLOOR_PCT:g}% below the trigger. Exit at +{TARGET_PCT:g}%, a {STOP_PCT:g}% stop, or after {MAX_HOLD} sessions. "
+         f"{FLOOR_PCT:g}% below the trigger. Exit at +{TARGET_PCT:g}%, a {STOP_PCT:g}% stop "
+         f"({', '.join(f'{k} {v:g}%' for k, v in STOP_BY_SCANNER.items())}), or after {MAX_HOLD} sessions. "
+         f"Wkly_upswing only when daily ATR(14) is under {ATR_MAX_PCT.get('Wkly_upswing', 0):g}% of the close. "
          f"Filter: {', '.join(f'{k} only within {v:g}% of the 52-week high' for k, v in NEAR_HIGH_PCT.items())}. "
          f"{bs.COST_PCT}% costs.", "",
          "| Group | Trades | Win rate | Avg | Avg win / loss | Target / stop / time | Avg days | ₹ on ₹1L a trade |",

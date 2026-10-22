@@ -197,7 +197,8 @@ function renderDip(d) {
   const r = z.rule;
   const intro = `After the breakout above the trigger, buy at the next open when a close is ${r.dip["63_30_daily"]}% below the highest close
     since the breakout (${r.dip["Wkly_upswing"]}% for Wkly_upswing), within ${r.zone_days} sessions and no more than ${r.floor}% below the trigger.
-    Sell at <b>+${r.target}%</b>, a <b>${r.stop}% stop</b>, or after 8 weeks.
+    Sell at <b>+${r.target}%</b>, a <b>${r.stop}% stop</b>${Object.entries(r.stop_by || {}).map(([k, v]) => ` (${v}% for ${esc(k)})`).join("")}, or after 8 weeks.
+    ${Object.entries(r.atr_max || {}).map(([k, v]) => `${esc(k)} only takes calm stocks (daily ATR under ${v}% of price).`).join(" ")}
     ${Object.entries(r.near_high || {}).map(([k, v]) => `${esc(k)} signals are only taken within ${v}% of the 52-week high${z.skipped ? ` (${z.skipped} skipped)` : ""}.`).join(" ")}
     ⭐ = another scanner flagged it in the 10 days before. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`;
   const cards = z.summary.rows.map((g) => `
