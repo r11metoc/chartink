@@ -10,34 +10,34 @@ Updated 2026-10-22. For each scanner 144 exit rules were tried; the setup filter
 
 - **Learned rule:** 12% stop, no target, out after 40 days
 - **Skips:** nothing
-- **Status:** proven (best candidate in sample: 4720 trades, avg +2.93%)
+- **Status:** proven (best candidate in sample: 1434 trades, avg +4.37%)
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 4493 | 32% | -0.49% | -0.77% | -2,192,800 |  |
-| Learned rule | 4493 | 49% | +2.47% | +1.01% | +11,101,400 | +2.96% (t 13.3) |
-| Learned rule + filter | 4115 | 50% | +2.66% | +0.94% | +10,955,600 | +2.93% (t 13.7) |
+| Base rule, every signal | 1299 | 33% | -0.25% | -0.57% | -329,300 |  |
+| Learned rule | 1299 | 54% | +3.87% | +1.80% | +5,032,600 | +4.13% (t 10.0) |
+| Learned rule + filter | 1098 | 51% | +3.44% | +1.68% | +3,779,100 | +3.16% (t 8.1) |
 
 ## Bullish_Scanner
 
 - **Learned rule:** 12% stop, no target, out after 40 days
 - **Skips:** nothing
-- **Status:** proven (best candidate in sample: 4176 trades, avg +4.58%)
+- **Status:** proven (best candidate in sample: 4173 trades, avg +4.59%)
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 4117 | 42% | +0.73% | +0.21% | +3,011,900 |  |
-| Learned rule | 4117 | 56% | +4.44% | +2.37% | +18,261,900 | +3.70% (t 16.5) |
-| Learned rule + filter | 3941 | 55% | +4.39% | +2.45% | +17,316,500 | +3.47% (t 15.6) |
+| Base rule, every signal | 4117 | 42% | +0.73% | +0.21% | +3,011,200 |  |
+| Learned rule | 4117 | 56% | +4.44% | +2.37% | +18,281,100 | +3.71% (t 16.6) |
+| Learned rule + filter | 3941 | 55% | +4.40% | +2.45% | +17,335,700 | +3.48% (t 15.6) |
 
 ## Wkly_upswing
 
 - **Learned rule:** 12% stop, no target, out after 40 days
 - **Skips:** nothing
-- **Status:** proven (best candidate in sample: 746 trades, avg +3.03%)
+- **Status:** proven (best candidate in sample: 743 trades, avg +3.05%)
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 688 | 39% | +0.03% | -0.61% | +17,600 |  |
-| Learned rule | 688 | 42% | +1.94% | +0.89% | +1,332,800 | +1.91% (t 2.8) |
-| Learned rule + filter | 507 | 42% | +1.52% | +0.32% | +771,400 | +1.10% (t 2.0) |
+| Base rule, every signal | 688 | 39% | +0.04% | -0.60% | +25,400 |  |
+| Learned rule | 688 | 42% | +1.96% | +0.91% | +1,351,500 | +1.93% (t 2.9) |
+| Learned rule + filter | 507 | 42% | +1.56% | +0.35% | +790,100 | +1.11% (t 2.0) |

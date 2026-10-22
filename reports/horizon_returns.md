@@ -1,6 +1,6 @@
 # Price after the trigger: 2 to 12 weeks
 
-Generated 2026-10-22 18:10 UTC by `scripts/horizon_returns.py`.
+Generated 2026-10-22 18:48 UTC by `scripts/horizon_returns.py`.
 
 Buy when price crosses the trigger (the signal candle's high; the completed week's candle for `Wkly_upswing`) within 3 sessions (5 for weekly), then just hold. No stop-loss, no target, no costs deducted. **Up** = share of trades above the entry price at that point. **Best / worst close** = the highest and lowest close reached at any time up to that point, averaged across trades. **Beat Nifty 500** = share of trades that did better than the index over the same days. Recent signals only count for horizons that have fully passed, so longer horizons have fewer trades and lean towards older signals.
 
@@ -8,15 +8,15 @@ Per-trade prices: `data/model/horizon_returns.csv`.
 
 ## 63_30_daily
 
-6300 signals, 4740 crossed the trigger (31 Dec 2020 to 21 Oct 2026).
+1832 signals, 1439 crossed the trigger (31 Dec 2020 to 14 Oct 2026).
 
 | Horizon | Trades | Up | Avg | Median | Avg best / worst close | Nifty 500 avg | Beat Nifty 500 |
 |---|---|---|---|---|---|---|---|
-| 2 weeks | 4732 | 48% | +0.8% | -0.2% | +4.9% / -4.1% | +0.6% | 44% |
-| 4 weeks | 4724 | 52% | +2.0% | +0.4% | +8.0% / -5.8% | +1.1% | 44% |
-| 6 weeks | 4717 | 54% | +3.0% | +1.1% | +10.5% / -7.1% | +1.6% | 47% |
-| 8 weeks | 4682 | 56% | +4.1% | +2.0% | +13.0% / -8.0% | +2.2% | 49% |
-| 12 weeks | 4619 | 58% | +6.3% | +3.3% | +17.7% / -9.5% | +3.3% | 49% |
+| 2 weeks | 1437 | 52% | +1.6% | +0.2% | +5.4% / -3.7% | +0.7% | 47% |
+| 4 weeks | 1435 | 57% | +3.1% | +1.6% | +8.8% / -5.3% | +1.4% | 48% |
+| 6 weeks | 1431 | 60% | +4.4% | +3.0% | +11.5% / -6.6% | +2.1% | 51% |
+| 8 weeks | 1425 | 60% | +5.3% | +4.1% | +14.1% / -7.5% | +2.8% | 52% |
+| 12 weeks | 1416 | 60% | +7.9% | +4.9% | +19.1% / -9.0% | +4.3% | 51% |
 
 ## Bullish_Scanner
 
@@ -24,11 +24,11 @@ Per-trade prices: `data/model/horizon_returns.csv`.
 
 | Horizon | Trades | Up | Avg | Median | Avg best / worst close | Nifty 500 avg | Beat Nifty 500 |
 |---|---|---|---|---|---|---|---|
-| 2 weeks | 4197 | 55% | +2.1% | +0.7% | +6.0% / -3.4% | +0.7% | 50% |
+| 2 weeks | 4196 | 55% | +2.1% | +0.7% | +6.0% / -3.4% | +0.7% | 50% |
 | 4 weeks | 4184 | 59% | +3.5% | +2.1% | +9.3% / -4.9% | +1.5% | 51% |
-| 6 weeks | 4172 | 60% | +4.6% | +2.8% | +11.9% / -6.0% | +2.0% | 53% |
-| 8 weeks | 4153 | 60% | +5.6% | +3.7% | +14.5% / -7.0% | +2.8% | 52% |
-| 12 weeks | 4115 | 63% | +8.5% | +5.4% | +19.1% / -8.3% | +4.1% | 53% |
+| 6 weeks | 4170 | 60% | +4.6% | +2.8% | +11.9% / -6.0% | +2.0% | 53% |
+| 8 weeks | 4152 | 60% | +5.6% | +3.7% | +14.5% / -7.0% | +2.8% | 52% |
+| 12 weeks | 4113 | 63% | +8.5% | +5.4% | +19.2% / -8.3% | +4.1% | 53% |
 
 ## Wkly_upswing
 
@@ -38,8 +38,8 @@ Per-trade prices: `data/model/horizon_returns.csv`.
 |---|---|---|---|---|---|---|---|
 | 2 weeks | 747 | 47% | +1.1% | -0.7% | +6.9% / -5.7% | +0.7% | 42% |
 | 4 weeks | 742 | 51% | +2.6% | +0.5% | +11.2% / -8.0% | +1.1% | 46% |
-| 6 weeks | 739 | 54% | +3.9% | +1.2% | +14.9% / -9.5% | +1.3% | 49% |
-| 8 weeks | 735 | 55% | +5.3% | +2.0% | +18.3% / -11.0% | +1.7% | 49% |
+| 6 weeks | 738 | 54% | +4.0% | +1.2% | +14.9% / -9.5% | +1.3% | 49% |
+| 8 weeks | 733 | 55% | +5.3% | +2.0% | +18.3% / -11.0% | +1.7% | 49% |
 | 12 weeks | 721 | 53% | +8.9% | +1.9% | +25.0% / -12.8% | +3.1% | 47% |
 
 ## Side by side, signals since 31 Dec 2020
@@ -48,11 +48,11 @@ Average return / share of trades up, over the same period for every scanner.
 
 | Horizon | 63_30_daily | Bullish_Scanner | Wkly_upswing |
 |---|---|---|---|
-| 2 weeks | +0.8% / 48% (n=4732) | +2.1% / 55% (n=4197) | +1.2% / 47% (n=573) |
-| 4 weeks | +2.0% / 52% (n=4724) | +3.5% / 59% (n=4184) | +2.7% / 53% (n=568) |
-| 6 weeks | +3.0% / 54% (n=4717) | +4.6% / 60% (n=4172) | +4.2% / 54% (n=565) |
-| 8 weeks | +4.1% / 56% (n=4682) | +5.6% / 60% (n=4153) | +6.1% / 57% (n=561) |
-| 12 weeks | +6.3% / 58% (n=4619) | +8.5% / 63% (n=4115) | +9.8% / 52% (n=547) |
+| 2 weeks | +1.6% / 52% (n=1437) | +2.1% / 55% (n=4196) | +1.2% / 47% (n=573) |
+| 4 weeks | +3.1% / 57% (n=1435) | +3.5% / 59% (n=4184) | +2.7% / 53% (n=568) |
+| 6 weeks | +4.4% / 60% (n=1431) | +4.6% / 60% (n=4170) | +4.3% / 54% (n=564) |
+| 8 weeks | +5.3% / 60% (n=1425) | +5.6% / 60% (n=4152) | +6.1% / 57% (n=559) |
+| 12 weeks | +7.9% / 60% (n=1416) | +8.5% / 63% (n=4113) | +9.8% / 52% (n=547) |
 
 ## Trailing stop vs just holding (up to 12 weeks)
 
@@ -62,11 +62,11 @@ Same entries as above. Each trailing stop starts that % below the entry and, aft
 
 | Exit | Trades | Win rate | Avg return | Median | Avg win / loss | Avg hold (d) | vs Nifty 500 (t) |
 |---|---|---|---|---|---|---|---|
-| Hold 12 weeks, no stop | 4615 | 57% | +6.0% | +3.1% | +19.3% / -11.7% | 60 | +2.8% (+8.8) |
-| Trailing stop 10% | 4615 | 42% | +2.5% | -3.0% | +16.1% / -7.4% | 30 | +1.0% (+4.7) |
-| Trailing stop 15% | 4615 | 51% | +4.4% | +0.3% | +18.6% / -10.0% | 45 | +2.3% (+8.3) |
-| Trailing stop 20% | 4615 | 54% | +5.2% | +1.9% | +19.3% / -11.3% | 53 | +2.5% (+8.5) |
-| Candle-low stop (2-8%), then trail 15% | 4615 | 20% | +1.3% | -3.1% | +22.1% / -3.9% | 16 | +0.3% (+1.7) |
+| Hold 12 weeks, no stop | 1416 | 60% | +7.6% | +4.6% | +20.7% / -12.0% | 60 | +3.4% (+5.8) |
+| Trailing stop 10% | 1416 | 47% | +4.4% | -1.0% | +17.4% / -7.2% | 31 | +2.2% (+5.6) |
+| Trailing stop 15% | 1416 | 54% | +6.1% | +2.0% | +19.7% / -9.7% | 45 | +3.2% (+6.3) |
+| Trailing stop 20% | 1416 | 57% | +6.7% | +3.5% | +20.6% / -11.5% | 53 | +3.2% (+5.8) |
+| Candle-low stop (2-8%), then trail 15% | 1416 | 21% | +2.2% | -2.9% | +25.0% / -3.7% | 17 | +1.0% (+2.6) |
 
 ### Bullish_Scanner
 
