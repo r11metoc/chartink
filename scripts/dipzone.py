@@ -43,6 +43,7 @@ START = "2026-09-25"  # live signals from this date are tracked
 ALERT_DAYS = 4        # only alert on events this recent (no flood on the first run)
 STAKE = 100_000
 MARKET_CLOSE = (15, 30)
+ACTIVE = {"waiting for breakout", "watching for dip", "buy zone", "holding"}
 
 
 def dip_for(scanner: str) -> float:
@@ -136,8 +137,13 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
     for d0, sc0, sym0, _ in paper._signals(conn, confirm_from):
         seen.setdefault(sym0, []).append((pd.Timestamp(d0), sc0))
     out = []
+    active: set[tuple[str, str]] = set()  # one open idea per scanner + stock
     for day, scanner, symbol, source in paper._signals(conn, START):
         t = pd.Timestamp(day)
+        if (scanner, symbol) in active:
+            out.append({"scanner": scanner, "symbol": symbol, "date": day, "source": source,
+                        "status": "duplicate", "why": "already watching or holding this stock for this scanner"})
+            continue
         others = sorted({sc for d0, sc in seen.get(symbol, [])
                          if sc != scanner and t - pd.Timedelta(days=CONFIRM_DAYS) <= d0 <= t})
         df = _completed(paper._frame(conn, symbol, lookback), now)
@@ -156,6 +162,8 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
                         "why": f"{-base['dist_52w_high']:.0f}% below its 52-week high (limit {NEAR_HIGH_PCT[scanner]:g}%)"})
             continue
         st = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner)
+        if st["status"] in ACTIVE:
+            active.add((scanner, symbol))
         out.append({**base, **st, "last_close": float(df["Close"].iloc[-1]), "last_date": df.index[-1]})
     return out
 
@@ -237,6 +245,7 @@ def summary(states: list[dict]) -> dict:
         closed = [x for x in xs if x.get("status") in ("target", "stop", "time")]
         hold = [x for x in xs if x.get("status") == "holding"]
         rets = [x["ret"] for x in closed]
+        xs = [x for x in xs if x.get("status") != "duplicate"]
         out.append({"group": g, "signals": len(xs),
                     "watching": sum(x.get("status") in ("waiting for breakout", "watching for dip", "buy zone") for x in xs),
                     "holding": len(hold), "closed": len(closed),

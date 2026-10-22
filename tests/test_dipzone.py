@@ -82,3 +82,10 @@ def test_52_week_high_filter():
 def test_tags_in_alert_text():
     s = {"confirmed_by": ["Bullish_Scanner"], "dist_52w_high": -4.2}
     assert "⭐ also on Bullish_Scanner" in dz._tags(s) and "4% off 52w high" in dz._tags(s)
+
+
+def test_summary_ignores_duplicates():
+    states = [{"scanner": "A", "symbol": "X", "status": "holding", "ret": 1.0},
+              {"scanner": "A", "symbol": "X", "status": "duplicate"}]
+    row = dz.summary(states)["rows"][0]
+    assert row["signals"] == 1 and row["holding"] == 1
