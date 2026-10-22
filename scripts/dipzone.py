@@ -8,6 +8,10 @@ For every signal (the scanner's trigger = the signal candle's high):
               is still no more than 5% below the trigger -> buy at the next open
 3. exit     : +8% target, 12% stop below the buy price, or the close after
               40 sessions (8 weeks), whichever comes first
+Filters: 63_30_daily signals are only taken when the signal-day close is
+within 10% of the 52-week high (NEAR_HIGH_PCT; backtest 2024-26: 72% wins
+vs 66%). Signals another scanner also flagged in the 10 days before are
+tagged "confirmed" (78% wins in 2024-26).
 
 Used live by run.py (Telegram alerts on every scan) and in the weekly
 backtest report (stock_outcomes.py). Decisions use completed daily candles
@@ -32,6 +36,9 @@ ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
 TARGET_PCT = 8.0
 STOP_PCT = 12.0
 MAX_HOLD = 40         # sessions (8 weeks)
+NEAR_HIGH_PCT = {"63_30_daily": 10.0}  # only take signals within this % of the 52-week high
+CONFIRM_DAYS = 10     # another scanner within this many days before = confirmed
+HISTORY_DAYS = 400    # calendar days of prices needed for the 52-week high
 START = "2026-09-25"  # live signals from this date are tracked
 ALERT_DAYS = 4        # only alert on events this recent (no flood on the first run)
 STAKE = 100_000
@@ -40,6 +47,20 @@ MARKET_CLOSE = (15, 30)
 
 def dip_for(scanner: str) -> float:
     return DIP_PCT.get(scanner, DEFAULT_DIP)
+
+
+def dist_52w_high(df: pd.DataFrame, end_pos: int) -> float | None:
+    """Signal-day close vs the highest high of the last 252 sessions, in %
+    (None with under 120 sessions of history)."""
+    win = df.iloc[max(0, end_pos - 251):end_pos + 1]
+    if len(win) < 120:
+        return None
+    return round((float(df["Close"].iloc[end_pos]) / float(win["High"].max()) - 1) * 100, 2)
+
+
+def passes_filter(scanner: str, dist: float | None) -> bool:
+    lim = NEAR_HIGH_PCT.get(scanner)
+    return lim is None or dist is None or dist >= -lim
 
 
 def simulate(fwd: pd.DataFrame, trigger: float, scanner: str) -> dict:
@@ -109,18 +130,30 @@ def _completed(df: pd.DataFrame, now: datetime) -> pd.DataFrame:
 def live_states(conn, now: datetime | None = None) -> list[dict]:
     import paper  # local import: paper imports policy/track_record
     now = now or datetime.now(IST)
-    lookback = (date.fromisoformat(START) - timedelta(days=14)).isoformat()
+    lookback = (date.fromisoformat(START) - timedelta(days=HISTORY_DAYS)).isoformat()
+    confirm_from = (date.fromisoformat(START) - timedelta(days=CONFIRM_DAYS)).isoformat()
+    seen: dict[str, list[tuple[pd.Timestamp, str]]] = {}
+    for d0, sc0, sym0, _ in paper._signals(conn, confirm_from):
+        seen.setdefault(sym0, []).append((pd.Timestamp(d0), sc0))
     out = []
     for day, scanner, symbol, source in paper._signals(conn, START):
+        t = pd.Timestamp(day)
+        others = sorted({sc for d0, sc in seen.get(symbol, [])
+                         if sc != scanner and t - pd.Timedelta(days=CONFIRM_DAYS) <= d0 <= t})
         df = _completed(paper._frame(conn, symbol, lookback), now)
         hit = pd.Timestamp(day)
         if not bs.is_weekly(scanner) and not df.empty and hit not in df.index and df.index[-1] > hit:
             earlier = df.index[df.index <= hit]
             hit = earlier[-1] if len(earlier) else hit
         sig = bs.signal_bar(df, hit, bs.is_weekly(scanner)) if not df.empty else None
-        base = {"scanner": scanner, "symbol": symbol, "date": day, "source": source}
+        base = {"scanner": scanner, "symbol": symbol, "date": day, "source": source, "confirmed_by": others}
         if sig is None:
             out.append({**base, "status": "no prices yet"})
+            continue
+        base["dist_52w_high"] = dist_52w_high(df, sig["end_pos"])
+        if not passes_filter(scanner, base["dist_52w_high"]):
+            out.append({**base, "status": "skipped", "trigger": sig["trigger"],
+                        "why": f"{-base['dist_52w_high']:.0f}% below its 52-week high (limit {NEAR_HIGH_PCT[scanner]:g}%)"})
             continue
         st = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner)
         out.append({**base, **st, "last_close": float(df["Close"].iloc[-1]), "last_date": df.index[-1]})
@@ -159,6 +192,15 @@ def new_events(conn, states: list[dict], now: datetime) -> list[tuple[str, dict,
     return fresh
 
 
+def _tags(s: dict) -> str:
+    t = ""
+    if s.get("confirmed_by"):
+        t += " ⭐ also on " + ", ".join(s["confirmed_by"])
+    if s.get("dist_52w_high") is not None:
+        t += f" · {-s['dist_52w_high']:.0f}% off 52w high"
+    return t
+
+
 def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
     if not fresh:
         return None
@@ -168,7 +210,7 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
         lines += ["", "<b>BUY ZONE</b> (buy at the next open):"]
         for s in buys:
             ref = s.get("entry", s["dip_close"])
-            lines.append(f"🟢 <b>{s['symbol']}</b> ({s['scanner']}) dipped {s['dip_pct']:g}% to {s['dip_close']:.2f} "
+            lines.append(f"🟢 <b>{s['symbol']}</b> ({s['scanner']}){_tags(s)} dipped {s['dip_pct']:g}% to {s['dip_close']:.2f} "
                          f"(trigger {s['trigger']:.2f}). Buy ~{ref:.2f}, target {ref * (1 + TARGET_PCT / 100):.2f} "
                          f"(+{TARGET_PCT:g}%), stop {ref * (1 - STOP_PCT / 100):.2f} (-{STOP_PCT:g}%), "
                          f"exit by {_exit_by(s) if 'entry_date' in s else 'day 40'}")
@@ -231,6 +273,7 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     cutoff = pd.Timestamp(date.today()) - pd.Timedelta(days=activity_days)
     for s in states:
         base = {"scanner": s["scanner"], "symbol": s["symbol"], "signal": s["date"],
+                "confirmed_by": s.get("confirmed_by", []), "off_high": s.get("dist_52w_high"),
                 "trigger": _r(s.get("trigger")), "now": _r(s.get("last_close")), "now_date": _iso(s.get("last_date"))}
         st = s.get("status")
         if st == "waiting for breakout":
@@ -258,8 +301,10 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     buy_list.sort(key=lambda x: (order[x["stage"]], x["signal"]), reverse=False)
     holding.sort(key=lambda x: x["entry_date"], reverse=True)
     activity.sort(key=lambda x: (x["when"], x["side"] == "SELL"), reverse=True)
+    skipped = sum(s.get("status") == "skipped" for s in states)
     return {"rule": {"dip": DIP_PCT, "floor": FLOOR_PCT, "zone_days": ZONE_DAYS, "target": TARGET_PCT,
-                     "stop": STOP_PCT, "max_hold": MAX_HOLD, "stake": STAKE},
+                     "stop": STOP_PCT, "max_hold": MAX_HOLD, "stake": STAKE, "near_high": NEAR_HIGH_PCT},
+            "skipped": skipped,
             "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity}
 
 
@@ -271,6 +316,8 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> lis
         df = prices.get(h["symbol"])
         sig = bs.signal_bar(df, h["hit_date"], bs.is_weekly(h["scanner_name"])) if df is not None else None
         if sig is None:
+            continue
+        if not passes_filter(h["scanner_name"], dist_52w_high(df, sig["end_pos"])):
             continue
         s = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"])
         if s["status"] in ("target", "stop", "time"):
@@ -284,6 +331,7 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> lis
          f"After the breakout, buy at the next open once a close is {DIP_PCT['63_30_daily']:g}% below the highest close "
          f"since the breakout ({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing), within {ZONE_DAYS} sessions and no more than "
          f"{FLOOR_PCT:g}% below the trigger. Exit at +{TARGET_PCT:g}%, a {STOP_PCT:g}% stop, or after {MAX_HOLD} sessions. "
+         f"Filter: {', '.join(f'{k} only within {v:g}% of the 52-week high' for k, v in NEAR_HIGH_PCT.items())}. "
          f"{bs.COST_PCT}% costs.", "",
          "| Group | Trades | Win rate | Avg | Avg win / loss | Target / stop / time | Avg days | ₹ on ₹1L a trade |",
          "|---|---|---|---|---|---|---|---|"]

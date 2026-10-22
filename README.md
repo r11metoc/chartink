@@ -154,7 +154,9 @@ sends a Telegram alert when:
   after 8 weeks (all shown in the alert).
 - **CLOSED**: a trade hits its target, its stop or the 8-week limit.
 
-Only completed daily candles are used, so a morning alert means "buy at
+63_30_daily signals are only taken when the signal-day close is within 10%
+of the 52-week high (`NEAR_HIGH_PCT`), and signals another scanner flagged in
+the 10 days before are tagged ⭐. Only completed daily candles are used, so a morning alert means "buy at
 today's open". Each alert is sent once (`dip_alerts` table). The digest adds
 a paper book for this rule, and the Saturday report
 (`reports/stock_outcomes.md`, "Buy-the-dip rule") backtests the same rule on

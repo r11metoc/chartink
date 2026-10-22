@@ -64,3 +64,21 @@ def test_alerts_only_once():
     first = dz.new_events(conn, [s], now)
     assert [k for _, _, k in first] == ["buy"] and "BUY ZONE" in dz.format_alerts(first)
     assert dz.new_events(conn, [s], now) == []
+
+
+def test_52_week_high_filter():
+    idx = pd.bdate_range("2025-01-01", periods=260)
+    high = [200.0] + [110.0] * 259                 # old peak at 200, then a range near 100-110
+    df = pd.DataFrame({"Open": 100.0, "High": high, "Low": 95.0, "Close": 100.0}, index=idx)
+    dist = dz.dist_52w_high(df, 259)               # peak 259 sessions back: just outside 252
+    assert dist == round((100 / 110 - 1) * 100, 2)
+    assert dz.passes_filter("63_30_daily", dist)               # 9% off -> kept
+    assert not dz.passes_filter("63_30_daily", dz.dist_52w_high(df, 200))   # 50% off the 200 peak
+    assert dz.passes_filter("Bullish_Scanner", -50.0)          # no filter on other scanners
+    assert dz.passes_filter("63_30_daily", None)               # not enough history: keep
+    assert dz.dist_52w_high(df, 50) is None
+
+
+def test_tags_in_alert_text():
+    s = {"confirmed_by": ["Bullish_Scanner"], "dist_52w_high": -4.2}
+    assert "⭐ also on Bullish_Scanner" in dz._tags(s) and "4% off 52w high" in dz._tags(s)

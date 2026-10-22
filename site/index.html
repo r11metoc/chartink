@@ -188,6 +188,8 @@ const STAGE = {
   breakout: ["WAIT", "WAIT B/O"],
 };
 const SELL = { target: "target", stop: "stop", time: "8 weeks" };
+const tags = (x) => (x.confirmed_by && x.confirmed_by.length ? ` · <b class="up">⭐ also on ${x.confirmed_by.map(esc).join(", ")}</b>` : "")
+  + (x.off_high != null ? ` · ${Math.abs(x.off_high).toFixed(0)}% off 52w high` : "");
 
 function renderDip(d) {
   const z = d.dip;
@@ -195,7 +197,9 @@ function renderDip(d) {
   const r = z.rule;
   const intro = `After the breakout above the trigger, buy at the next open when a close is ${r.dip["63_30_daily"]}% below the highest close
     since the breakout (${r.dip["Wkly_upswing"]}% for Wkly_upswing), within ${r.zone_days} sessions and no more than ${r.floor}% below the trigger.
-    Sell at <b>+${r.target}%</b>, a <b>${r.stop}% stop</b>, or after 8 weeks. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`;
+    Sell at <b>+${r.target}%</b>, a <b>${r.stop}% stop</b>, or after 8 weeks.
+    ${Object.entries(r.near_high || {}).map(([k, v]) => `${esc(k)} signals are only taken within ${v}% of the 52-week high${z.skipped ? ` (${z.skipped} skipped)` : ""}.`).join(" ")}
+    ⭐ = another scanner flagged it in the 10 days before. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`;
   const cards = z.summary.rows.map((g) => `
     <div class="stat"><b>${esc(g.group)}</b>
       <div><span>Watching</span><span>${g.watching}</span></div>
@@ -214,12 +218,12 @@ function renderDip(d) {
       : b.stage === "dip" ? [["Buy at or below", money(b.level)], ["High close", money(b.high_close)], ["Not below", money(b.floor)]]
       : [["Trigger", money(b.trigger)], ["Now", money(b.now)], ["Signal", fmtDate(b.signal)]];
     return `<div class="row" style="border-bottom:0"><div><div class="sym">${esc(b.symbol)}</div>
-        <div class="meta">${esc(b.scanner)} · signal ${fmtDate(b.signal)} · now ${money(b.now)}</div><div class="meta">${what}</div></div>
+        <div class="meta">${esc(b.scanner)} · signal ${fmtDate(b.signal)} · now ${money(b.now)}${tags(b)}</div><div class="meta">${what}</div></div>
         <div></div><span class="pill ${pill}">${label}</span></div>${lv(levels)}`;
   }).join("");
   const holdRows = z.holding.map((h) => `
     <div class="row" style="border-bottom:0"><div><div class="sym">${esc(h.symbol)}</div>
-      <div class="meta">${esc(h.scanner)} · bought ${fmtDate(h.entry_date)} at ${money(h.entry)} · now ${money(h.now)}</div></div>
+      <div class="meta">${esc(h.scanner)} · bought ${fmtDate(h.entry_date)} at ${money(h.entry)} · now ${money(h.now)}${tags(h)}</div></div>
       <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div>
       <span class="pill ${h.ret > 0 ? "BUY" : "HOLD"}">HOLD</span></div>
     ${lv([["Target", money(h.target)], ["Stop", money(h.stop)], ["Exit by", fmtDate(h.exit_by)]])}`).join("");
