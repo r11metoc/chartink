@@ -21,6 +21,7 @@ Three views:
 from __future__ import annotations
 
 import json
+import math
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -247,6 +248,18 @@ def policy_view() -> dict | None:
     return {"from": entry["from"], "updated": policy.current().get("updated"), "rows": rows}
 
 
+def _finite(x):
+    """JSON has no Infinity/NaN (a rule with no target has target = inf):
+    write them as null so browsers can read data.json."""
+    if isinstance(x, float) and not math.isfinite(x):
+        return None
+    if isinstance(x, dict):
+        return {k: _finite(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_finite(v) for v in x]
+    return x
+
+
 def main() -> int:
     conn = db.connect()
     latest_run, last_scan = conn.execute("SELECT id, run_at FROM runs ORDER BY id DESC LIMIT 1").fetchone()
@@ -273,7 +286,8 @@ def main() -> int:
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    OUT.write_text(json.dumps(_finite(data), ensure_ascii=False, separators=(",", ":"), allow_nan=False),
+                   encoding="utf-8")
     print(f"Wrote {OUT} ({len(breakouts)} breakouts, {sum(len(s['rows']) for s in data['scanners'])} on scanners)")
     return 0
 

@@ -162,7 +162,7 @@ function renderPaper(d) {
     </div>`).join("");
   const rows = p.trades.map((t) => {
     const detail = t.entry != null
-      ? `bought ${money(t.entry)} ${fmtDate(t.entry_date)} → ${REASON[t.exit_reason] || t.exit_reason} ${money(t.exit)} · stop ${money(t.stop)} · target ${money(t.target)}`
+      ? `bought ${money(t.entry)} ${fmtDate(t.entry_date)} → ${REASON[t.exit_reason] || t.exit_reason} ${money(t.exit)} · stop ${money(t.stop)} · ${t.target != null ? "target " + money(t.target) : "no target"}`
       : t.status === "skipped" ? `skipped: ${esc(t.why)}`
       : t.trigger != null ? `buy above ${money(t.trigger)}` : "waiting for prices";
     return `
