@@ -216,7 +216,8 @@ function renderPerformance(f) {
   const yrs = f.years.map((y) => `<tr><td>${y.year}</td><td class="n ${cls(y.ret)}">${y.ret > 0 ? "+" : ""}${y.ret}%</td>
     <td class="n ${cls(y.bench)}">${y.bench == null ? "–" : (y.bench > 0 ? "+" : "") + y.bench + "%"}</td></tr>`).join("");
   return `<section class="card"><h2>📈 If you had bought on the alerts <small>backtest since ${fmtYear(f.start)}</small></h2>
-    <div class="note">₹${p.capital / 100000}L, ₹${p.stake / 100000}L a trade, at most ${p.max_pos} open, first come first served, after costs.</div>
+    <div class="note">Starting with ₹${p.capital / 100000}L, each buy is 1/${p.max_pos} of the portfolio's value at the time (profits reinvested),
+      at most ${p.max_pos} open, first come first served, after costs.</div>
     <div class="lv"><div><span>₹${p.capital / 100000}L became</span><b>${L(p.final)}</b></div>
       <div><span>Per year</span><b class="${cls(p.cagr)}">${p.cagr}%</b></div>
       <div><span>Worst fall</span><b class="down">${p.max_dd}%</b></div></div>
@@ -226,6 +227,11 @@ function renderPerformance(f) {
     ${equityChart(f.monthly)}
     <table class="tight"><tr><th>Every alert</th><th class="n">Trades</th><th class="n">Won</th><th class="n">Avg</th><th class="n">Held</th></tr>${sc}</table>
     <table class="tight"><tr><th>Year</th><th class="n">Alerts</th><th class="n">Nifty 500</th></tr>${yrs}</table>
+    ${(f.exits || []).length ? `<h2 style="padding-top:14px">Exit rules compared <small>same dip buys</small></h2>
+      <table class="tight"><tr><th>Sell when</th><th class="n">Won</th><th class="n">Avg</th><th class="n">Held</th><th class="n">Per year</th><th class="n">Worst</th></tr>
+      ${f.exits.map((x) => `<tr><td>${esc(x.label)}</td><td class="n">${x.win}%</td><td class="n ${cls(x.avg)}">${pct(x.avg)}</td>
+        <td class="n">${x.days}d</td><td class="n ${cls(x.cagr)}">${x.cagr}%</td><td class="n down">${x.max_dd}%</td></tr>`).join("")}</table>
+      <div class="note" style="padding-top:6px">All keep the starting 12% stop (15% Wkly_upswing); riding exits sell after a year at the latest.</div>` : ""}
     <div class="note" style="padding-top:8px">${p.taken} trades taken, ${p.skipped} skipped for want of a free slot (${p.win}% of those taken won).
       Open positions counted at cost; this year is year-to-date. Past results, not a promise.</div></section>`;
 }
