@@ -48,6 +48,7 @@ SUMMARY_CSV = ROOT / "data" / "model" / "stock_summary.csv"
 REENTRY_CSV = ROOT / "data" / "model" / "reentry_trades.csv"
 PULLBACK_CSV = ROOT / "data" / "model" / "pullback_rules.csv"
 PERF_JSON = ROOT / "data" / "model" / "performance.json"
+EXITS_CSV = ROOT / "data" / "model" / "exit_trades.csv"
 
 HORIZONS = [("2w", 10, "Short"), ("1m", 21, "Short"), ("3m", 63, "Medium"),
             ("6m", 126, "Medium"), ("1y", 252, "Long"), ("2y", 504, "Long")]
@@ -385,6 +386,7 @@ def main() -> int:
     pb[0].to_csv(PULLBACK_CSV, index=False)
     dt = dipzone.backtest_trades(hits, prices)
     et = dipzone.exit_trades(hits, prices)
+    et.to_csv(EXITS_CSV, index=False)  # every dip buy, sold by each exit rule
     perf = dipzone.performance(dt, bench, et)
     PERF_JSON.write_text(json.dumps(perf, allow_nan=False), encoding="utf-8")
     dz = dipzone.performance_section(perf) + dipzone.backtest_section(hits, prices, dt)
