@@ -67,21 +67,6 @@ CREATE TABLE IF NOT EXISTS backtest_hits (
     UNIQUE(scanner_name, hit_date, symbol)
 );
 CREATE INDEX IF NOT EXISTS idx_backtest_scanner_symbol ON backtest_hits(scanner_name, symbol);
-
-CREATE TABLE IF NOT EXISTS backtest_outcomes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scanner_name TEXT NOT NULL,
-    hit_date TEXT NOT NULL,
-    symbol TEXT NOT NULL,
-    trigger_close REAL NOT NULL,
-    future_close REAL NOT NULL,
-    pct_return REAL NOT NULL,
-    label INTEGER NOT NULL,
-    horizon_days INTEGER NOT NULL,
-    success_threshold_pct REAL NOT NULL,
-    computed_at TEXT NOT NULL,
-    UNIQUE(scanner_name, hit_date, symbol, horizon_days, success_threshold_pct)
-);
 """
 
 
@@ -93,6 +78,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         # was seen before, dropped out for at least one run, and is back -
         # i.e. the scan condition re-triggered at the same technical level.
         conn.execute("ALTER TABLE breakouts ADD COLUMN kind TEXT NOT NULL DEFAULT 'fresh'")
+    conn.execute("DROP TABLE IF EXISTS backtest_outcomes")  # old model's table, unused
 
 
 def connect() -> sqlite3.Connection:
@@ -290,38 +276,6 @@ def all_backtest_hits(conn: sqlite3.Connection) -> list[tuple[str, str, str]]:
 def earliest_backtest_date(conn: sqlite3.Connection) -> str | None:
     row = conn.execute("SELECT MIN(hit_date) FROM backtest_hits").fetchone()
     return row[0] if row else None
-
-
-def save_backtest_outcome(
-    conn: sqlite3.Connection, scanner_name: str, hit_date: str, symbol: str,
-    trigger_close: float, future_close: float, pct_return: float, label: int,
-    horizon_days: int, success_threshold_pct: float,
-) -> None:
-    now = datetime.now(timezone.utc).isoformat()
-    conn.execute(
-        "INSERT OR REPLACE INTO backtest_outcomes "
-        "(scanner_name, hit_date, symbol, trigger_close, future_close, pct_return, label, "
-        " horizon_days, success_threshold_pct, computed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (scanner_name, hit_date, symbol, trigger_close, future_close, pct_return, label,
-         horizon_days, success_threshold_pct, now),
-    )
-
-
-def outcomes_with_context(conn: sqlite3.Connection, horizon_days: int, success_threshold_pct: float) -> list[dict]:
-    """Join backtest_outcomes with backtest_hits (sector/marketcap) for a
-    given labeling rule, in chronological order - the training/reporting dataset."""
-    cur = conn.execute(
-        "SELECT o.scanner_name, o.hit_date, o.symbol, o.trigger_close, o.future_close, "
-        "       o.pct_return, o.label, h.marketcap, h.sector "
-        "FROM backtest_outcomes o "
-        "JOIN backtest_hits h ON h.scanner_name = o.scanner_name "
-        "                    AND h.hit_date = o.hit_date AND h.symbol = o.symbol "
-        "WHERE o.horizon_days = ? AND o.success_threshold_pct = ? "
-        "ORDER BY o.hit_date",
-        (horizon_days, success_threshold_pct),
-    )
-    cols = ["scanner_name", "hit_date", "symbol", "trigger_close", "future_close", "pct_return", "label", "marketcap", "sector"]
-    return [dict(zip(cols, row)) for row in cur.fetchall()]
 
 
 def breakouts_since(conn: sqlite3.Connection, since_iso: str) -> list[dict]:
