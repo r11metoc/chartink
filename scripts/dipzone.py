@@ -350,7 +350,8 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
 
 # ------------------------------------------------------------ backtest report
 
-def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> list[str]:
+def backtest_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Every closed backtest trade under the live rule (filters applied)."""
     rows = []
     for _, h in hits.iterrows():
         df = prices.get(h["symbol"])
@@ -361,12 +362,19 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> lis
             continue
         s = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"])
         if s["status"] in ("target", "stop", "time"):
-            rows.append({"scanner": h["scanner_name"], "cap": h["marketcap"], "status": s["status"], "ret": s["ret"],
+            rows.append({"scanner": h["scanner_name"], "symbol": h["symbol"], "cap": h["marketcap"],
+                         "status": s["status"], "ret": s["ret"],
+                         "entry_date": pd.Timestamp(s["entry_date"]), "exit_date": pd.Timestamp(s["exit_date"]),
                          "days": int(np.busday_count(pd.Timestamp(s["entry_date"]).date(),
                                                      pd.Timestamp(s["exit_date"]).date())) + 1})
-    if not rows:
+    return pd.DataFrame(rows)
+
+
+def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], d: pd.DataFrame | None = None) -> list[str]:
+    if d is None:
+        d = backtest_trades(hits, prices)
+    if d.empty:
         return []
-    d = pd.DataFrame(rows)
     L = ["", "## Buy-the-dip rule (the live alert rule)", "",
          f"After the breakout, buy at the next open once a close is {DIP_PCT['63_30_daily']:g}% below the highest close "
          f"since the breakout ({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing), within {ZONE_DAYS} sessions and no more than "
@@ -383,4 +391,123 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> lis
         L.append(f"| {name} | {len(x)} | {(r > 0).mean():.0%} | {r.mean():+.2f}% | {r[r > 0].mean():+.1f}% / "
                  f"{r[r <= 0].mean():+.1f}% | {(x.status == 'target').mean():.0%} / {(x.status == 'stop').mean():.0%} / "
                  f"{(x.status == 'time').mean():.0%} | {x['days'].mean():.0f} | {r.sum() * 1000:,.0f} |")
+    return L
+
+
+# ------------------------------------------------------- portfolio backtest
+
+PF_CAPITAL = 1_000_000   # ₹10 lakh
+PF_STAKE = 100_000       # ₹1 lakh a trade
+PF_MAX_POS = 10
+
+
+def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, stake: float = PF_STAKE,
+              max_pos: int = PF_MAX_POS) -> dict | None:
+    """Trade the alerts with limited money: first come, first served, a fixed
+    stake per trade, at most max_pos open and one position per stock. Returns
+    the daily equity curve (cash + open positions at cost) and the trades taken."""
+    if trades.empty:
+        return None
+    t = trades.sort_values(["entry_date", "scanner", "symbol"]).reset_index(drop=True)
+    by_day = {d: g.to_dict("records") for d, g in t.groupby("entry_date")}
+    cash, open_, taken, skipped, curve = float(capital), [], [], 0, {}
+    for d in pd.bdate_range(t["entry_date"].min(), t["exit_date"].max()):
+        still = []
+        for x in open_:
+            if x["exit_date"] <= d:
+                cash += stake * (1 + x["ret"] / 100)
+            else:
+                still.append(x)
+        open_ = still
+        for x in by_day.get(d, []):
+            if len(open_) >= max_pos or cash < stake or any(o["symbol"] == x["symbol"] for o in open_):
+                skipped += 1
+                continue
+            cash -= stake
+            open_.append(x)
+            taken.append(x)
+        curve[d] = cash + stake * len(open_)
+    return {"equity": pd.Series(curve), "taken": pd.DataFrame(taken), "skipped": skipped,
+            "capital": capital, "stake": stake, "max_pos": max_pos}
+
+
+def _rn(x) -> float | None:
+    return None if x is None or pd.isna(x) else round(float(x), 1)
+
+
+def _cagr(first: float, last: float, start, end) -> float:
+    yrs = (pd.Timestamp(end) - pd.Timestamp(start)).days / 365.25
+    return ((last / first) ** (1 / yrs) - 1) * 100 if yrs > 0 and first > 0 else float("nan")
+
+
+def performance(trades: pd.DataFrame, bench: pd.Series | None) -> dict | None:
+    """Would buying on the alerts have made money? Per-trade stats per
+    scanner, plus a ₹10L portfolio from the date all three scanners have
+    backtest data, compared with the Nifty 500 over the same days."""
+    if trades.empty:
+        return None
+    start = trades.groupby("scanner")["entry_date"].min().max()  # all scanners live from here
+    t = trades[trades["entry_date"] >= start]
+    per = []
+    for name, g in [*t.groupby("scanner"), ("All", t)]:
+        r = g["ret"]
+        per.append({"group": name, "trades": len(g), "win": round((r > 0).mean() * 100),
+                    "avg": round(r.mean(), 2), "avg_win": _rn(r[r > 0].mean()),
+                    "avg_loss": _rn(r[r <= 0].mean()), "days": round(g["days"].mean())})
+    pf = portfolio(t)
+    eq = pf["equity"]
+    yearly = eq.resample("YE").last()
+    prev = yearly.shift(1).fillna(pf["capital"])
+    out = {"start": start.date().isoformat(), "end": eq.index[-1].date().isoformat(), "per_scanner": per,
+           "portfolio": {"capital": pf["capital"], "stake": pf["stake"], "max_pos": pf["max_pos"],
+                         "final": round(eq.iloc[-1]), "profit": round(eq.iloc[-1] - pf["capital"]),
+                         "cagr": round(_cagr(pf["capital"], eq.iloc[-1], eq.index[0], eq.index[-1]), 1),
+                         "max_dd": round((eq / eq.cummax() - 1).min() * 100, 1),
+                         "taken": len(pf["taken"]), "skipped": pf["skipped"],
+                         "win": round((pf["taken"]["ret"] > 0).mean() * 100)},
+           "years": [{"year": int(d.year), "ret": round((v / p - 1) * 100, 1)} for d, v, p in zip(yearly.index, yearly, prev)],
+           "monthly": [{"m": d.strftime("%Y-%m"), "v": round(v)} for d, v in eq.resample("ME").last().items()]}
+    if bench is not None:
+        b = bench[(bench.index >= eq.index[0]) & (bench.index <= eq.index[-1])].dropna()
+        if len(b) > 1:
+            by = b.resample("YE").last()
+            bprev = by.shift(1).fillna(b.iloc[0])
+            out["bench"] = {"name": "Nifty 500", "cagr": round(_cagr(b.iloc[0], b.iloc[-1], b.index[0], b.index[-1]), 1),
+                            "max_dd": round((b / b.cummax() - 1).min() * 100, 1),
+                            "final": round(pf["capital"] * b.iloc[-1] / b.iloc[0])}
+            bmap = {int(d.year): round((v / p - 1) * 100, 1) for d, v, p in zip(by.index, by, bprev)}
+            for y in out["years"]:
+                y["bench"] = bmap.get(y["year"])
+            bm = (b / b.iloc[0] * pf["capital"]).resample("ME").last()
+            for m in out["monthly"]:
+                v = bm.get(pd.Timestamp(m["m"]) + pd.offsets.MonthEnd(0))
+                m["b"] = None if v is None or pd.isna(v) else round(v)
+    return out
+
+
+def _pctx(v) -> str:
+    return "–" if v is None else f"{v:+.1f}%"
+
+
+def performance_section(perf: dict | None) -> list[str]:
+    if not perf:
+        return []
+    p, b = perf["portfolio"], perf.get("bench")
+    L = ["", "## If I had bought on the alerts", "",
+         f"Every buy alert from {perf['start']} (when all three scanners have backtest data) to {perf['end']}, "
+         f"with ₹{p['capital'] / 1e5:g}L: ₹{p['stake'] / 1e5:g}L a trade, at most {p['max_pos']} open, first come first served, "
+         "one position per stock, after costs.", "",
+         "| Scanner | Trades | Win rate | Avg | Avg win / loss | Avg days |", "|---|---|---|---|---|---|"]
+    for r in perf["per_scanner"]:
+        L.append(f"| {r['group']} | {r['trades']} | {r['win']}% | {r['avg']:+.2f}% | {_pctx(r['avg_win'])} / {_pctx(r['avg_loss'])} | {r['days']} |")
+    L += ["", "| | Alerts portfolio | " + (b["name"] if b else "Index") + " |", "|---|---|---|",
+          f"| ₹{p['capital'] / 1e5:g}L became | ₹{p['final'] / 1e5:.1f}L | " + (f"₹{b['final'] / 1e5:.1f}L" if b else "–") + " |",
+          f"| Yearly growth (CAGR) | {p['cagr']:.1f}% | " + (f"{b['cagr']:.1f}%" if b else "–") + " |",
+          f"| Worst fall from a peak | {p['max_dd']:.1f}% | " + (f"{b['max_dd']:.1f}%" if b else "–") + " |",
+          f"| Trades taken / skipped (no free slot) | {p['taken']} / {p['skipped']} | |",
+          f"| Win rate of trades taken | {p['win']}% | |", "",
+          "| Year | Alerts portfolio | " + (b["name"] if b else "Index") + " |", "|---|---|---|"]
+    for y in perf["years"]:
+        L.append(f"| {y['year']} | {y['ret']:+.1f}% | " + (f"{y['bench']:+.1f}%" if y.get("bench") is not None else "–") + " |")
+    L += ["", "Open positions are counted at cost until sold. The current year is year-to-date."]
     return L

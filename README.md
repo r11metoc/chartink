@@ -164,6 +164,14 @@ a paper book for this rule, and the Saturday report
 (`reports/stock_outcomes.md`, "Buy-the-dip rule") backtests the same rule on
 the full history. Settings are at the top of `scripts/dipzone.py`.
 
+**Would it have made money?** The Saturday run also trades the alerts as a
+₹10L portfolio (₹1L a trade, at most 10 open, first come first served, one
+position per stock) from the first date all three scanners have backtest
+data, and compares it with the Nifty 500: growth per year, worst fall and
+year by year. It is written to `data/model/performance.json`, shown at the
+bottom of the website's Dip tab and in the report ("If I had bought on the
+alerts"). Settings: `PF_CAPITAL`, `PF_STAKE`, `PF_MAX_POS` in `scripts/dipzone.py`.
+
 ## If I had bought every scanner stock
 
 `scripts/stock_outcomes.py` (part of the Saturday `signal_model.yml` run, and

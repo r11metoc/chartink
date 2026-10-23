@@ -28,6 +28,7 @@ Usage: python stock_outcomes.py
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -46,6 +47,7 @@ TRADES_CSV = ROOT / "data" / "model" / "stock_outcomes.csv"
 SUMMARY_CSV = ROOT / "data" / "model" / "stock_summary.csv"
 REENTRY_CSV = ROOT / "data" / "model" / "reentry_trades.csv"
 PULLBACK_CSV = ROOT / "data" / "model" / "pullback_rules.csv"
+PERF_JSON = ROOT / "data" / "model" / "performance.json"
 
 HORIZONS = [("2w", 10, "Short"), ("1m", 21, "Short"), ("3m", 63, "Medium"),
             ("6m", 126, "Medium"), ("1y", 252, "Long"), ("2y", 504, "Long")]
@@ -381,7 +383,10 @@ def main() -> int:
     rt.to_csv(REENTRY_CSV, index=False)
     pb = pullback.analyse(hits, prices)
     pb[0].to_csv(PULLBACK_CSV, index=False)
-    dz = dipzone.backtest_section(hits, prices)
+    dt = dipzone.backtest_trades(hits, prices)
+    perf = dipzone.performance(dt, bench)
+    PERF_JSON.write_text(json.dumps(perf, allow_nan=False), encoding="utf-8")
+    dz = dipzone.performance_section(perf) + dipzone.backtest_section(hits, prices, dt)
     REPORT.write_text(build_report(t, s, rt, pb, dz), encoding="utf-8")
     print(f"Wrote {REPORT} ({len(b)} bought of {len(t)} signals)")
     return 0

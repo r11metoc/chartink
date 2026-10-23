@@ -74,6 +74,7 @@
   th, td { padding: 8px 14px; border-top: 1px solid var(--line); text-align: left; }
   th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.tight th, table.tight td { padding: 8px 10px; }
   footer { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 16px 24px; }
   .err { color: var(--down); padding: 16px; }
   .note { color: var(--muted); font-size: 12.5px; padding: 0 14px 10px; }
@@ -108,6 +109,7 @@ const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-I
 const pct = (v) => (v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(2) + "%");
 const cls = (v) => (v == null || v === 0 ? "" : v > 0 ? "up" : "down");
 const fmtDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+const fmtYear = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 const fmtWhen = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
 
 function trackLine(t, l) {
@@ -191,6 +193,43 @@ const SELL = { target: "target", stop: "stop", time: "8 weeks" };
 const tags = (x) => (x.confirmed_by && x.confirmed_by.length ? ` · <b class="up">⭐ also on ${x.confirmed_by.map(esc).join(", ")}</b>` : "")
   + (x.off_high != null ? ` · ${Math.abs(x.off_high).toFixed(0)}% off 52w high` : "");
 
+function equityChart(m) {
+  const pts = m.filter((x) => x.v != null);
+  if (pts.length < 2) return "";
+  const vals = pts.flatMap((x) => [x.v, x.b]).filter((v) => v != null);
+  const lo = Math.min(...vals), hi = Math.max(...vals), W = 600, H = 150, pad = 4;
+  const X = (i) => pad + (i * (W - 2 * pad)) / (pts.length - 1);
+  const Y = (v) => H - pad - ((v - lo) / (hi - lo || 1)) * (H - 2 * pad);
+  const line = (key) => pts.map((x, i) => (x[key] == null ? "" : `${X(i).toFixed(1)},${Y(x[key]).toFixed(1)}`)).filter(Boolean).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;padding:0 14px 4px" role="img" aria-label="Portfolio value against the Nifty 500">
+    <polyline points="${line("b")}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="4 4"/>
+    <polyline points="${line("v")}" fill="none" stroke="var(--accent)" stroke-width="2.5"/></svg>
+    <div class="note"><span style="color:var(--accent)">━</span> alerts portfolio &nbsp; <span>┅</span> Nifty 500 · ${esc(pts[0].m)} to ${esc(pts[pts.length - 1].m)}</div>`;
+}
+
+function renderPerformance(f) {
+  if (!f) return "";
+  const p = f.portfolio, b = f.bench;
+  const L = (v) => "₹" + (v / 100000).toFixed(1) + "L";
+  const sc = f.per_scanner.map((r) => `<tr><td>${esc(r.group)}</td><td class="n">${r.trades}</td><td class="n">${r.win}%</td>
+    <td class="n ${cls(r.avg)}">${pct(r.avg)}</td><td class="n">${r.days}d</td></tr>`).join("");
+  const yrs = f.years.map((y) => `<tr><td>${y.year}</td><td class="n ${cls(y.ret)}">${y.ret > 0 ? "+" : ""}${y.ret}%</td>
+    <td class="n ${cls(y.bench)}">${y.bench == null ? "–" : (y.bench > 0 ? "+" : "") + y.bench + "%"}</td></tr>`).join("");
+  return `<section class="card"><h2>📈 If you had bought on the alerts <small>backtest since ${fmtYear(f.start)}</small></h2>
+    <div class="note">₹${p.capital / 100000}L, ₹${p.stake / 100000}L a trade, at most ${p.max_pos} open, first come first served, after costs.</div>
+    <div class="lv"><div><span>₹${p.capital / 100000}L became</span><b>${L(p.final)}</b></div>
+      <div><span>Per year</span><b class="${cls(p.cagr)}">${p.cagr}%</b></div>
+      <div><span>Worst fall</span><b class="down">${p.max_dd}%</b></div></div>
+    ${b ? `<div class="lv"><div><span>Nifty 500 instead</span><b>${L(b.final)}</b></div>
+      <div><span>Per year</span><b class="${cls(b.cagr)}">${b.cagr}%</b></div>
+      <div><span>Worst fall</span><b class="down">${b.max_dd}%</b></div></div>` : ""}
+    ${equityChart(f.monthly)}
+    <table class="tight"><tr><th>Every alert</th><th class="n">Trades</th><th class="n">Won</th><th class="n">Avg</th><th class="n">Held</th></tr>${sc}</table>
+    <table class="tight"><tr><th>Year</th><th class="n">Alerts</th><th class="n">Nifty 500</th></tr>${yrs}</table>
+    <div class="note" style="padding-top:8px">${p.taken} trades taken, ${p.skipped} skipped for want of a free slot (${p.win}% of those taken won).
+      Open positions counted at cost; this year is year-to-date. Past results, not a promise.</div></section>`;
+}
+
 function renderDip(d) {
   const z = d.dip;
   if (!z) return `<section class="card"><div class="empty">The buy-the-dip data isn't in this scan yet.</div></section>`;
@@ -242,7 +281,8 @@ function renderDip(d) {
     <section class="card"><h2>📦 Holding <small>${z.holding.length}</small></h2>
       ${holdRows || `<div class="empty">No open positions.</div>`}</section>
     <section class="card"><h2>🧾 Recent buys and sells <small>last 60 days</small></h2>
-      ${actRows || `<div class="empty">No trades yet.</div>`}</section>`;
+      ${actRows || `<div class="empty">No trades yet.</div>`}</section>
+    ${renderPerformance(d.performance)}`;
 }
 
 function renderNow(d) {

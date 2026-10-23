@@ -260,6 +260,15 @@ def _finite(x):
     return x
 
 
+def _performance() -> dict | None:
+    """Backtest of buying on the alerts (written by stock_outcomes.py)."""
+    f = ROOT / "data" / "model" / "performance.json"
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    except ValueError:
+        return None
+
+
 def main() -> int:
     conn = db.connect()
     latest_run, last_scan = conn.execute("SELECT id, run_at FROM runs ORDER BY id DESC LIMIT 1").fetchone()
@@ -283,6 +292,7 @@ def main() -> int:
                               "trades": learned[::-1]}},
         "policy": policy_view(),
         "dip": dipzone.dashboard_view(dipzone.live_states(conn)),
+        "performance": _performance(),
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)
