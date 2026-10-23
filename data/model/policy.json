@@ -27,10 +27,10 @@
      "walk_forward": {
       "base": {
        "n": 1300,
-       "win": 34,
+       "win": 33,
        "avg": -0.25,
        "vs_index": -0.57,
-       "total": -329.2,
+       "total": -329.7,
        "gain": 0.0,
        "t": null
       },
@@ -39,18 +39,18 @@
        "win": 53,
        "avg": 3.82,
        "vs_index": 1.77,
-       "total": 4961.9,
+       "total": 4965.5,
        "gain": 4.07,
-       "t": 9.84
+       "t": 9.85
       },
       "rule+filter": {
        "n": 1109,
        "win": 51,
        "avg": 3.45,
        "vs_index": 1.71,
-       "total": 3824.4,
+       "total": 3828.0,
        "gain": 3.2,
-       "t": 8.14
+       "t": 8.15
       }
      }
     },
@@ -72,36 +72,36 @@
       "max_hold": 40
      },
      "train": {
-      "n": 4176,
-      "avg": 4.58
+      "n": 4178,
+      "avg": 4.57
      },
      "walk_forward": {
       "base": {
        "n": 4117,
        "win": 42,
-       "avg": 0.73,
+       "avg": 0.72,
        "vs_index": 0.21,
-       "total": 2984.8,
+       "total": 2981.9,
        "gain": 0.0,
        "t": null
       },
       "rule": {
        "n": 4117,
        "win": 56,
-       "avg": 4.41,
-       "vs_index": 2.35,
-       "total": 18154.4,
-       "gain": 3.68,
-       "t": 16.44
+       "avg": 4.43,
+       "vs_index": 2.37,
+       "total": 18219.3,
+       "gain": 3.7,
+       "t": 16.5
       },
       "rule+filter": {
        "n": 3941,
        "win": 55,
-       "avg": 4.37,
-       "vs_index": 2.43,
-       "total": 17208.9,
-       "gain": 3.45,
-       "t": 15.52
+       "avg": 4.38,
+       "vs_index": 2.45,
+       "total": 17273.8,
+       "gain": 3.47,
+       "t": 15.59
       }
      }
     },
@@ -132,7 +132,7 @@
        "win": 42,
        "avg": 0.41,
        "vs_index": -0.05,
-       "total": 144.1,
+       "total": 144.2,
        "gain": 0.0,
        "t": null
       },
@@ -140,8 +140,8 @@
        "n": 350,
        "win": 41,
        "avg": 1.99,
-       "vs_index": 1.17,
-       "total": 696.8,
+       "vs_index": 1.15,
+       "total": 697.8,
        "gain": 1.58,
        "t": 2.09
       },
@@ -149,8 +149,8 @@
        "n": 281,
        "win": 41,
        "avg": 1.21,
-       "vs_index": 0.59,
-       "total": 339.2,
+       "vs_index": 0.58,
+       "total": 338.7,
        "gain": 0.56,
        "t": 0.85
       }

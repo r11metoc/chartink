@@ -172,7 +172,7 @@ scanner_name,symbol,signals,first,last,sector,marketcap,avg_2w,up_2w,avg_1m,up_1
 63_30_daily,GODREJAGRO,5,2021-05-24,2023-12-13,FMCG,Midcap,4.1,100.0,6.2,100.0,0.3,20.0,12.6,100.0,34.4,80.0,2.9,80.0
 63_30_daily,GODREJCP,1,2024-01-02,2024-01-02,FMCG,Largecap,-2.3,0.0,7.6,100.0,5.3,100.0,25.7,100.0,2.2,100.0,6.8,100.0
 63_30_daily,GOKEX,3,2021-05-05,2023-06-05,Readymade Garments/Apparels,Midcap,14.6,100.0,23.2,100.0,82.1,100.0,115.4,100.0,165.3,100.0,161.3,100.0
-63_30_daily,GOKULAGRO,3,2024-05-03,2026-04-22,FMCG,Midcap,7.1,100.0,3.4,66.7,35.1,66.7,100.9,66.7,75.4,66.7,248.2,66.7
+63_30_daily,GOKULAGRO,3,2024-05-03,2026-04-22,FMCG,Midcap,7.1,100.0,3.4,66.7,35.1,66.7,64.3,66.7,75.4,66.7,248.2,66.7
 63_30_daily,GOODLUCK,5,2023-07-31,2026-02-19,Metals & Mining,Midcap,1.8,80.0,3.2,80.0,56.1,100.0,82.5,100.0,91.7,80.0,105.0,80.0
 63_30_daily,GOODYEAR,1,2022-12-07,2022-12-07,Auto,Smallcap,-6.4,0.0,-2.6,0.0,-8.5,0.0,2.5,100.0,-31.1,0.0,,
 63_30_daily,GPPL,1,2021-05-31,2021-05-31,Transportation,Midcap,6.2,100.0,4.8,100.0,-7.1,0.0,-10.1,0.0,-27.4,0.0,2.6,100.0
@@ -217,7 +217,7 @@ scanner_name,symbol,signals,first,last,sector,marketcap,avg_2w,up_2w,avg_1m,up_1
 63_30_daily,IGARASHI,2,2023-06-01,2023-06-05,Industrials,Smallcap,6.3,100.0,2.7,100.0,33.8,100.0,14.3,100.0,12.1,100.0,1.6,50.0
 63_30_daily,IGL,1,2021-06-11,2021-06-11,Energy,Midcap,-5.8,0.0,4.7,100.0,8.7,100.0,-6.1,0.0,-37.1,0.0,-10.6,0.0
 63_30_daily,IGPL,1,2023-09-21,2023-09-21,Chemicals,Smallcap,-9.4,0.0,-14.6,0.0,-17.7,0.0,-24.4,0.0,2.1,100.0,-25.4,0.0
-63_30_daily,IIFL,3,2023-06-14,2025-10-14,Financials,Largecap,0.6,33.3,8.9,100.0,19.2,100.0,14.6,66.7,2.0,66.7,-8.5,0.0
+63_30_daily,IIFL,3,2023-06-14,2025-10-14,Financials,Largecap,0.6,33.3,8.9,100.0,19.2,100.0,14.6,66.7,4.3,66.7,-8.5,0.0
 63_30_daily,IIFLCAPS,1,2024-05-17,2024-05-17,Financials,Midcap,12.9,100.0,24.0,100.0,41.4,100.0,81.8,100.0,56.6,100.0,92.4,100.0
 63_30_daily,IMAGICAA,3,2023-12-12,2024-08-09,Media,Smallcap,8.4,100.0,9.7,66.7,0.9,33.3,-3.1,33.3,-11.9,33.3,-38.4,0.0
 63_30_daily,IMFA,6,2022-04-12,2023-07-06,Metals & Mining,Midcap,0.2,66.7,3.0,83.3,14.7,83.3,38.7,83.3,96.8,83.3,118.4,100.0
@@ -264,7 +264,7 @@ scanner_name,symbol,signals,first,last,sector,marketcap,avg_2w,up_2w,avg_1m,up_1
 63_30_daily,KANORICHEM,1,2024-09-11,2024-09-11,Chemicals,Smallcap,-0.9,0.0,-5.1,0.0,-15.4,0.0,-45.8,0.0,-43.1,0.0,25.7,100.0
 63_30_daily,KANSAINER,2,2023-12-08,2024-01-05,Building Materials,Midcap,-1.1,50.0,-2.6,50.0,-18.2,0.0,-16.7,0.0,-25.2,0.0,-32.7,0.0
 63_30_daily,KARURVYSYA,3,2023-05-29,2025-06-09,Bank,Largecap,4.6,100.0,11.6,100.0,8.8,100.0,36.6,100.0,68.3,100.0,131.7,66.7
-63_30_daily,KAVDEFENCE,1,2026-10-08,2026-10-08,,,,,,,,,,,,,,
+63_30_daily,KAVDEFENCE,1,2026-10-08,2026-10-08,,,-13.3,0.0,,,,,,,,,,
 63_30_daily,KEC,5,2021-06-25,2023-05-10,Realty,Midcap,-2.9,40.0,-2.3,60.0,12.8,60.0,7.0,100.0,24.2,60.0,49.0,100.0
 63_30_daily,KESORAMIND,2,2023-04-17,2024-12-06,Miscellaneous,Smallcap,-0.5,50.0,0.3,50.0,-39.2,50.0,-29.3,50.0,45.6,50.0,-93.3,0.0
 63_30_daily,KHADIM,1,2024-07-31,2024-07-31,Consumer Discretionary,Smallcap,-16.6,0.0,-17.4,0.0,-13.2,0.0,-19.1,0.0,-38.6,0.0,-79.4,0.0
@@ -453,7 +453,7 @@ scanner_name,symbol,signals,first,last,sector,marketcap,avg_2w,up_2w,avg_1m,up_1
 63_30_daily,SSWL,1,2022-04-05,2022-04-05,Auto,Midcap,-7.7,0.0,-12.1,0.0,-10.4,0.0,-12.4,0.0,-14.8,0.0,20.1,100.0
 63_30_daily,STAR,8,2021-04-19,2026-04-15,Healthcare,Midcap,3.0,87.5,10.3,87.5,7.3,87.5,4.5,87.5,-65.0,0.0,-63.9,0.0
 63_30_daily,STARCEMENT,4,2023-04-13,2023-05-04,Building Materials,Midcap,0.9,100.0,9.4,100.0,21.6,100.0,37.4,100.0,84.6,100.0,86.3,100.0
-63_30_daily,STARHEALTH,7,2024-07-26,2026-04-29,Financials,Largecap,-2.3,42.9,0.3,57.1,5.9,71.4,-11.8,28.6,-28.9,0.0,-7.1,0.0
+63_30_daily,STARHEALTH,7,2024-07-26,2026-04-29,Financials,Largecap,-2.3,42.9,0.3,57.1,5.9,71.4,-11.2,28.6,-28.9,0.0,-7.1,0.0
 63_30_daily,STARPAPER,2,2022-08-10,2022-08-10,Building Materials,Smallcap,7.8,100.0,16.6,100.0,12.7,100.0,-4.1,0.0,5.0,100.0,30.2,100.0
 63_30_daily,STEELCAS,3,2023-08-10,2023-08-21,"Castings, Forgings & Fasteners",Smallcap,17.6,100.0,27.1,100.0,9.7,100.0,16.6,100.0,16.7,100.0,91.3,100.0
 63_30_daily,STERTOOLS,1,2024-01-08,2024-01-08,"Castings, Forgings & Fasteners",Smallcap,-10.4,0.0,-12.1,0.0,-17.8,0.0,-5.0,0.0,30.2,100.0,-43.1,0.0
@@ -474,7 +474,7 @@ scanner_name,symbol,signals,first,last,sector,marketcap,avg_2w,up_2w,avg_1m,up_1
 63_30_daily,TAJGVK,7,2021-09-22,2024-01-29,Services,Smallcap,3.6,42.9,7.9,57.1,0.7,28.6,8.2,71.4,32.7,100.0,71.7,100.0
 63_30_daily,TALBROAUTO,2,2023-05-30,2023-06-02,Auto,Smallcap,19.0,100.0,32.5,100.0,85.7,100.0,164.9,100.0,173.9,100.0,158.1,100.0
 63_30_daily,TANLA,1,2021-10-19,2021-10-19,I.T,Midcap,26.8,100.0,49.9,100.0,92.2,100.0,50.9,100.0,-20.6,0.0,-2.3,0.0
-63_30_daily,TATACOMM,12,2022-01-17,2025-10-15,Telecom-Service,Largecap,3.3,66.7,4.6,75.0,2.0,25.0,2.6,75.0,-9.8,25.0,-9.4,33.3
+63_30_daily,TATACOMM,12,2022-01-17,2025-10-15,Telecom-Service,Largecap,3.3,66.7,4.6,75.0,2.0,25.0,2.6,75.0,-9.6,25.0,-9.4,33.3
 63_30_daily,TATACONSUM,5,2022-04-06,2024-07-23,FMCG,Largecap,-0.5,60.0,-5.4,20.0,-8.6,0.0,-11.7,0.0,-11.9,0.0,17.2,60.0
 63_30_daily,TATAINVEST,2,2021-06-08,2022-09-01,Financials,Largecap,33.3,100.0,22.4,100.0,27.5,100.0,26.1,100.0,37.7,100.0,215.2,100.0
 63_30_daily,TATAPOWER,1,2024-09-27,2024-09-27,Power & Utilities,Largecap,-4.2,0.0,-11.8,0.0,-18.7,0.0,-22.3,0.0,-18.2,0.0,-28.8,0.0
@@ -625,7 +625,7 @@ Bullish_Scanner,ASTRAL,2,2023-05-31,2023-06-05,Plastic products,Largecap,6.6,100
 Bullish_Scanner,ASTRAMICRO,2,2021-06-08,2025-09-22,Aerospace & Defence,Midcap,8.1,50.0,5.8,50.0,-0.9,50.0,32.0,50.0,45.1,100.0,143.7,50.0
 Bullish_Scanner,ATALREAL,4,2025-04-04,2026-06-05,Realty,Smallcap,3.5,75.0,-4.4,25.0,19.9,75.0,50.9,50.0,66.3,50.0,,
 Bullish_Scanner,ATULAUTO,3,2021-10-07,2021-10-12,Auto,Smallcap,-4.2,0.0,-0.4,33.3,-18.4,0.0,-19.6,0.0,12.7,100.0,164.3,100.0
-Bullish_Scanner,AUBANK,10,2021-08-12,2026-04-22,Bank,Largecap,-3.1,20.0,-6.8,30.0,-5.6,10.0,-4.4,10.0,-12.1,0.0,6.9,60.0
+Bullish_Scanner,AUBANK,10,2021-08-12,2026-04-22,Bank,Largecap,-3.1,20.0,-6.8,30.0,-5.6,10.0,-4.3,10.0,-12.1,0.0,6.9,60.0
 Bullish_Scanner,AUROPHARMA,10,2021-01-05,2026-04-23,Healthcare,Largecap,0.5,60.0,-0.8,50.0,5.2,50.0,-12.4,20.0,-26.4,0.0,-20.1,30.0
 Bullish_Scanner,AURUM,4,2024-07-31,2026-06-29,I.T,Smallcap,14.9,100.0,12.2,100.0,8.0,100.0,17.8,50.0,3.1,25.0,24.3,50.0
 Bullish_Scanner,AUTOAXLES,2,2021-12-30,2021-12-31,Auto,Smallcap,1.8,50.0,-5.7,0.0,8.9,100.0,25.6,100.0,28.7,100.0,44.3,100.0
@@ -687,7 +687,7 @@ Bullish_Scanner,CENTENKA,4,2022-01-04,2024-05-07,Textiles,Smallcap,9.6,100.0,15.
 Bullish_Scanner,CENTURYPLY,10,2021-09-27,2024-09-06,Building Materials,Midcap,8.0,90.0,11.1,80.0,6.5,50.0,21.0,50.0,9.7,60.0,15.4,60.0
 Bullish_Scanner,CESC,7,2021-06-08,2024-05-03,Power & Utilities,Midcap,-1.3,28.6,-1.8,42.9,16.4,100.0,17.6,100.0,29.9,42.9,22.4,42.9
 Bullish_Scanner,CGCL,5,2021-11-01,2026-06-19,Financials,Largecap,4.3,80.0,10.6,80.0,14.2,100.0,14.0,20.0,10.4,20.0,14.0,20.0
-Bullish_Scanner,CGPOWER,20,2021-09-03,2026-04-22,Industrials,Largecap,4.4,70.0,7.3,80.0,24.1,90.0,29.1,90.0,79.8,90.0,152.4,85.0
+Bullish_Scanner,CGPOWER,20,2021-09-03,2026-04-22,Industrials,Largecap,4.4,70.0,7.3,80.0,24.1,90.0,29.4,90.0,79.8,90.0,152.4,85.0
 Bullish_Scanner,CHALET,9,2022-07-07,2023-05-25,Services,Midcap,2.0,66.7,1.9,55.6,17.7,100.0,36.9,88.9,79.0,100.0,123.9,100.0
 Bullish_Scanner,CHAMBLFERT,8,2022-04-12,2025-04-02,Chemicals,Midcap,0.3,50.0,1.6,50.0,-1.6,37.5,-9.5,37.5,7.2,37.5,0.9,37.5
 Bullish_Scanner,CHEMPLASTS,1,2024-06-14,2024-06-14,Chemicals,Smallcap,-6.1,0.0,-7.6,0.0,-10.2,0.0,-13.5,0.0,-28.0,0.0,-65.5,0.0
@@ -813,13 +813,13 @@ Bullish_Scanner,GODREJCP,12,2021-01-14,2024-05-08,FMCG,Largecap,-4.7,0.0,-0.5,66
 Bullish_Scanner,GODREJIND,10,2021-03-09,2024-09-02,Chemicals,Largecap,5.0,70.0,3.7,70.0,5.6,80.0,9.5,90.0,16.8,70.0,15.0,70.0
 Bullish_Scanner,GODREJPROP,7,2021-07-13,2023-11-15,Realty,Largecap,0.9,71.4,1.1,57.1,39.4,100.0,32.1,100.0,16.4,42.9,9.1,85.7
 Bullish_Scanner,GOKEX,5,2021-05-05,2024-12-10,Readymade Garments/Apparels,Midcap,16.8,100.0,23.9,100.0,68.7,80.0,97.3,80.0,159.9,80.0,195.7,80.0
-Bullish_Scanner,GOKULAGRO,3,2026-04-22,2026-08-26,FMCG,Midcap,-1.9,33.3,-7.3,33.3,-2.9,0.0,,,,,,
+Bullish_Scanner,GOKULAGRO,3,2026-04-22,2026-08-26,FMCG,Midcap,-1.9,33.3,-7.3,33.3,-2.9,0.0,-8.9,0.0,,,,
 Bullish_Scanner,GOLDIAM,1,2024-08-13,2024-08-13,Consumer Discretionary,Smallcap,62.9,100.0,71.0,100.0,59.2,100.0,96.6,100.0,73.7,100.0,131.9,100.0
 Bullish_Scanner,GOODLUCK,3,2023-08-17,2026-10-13,Metals & Mining,Midcap,3.2,66.7,3.9,66.7,57.8,66.7,78.4,66.7,104.3,66.7,115.9,66.7
 Bullish_Scanner,GOODYEAR,1,2023-05-08,2023-05-08,Auto,Smallcap,-0.4,0.0,-3.2,0.0,12.6,100.0,2.7,100.0,-42.6,0.0,,
 Bullish_Scanner,GPIL,5,2023-06-13,2026-04-20,Metals & Mining,Midcap,5.8,60.0,7.7,60.0,14.5,60.0,6.8,60.0,-1.6,40.0,35.7,40.0
 Bullish_Scanner,GPPL,11,2021-03-03,2025-12-10,Transportation,Midcap,-6.0,9.1,-4.3,9.1,-1.8,36.4,0.7,36.4,2.8,36.4,-4.3,45.5
-Bullish_Scanner,GRANULES,12,2023-09-29,2026-05-06,Healthcare,Largecap,3.3,75.0,8.7,75.0,17.0,100.0,19.2,41.7,39.7,25.0,64.9,41.7
+Bullish_Scanner,GRANULES,12,2023-09-29,2026-05-06,Healthcare,Largecap,3.3,75.0,8.7,75.0,17.0,100.0,18.7,50.0,39.7,25.0,64.9,41.7
 Bullish_Scanner,GRAPHITE,5,2023-12-18,2026-01-02,Industrials,Midcap,-3.2,20.0,-4.9,20.0,3.3,60.0,5.3,60.0,2.5,20.0,18.6,20.0
 Bullish_Scanner,GRASIM,10,2021-09-13,2022-12-05,Textiles,Largecap,0.4,50.0,-0.2,60.0,-0.7,40.0,-4.9,30.0,0.9,40.0,15.4,100.0
 Bullish_Scanner,GRAUWEIL,1,2022-10-13,2022-10-13,Chemicals,Smallcap,18.1,100.0,22.1,100.0,6.2,100.0,42.5,100.0,52.2,100.0,,
@@ -849,7 +849,7 @@ Bullish_Scanner,HEIDELBERG,12,2021-07-20,2024-07-08,Building Materials,Smallcap,
 Bullish_Scanner,HERITGFOOD,7,2021-10-25,2023-12-26,FMCG,Smallcap,0.7,57.1,-2.9,42.9,-1.1,57.1,15.8,57.1,62.9,57.1,46.0,57.1
 Bullish_Scanner,HGINFRA,2,2024-04-02,2024-04-26,Realty,Smallcap,2.1,100.0,20.5,100.0,55.8,100.0,29.2,100.0,-2.3,50.0,-42.1,0.0
 Bullish_Scanner,HGS,2,2021-12-22,2021-12-24,I.T,Smallcap,-5.1,50.0,-21.0,0.0,-37.1,0.0,-36.5,0.0,-20.9,0.0,-42.2,0.0
-Bullish_Scanner,HINDALCO,20,2022-02-07,2025-10-14,Metals & Mining,Largecap,1.6,35.0,1.5,65.0,-7.4,30.0,4.7,55.0,3.7,65.0,33.7,60.0
+Bullish_Scanner,HINDALCO,20,2022-02-07,2025-10-14,Metals & Mining,Largecap,1.6,35.0,1.5,65.0,-7.4,30.0,4.7,55.0,3.9,65.0,33.7,60.0
 Bullish_Scanner,HINDOILEXP,2,2024-07-15,2024-07-18,Energy,Smallcap,14.8,100.0,5.1,100.0,-8.1,0.0,-23.0,0.0,-29.5,0.0,-34.2,0.0
 Bullish_Scanner,HINDPETRO,16,2021-05-11,2025-11-04,Energy,Largecap,1.8,56.2,3.7,68.8,-5.5,12.5,-3.4,31.2,-17.3,12.5,-9.7,12.5
 Bullish_Scanner,HINDWAREAP,1,2023-01-02,2023-01-02,Consumer Discretionary,Smallcap,-1.4,0.0,-7.4,0.0,-25.1,0.0,19.1,100.0,9.6,100.0,-43.6,0.0
@@ -1009,7 +1009,7 @@ Bullish_Scanner,MAYURUNIQ,5,2023-08-29,2026-05-18,Consumer Discretionary,Smallca
 Bullish_Scanner,MAZDA,2,2024-12-30,2025-01-07,Industrials,Smallcap,11.4,100.0,1.4,50.0,-25.6,0.0,-16.1,0.0,-33.2,0.0,,
 Bullish_Scanner,MAZDOCK,5,2021-11-08,2024-01-18,Aerospace & Defence,Largecap,-10.8,0.0,-13.7,0.0,-11.2,20.0,12.6,20.0,151.1,100.0,449.1,100.0
 Bullish_Scanner,MBAPL,5,2026-02-10,2026-04-08,Chemicals,Midcap,-2.3,40.0,0.4,40.0,13.5,100.0,68.5,100.0,,,,
-Bullish_Scanner,MCX,9,2024-08-01,2025-10-15,Financials,Largecap,8.8,88.9,19.4,100.0,24.8,100.0,35.7,100.0,81.0,88.9,248.6,44.4
+Bullish_Scanner,MCX,9,2024-08-01,2025-10-15,Financials,Largecap,8.8,88.9,19.4,100.0,24.8,100.0,35.7,100.0,79.2,100.0,248.6,44.4
 Bullish_Scanner,MEDPLUS,2,2025-05-19,2025-05-26,Consumer Discretionary,Midcap,-1.4,50.0,-6.2,0.0,-12.6,0.0,-15.8,0.0,-5.0,0.0,,
 Bullish_Scanner,MENONBE,2,2022-01-17,2023-05-11,Auto,Smallcap,2.6,50.0,1.2,50.0,0.7,50.0,0.7,50.0,3.8,100.0,21.3,50.0
 Bullish_Scanner,METROBRAND,9,2023-05-03,2024-07-15,Consumer Discretionary,Largecap,-0.2,66.7,1.3,44.4,7.1,77.8,27.0,77.8,11.9,77.8,14.9,77.8
@@ -1307,7 +1307,7 @@ Bullish_Scanner,TITAN,3,2021-06-04,2021-06-10,Consumer Discretionary,Largecap,1.
 Bullish_Scanner,TMPV,12,2021-10-05,2024-07-29,Auto,Largecap,7.0,66.7,12.4,83.3,23.4,83.3,20.8,83.3,22.1,83.3,-7.4,41.7
 Bullish_Scanner,TNPETRO,3,2021-02-26,2023-12-22,Energy,Smallcap,2.3,66.7,0.4,66.7,22.8,33.3,46.5,33.3,17.4,33.3,24.2,100.0
 Bullish_Scanner,TORNTPHARM,10,2021-07-12,2023-11-08,Healthcare,Largecap,0.4,50.0,3.2,70.0,13.1,80.0,14.2,90.0,45.2,100.0,86.2,100.0
-Bullish_Scanner,TORNTPOWER,10,2021-02-25,2026-04-22,Power & Utilities,Largecap,3.4,70.0,-2.2,30.0,-3.5,30.0,7.8,30.0,51.2,80.0,161.9,80.0
+Bullish_Scanner,TORNTPOWER,10,2021-02-25,2026-04-22,Power & Utilities,Largecap,3.4,70.0,-2.2,30.0,-3.5,30.0,0.5,30.0,51.2,80.0,161.9,80.0
 Bullish_Scanner,TRENT,14,2021-06-11,2023-06-07,Consumer Discretionary,Largecap,-2.8,42.9,-0.0,64.3,8.4,85.7,16.0,71.4,53.1,92.9,242.7,100.0
 Bullish_Scanner,TRIDENT,1,2024-01-08,2024-01-08,Textiles,Midcap,2.3,100.0,6.9,100.0,-4.9,0.0,-9.6,0.0,-24.0,0.0,-41.6,0.0
 Bullish_Scanner,TRIGYN,4,2023-12-14,2024-01-19,I.T,Smallcap,-3.5,25.0,-3.9,50.0,-27.3,0.0,-9.8,0.0,-29.1,0.0,-57.6,0.0
@@ -1552,7 +1552,7 @@ Wkly_upswing,LICHSGFIN,1,2023-08-07,2023-08-07,Financials,Largecap,-2.5,0.0,3.6,
 Wkly_upswing,LT,1,2018-01-08,2018-01-08,Realty,Largecap,5.3,100.0,0.4,100.0,2.1,100.0,-4.1,0.0,1.0,100.0,2.8,100.0
 Wkly_upswing,M&M,1,2021-10-11,2021-10-11,Auto,Largecap,-0.0,0.0,3.3,100.0,-6.0,0.0,-3.2,0.0,37.4,100.0,74.9,100.0
 Wkly_upswing,MAHABANK,1,2026-01-05,2026-01-05,Bank,Largecap,4.0,100.0,1.8,100.0,9.1,100.0,28.6,100.0,,,,
-Wkly_upswing,MAHLOG,1,2026-04-21,2026-04-21,Transportation,Smallcap,-8.9,0.0,-18.5,0.0,-7.9,0.0,-15.7,0.0,,,,
+Wkly_upswing,MAHLOG,1,2026-04-21,2026-04-21,Transportation,Smallcap,-8.9,0.0,-18.5,0.0,-7.9,0.0,-12.2,0.0,,,,
 Wkly_upswing,MAHSEAMLES,1,2021-10-11,2021-10-11,Metals & Mining,Midcap,34.0,100.0,31.8,100.0,43.1,100.0,57.9,100.0,128.3,100.0,249.0,100.0
 Wkly_upswing,MANAKSIA,1,2023-01-31,2023-01-31,Services,Smallcap,45.5,100.0,19.5,100.0,29.9,100.0,30.7,100.0,28.1,100.0,-28.3,0.0
 Wkly_upswing,MANALIPETC,1,2024-06-19,2024-06-19,Energy,Smallcap,2.8,100.0,0.0,100.0,-5.6,0.0,-28.0,0.0,-26.1,0.0,-29.7,0.0
@@ -1661,7 +1661,7 @@ Wkly_upswing,SWANCORP,1,2024-12-16,2024-12-16,Textiles,Midcap,-10.6,0.0,-19.4,0.
 Wkly_upswing,SWARAJENG,1,2021-06-21,2021-06-21,Industrials,Smallcap,4.6,100.0,6.9,100.0,-4.8,0.0,-3.4,0.0,-4.4,0.0,31.5,100.0
 Wkly_upswing,SWSOLAR,1,2023-12-19,2023-12-19,Realty,Smallcap,0.8,100.0,2.7,100.0,10.4,100.0,60.0,100.0,2.1,100.0,-51.0,0.0
 Wkly_upswing,TAJGVK,2,2018-04-24,2022-09-05,Services,Smallcap,-1.2,50.0,-0.5,50.0,4.3,50.0,-16.6,50.0,6.2,50.0,8.7,50.0
-Wkly_upswing,TARACHAND,1,2025-10-14,2025-10-14,Miscellaneous,Smallcap,-2.8,0.0,-18.8,0.0,-23.3,0.0,-32.2,0.0,,,,
+Wkly_upswing,TARACHAND,1,2025-10-14,2025-10-14,Miscellaneous,Smallcap,-2.8,0.0,-18.8,0.0,-23.3,0.0,-32.2,0.0,-53.5,0.0,,
 Wkly_upswing,TARC,1,2023-04-26,2023-04-26,Realty,Smallcap,-3.4,0.0,6.4,100.0,38.3,100.0,80.5,100.0,187.5,100.0,197.7,100.0
 Wkly_upswing,TATACHEM,2,2022-08-19,2024-01-01,Chemicals,Midcap,-2.2,0.0,-6.8,0.0,-6.5,0.0,-8.2,0.0,-11.2,0.0,-20.2,0.0
 Wkly_upswing,TATAINVEST,1,2022-09-05,2022-09-05,Financials,Largecap,60.5,100.0,39.7,100.0,37.2,100.0,20.7,100.0,47.9,100.0,300.9,100.0
