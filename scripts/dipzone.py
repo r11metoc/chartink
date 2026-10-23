@@ -1,4 +1,4 @@
-"""Buy-the-dip rule: wait for the pullback after a breakout, buy it, take +8%.
+"""Buy-the-dip rule: wait for the pullback after a breakout, buy it, ride the trend.
 
 For every signal (the scanner's trigger = the signal candle's high):
 1. breakout : price crosses above the trigger within 3 sessions (5 after a
@@ -6,8 +6,10 @@ For every signal (the scanner's trigger = the signal candle's high):
 2. buy zone : within 20 sessions of the breakout, a daily close at least
               DIP% below the highest close since the breakout, while the close
               is still no more than 5% below the trigger -> buy at the next open
-3. exit     : +8% target, 12% stop below the buy price, or the close after
-              40 sessions (8 weeks), whichever comes first
+3. exit     : sell at the next open after a close below the 50-day average,
+              a 12% stop below the buy price, or after 250 sessions (~1 year)
+              (backtest 2021-26: +4.2% a trade vs +1.9% for the old +8%
+              target; ₹10L portfolio ~18% a year vs ~12%, smaller worst fall)
 Wkly_upswing: only when daily ATR(14) < 4% of the close, with a 15% stop.
 Filters: 63_30_daily signals are only taken when the signal-day close is
 within 10% of the 52-week high (NEAR_HIGH_PCT; backtest 2024-26: 72% wins
@@ -38,7 +40,10 @@ TARGET_PCT = 8.0
 STOP_PCT = 12.0
 STOP_BY_SCANNER = {"Wkly_upswing": 15.0}  # weekly picks swing more (backtest: 70% wins vs 68% at 12%)
 ATR_MAX_PCT = {"Wkly_upswing": 4.0}       # daily ATR(14) under 4% of the close (2023-26: 74% wins vs 68%)
-MAX_HOLD = 40         # sessions (8 weeks)
+MAX_HOLD = 40         # sessions (8 weeks) - the old +8% target rule (kept for comparison)
+EXIT_MA = 50          # live exit: sell at the next open after a close below this daily average
+RIDE_MAX_HOLD = 250   # sessions (~1 year) before a riding position is sold anyway
+CLOSED = ("target", "stop", "time", "average")
 NEAR_HIGH_PCT = {"63_30_daily": 10.0}  # only take signals within this % of the 52-week high
 CONFIRM_DAYS = 10     # another scanner within this many days before = confirmed
 HISTORY_DAYS = 400    # calendar days of prices needed for the 52-week high
@@ -92,8 +97,10 @@ def skip_reason(scanner: str, dist: float | None, atr: float | None) -> str:
     return f"too volatile: daily ATR {atr:.1f}% of price (limit {ATR_MAX_PCT[scanner]:g}%)"
 
 
-def simulate(fwd: pd.DataFrame, trigger: float, scanner: str) -> dict:
-    """Run the rule over the daily bars after the signal bar."""
+def simulate(fwd: pd.DataFrame, trigger: float, scanner: str, ma: np.ndarray | None = None) -> dict:
+    """Run the rule over the daily bars after the signal bar. With `ma` (the
+    EXIT_MA-day average aligned to `fwd`) the position rides until a close
+    below it (the live rule); without it, the old +8% target rule."""
     o, h, l, c = (fwd[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
     dates = fwd.index
     n = len(c)
@@ -125,6 +132,8 @@ def simulate(fwd: pd.DataFrame, trigger: float, scanner: str) -> dict:
     ep = float(o[e])
     tgt, stp = ep * (1 + TARGET_PCT / 100), ep * (1 - stop_for(scanner) / 100)
     out.update(entry_date=dates[e], entry=ep, target=tgt, stop=stp)
+    if ma is not None:
+        return _ride_ma(out, o, l, c, dates, e, ep, stp, ma)
     last = min(n - 1, e + MAX_HOLD)
     for i in range(e, last + 1):
         if i > e and o[i] <= stp:
@@ -138,6 +147,32 @@ def simulate(fwd: pd.DataFrame, trigger: float, scanner: str) -> dict:
     if e + MAX_HOLD <= n - 1:
         return {**out, "status": "time", "exit_date": dates[last], "exit": float(c[last])} | _ret(ep, c[last])
     return {**out, "status": "holding", "now": float(c[-1]), "sessions_left": e + MAX_HOLD - (n - 1)} | _ret(ep, c[-1])
+
+
+def _ride_ma(out, o, l, c, dates, e, ep, stp, ma) -> dict:
+    out["target"] = None
+    n = len(c)
+    last = min(n - 1, e + RIDE_MAX_HOLD)
+    for i in range(e, last + 1):
+        if i > e and o[i] <= stp:
+            return {**out, "status": "stop", "exit_date": dates[i], "exit": float(o[i])} | _ret(ep, o[i])
+        if l[i] <= stp:
+            return {**out, "status": "stop", "exit_date": dates[i], "exit": stp} | _ret(ep, stp)
+        if i > e and not np.isnan(ma[i]) and c[i] < ma[i]:
+            if i + 1 <= n - 1:
+                return {**out, "status": "average", "exit_date": dates[i + 1], "exit": float(o[i + 1]),
+                        "signal_date": dates[i], "ma": float(ma[i])} | _ret(ep, o[i + 1])
+            return {**out, "status": "holding", "sell_signal": dates[i], "now": float(c[i]), "ma": float(ma[i]),
+                    "sessions_left": 1} | _ret(ep, c[i])
+    if e + RIDE_MAX_HOLD <= n - 1:
+        return {**out, "status": "time", "exit_date": dates[last], "exit": float(c[last])} | _ret(ep, c[last])
+    return {**out, "status": "holding", "now": float(c[-1]), "ma": float(ma[n - 1]) if not np.isnan(ma[n - 1]) else None,
+            "sessions_left": e + RIDE_MAX_HOLD - (n - 1)} | _ret(ep, c[-1])
+
+
+def exit_ma(df: pd.DataFrame, start: int) -> np.ndarray:
+    """EXIT_MA-day average of the close, from bar `start` on (aligned to df.iloc[start:])."""
+    return df["Close"].rolling(EXIT_MA, min_periods=EXIT_MA).mean().to_numpy()[start:]
 
 
 def _ret(entry: float, exit_: float) -> dict:
@@ -190,7 +225,7 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
             out.append({**base, "status": "skipped", "trigger": sig["trigger"],
                         "why": skip_reason(scanner, base["dist_52w_high"], base["atr_pct"])})
             continue
-        st = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner)
+        st = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], scanner, exit_ma(df, sig["end_pos"] + 1))
         if st["status"] in ACTIVE:
             active.add((scanner, symbol))
         out.append({**base, **st, "last_close": float(df["Close"].iloc[-1]), "last_date": df.index[-1]})
@@ -202,7 +237,7 @@ def _d(x) -> str:
 
 
 def _exit_by(s: dict) -> str:
-    return _d(pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(MAX_HOLD)) if "entry_date" in s else "–"
+    return _d(pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(RIDE_MAX_HOLD)) if "entry_date" in s else "–"
 
 
 def events(states: list[dict], now: datetime) -> list[tuple[str, dict, str]]:
@@ -212,7 +247,9 @@ def events(states: list[dict], now: datetime) -> list[tuple[str, dict, str]]:
     for s in states:
         if "dip_date" in s and s["dip_date"] >= since:
             ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|buy", s, "buy"))
-        if s.get("status") in ("target", "stop", "time") and s["exit_date"] >= since:
+        if s.get("sell_signal") is not None and s["sell_signal"] >= since:
+            ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|sell", s, "sell"))
+        if s.get("status") in CLOSED and s["exit_date"] >= since:
             ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|exit", s, s["status"]))
     return ev
 
@@ -248,12 +285,17 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
         for s in buys:
             ref = s.get("entry", s["dip_close"])
             lines.append(f"🟢 <b>{s['symbol']}</b> ({s['scanner']}){_tags(s)} dipped {s['dip_pct']:g}% to {s['dip_close']:.2f} "
-                         f"(trigger {s['trigger']:.2f}). Buy ~{ref:.2f}, target {ref * (1 + TARGET_PCT / 100):.2f} "
-                         f"(+{TARGET_PCT:g}%), stop {ref * (1 - stop_for(s['scanner']) / 100):.2f} (-{stop_for(s['scanner']):g}%), "
-                         f"exit by {_exit_by(s) if 'entry_date' in s else 'day 40'}")
-    icon = {"target": "✅", "stop": "🛑", "time": "⏱"}
-    label = {"target": "target hit", "stop": "stopped", "time": "8 weeks up, sold"}
-    exits = [(s, k) for _, s, k in fresh if k != "buy"]
+                         f"(trigger {s['trigger']:.2f}). Buy ~{ref:.2f}, stop {ref * (1 - stop_for(s['scanner']) / 100):.2f} "
+                         f"(-{stop_for(s['scanner']):g}%), then hold while it closes above its {EXIT_MA}-day average")
+    sells = [s for _, s, k in fresh if k == "sell"]
+    if sells:
+        lines += ["", f"<b>SELL</b> (closed below the {EXIT_MA}-day average, sell at the next open):"]
+        for s in sells:
+            lines.append(f"🔻 <b>{s['symbol']}</b> ({s['scanner']}) closed {s['now']:.2f} below its {EXIT_MA}-day average "
+                         f"{s['ma']:.2f} on {_d(s['sell_signal'])}. Bought {s['entry']:.2f} ({s['ret']:+.1f}%)")
+    icon = {"target": "✅", "stop": "🛑", "time": "⏱", "average": "📉"}
+    label = {"target": "target hit", "stop": "stopped", "time": "a year up, sold", "average": f"sold below the {EXIT_MA}-day average"}
+    exits = [(s, k) for _, s, k in fresh if k in icon]
     if exits:
         lines += ["", "<b>CLOSED</b>:"]
         for s, k in exits:
@@ -261,8 +303,8 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
                          f"{s['entry']:.2f} → {s['exit']:.2f} ({s['ret']:+.1f}%)")
     lines += ["", f"<i>Rule: after the breakout, buy a {DIP_PCT['63_30_daily']:g}% dip "
                   f"({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing) that stays within {FLOOR_PCT:g}% of the trigger; "
-                  f"+{TARGET_PCT:g}% target, -{STOP_PCT:g}% stop (-{STOP_BY_SCANNER.get('Wkly_upswing', STOP_PCT):g}% weekly), "
-                  f"out after 8 weeks. Backtest, not advice.</i>"]
+                  f"-{STOP_PCT:g}% stop (-{STOP_BY_SCANNER.get('Wkly_upswing', STOP_PCT):g}% weekly), sell on a close below "
+                  f"the {EXIT_MA}-day average or after a year. Backtest, not advice.</i>"]
     return "\n".join(lines)
 
 
@@ -272,7 +314,7 @@ def summary(states: list[dict]) -> dict:
         groups.setdefault(s["scanner"], []).append(s)
     out = []
     for g, xs in groups.items():
-        closed = [x for x in xs if x.get("status") in ("target", "stop", "time")]
+        closed = [x for x in xs if x.get("status") in CLOSED]
         hold = [x for x in xs if x.get("status") == "holding"]
         rets = [x["ret"] for x in closed]
         xs = [x for x in xs if x.get("status") != "duplicate"]
@@ -324,16 +366,17 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
         elif st == "buy zone":
             ref = s["dip_close"]
             buy_list.append({**base, "stage": "zone", "level": _r(ref), "dip_pct": s["dip_pct"],
-                             "target": _r(ref * (1 + TARGET_PCT / 100)), "stop": _r(ref * (1 - stop_for(s["scanner"]) / 100))})
+                             "stop": _r(ref * (1 - stop_for(s["scanner"]) / 100))})
         if "entry_date" in s:
             trade = {**base, "entry_date": _iso(s["entry_date"]), "entry": _r(s["entry"]),
-                     "target": _r(s["target"]), "stop": _r(s["stop"]), "exit_by": _iso(
-                         pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(MAX_HOLD)), "ret": s.get("ret")}
+                     "target": _r(s.get("target")), "stop": _r(s["stop"]), "ma": _r(s.get("ma")),
+                     "sell_signal": _iso(s.get("sell_signal")), "exit_by": _iso(
+                         pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(RIDE_MAX_HOLD)), "ret": s.get("ret")}
             if st == "holding":
                 holding.append({**trade, "pnl": int(s["ret"] / 100 * STAKE)})
             if pd.Timestamp(s["entry_date"]) >= cutoff:
                 activity.append({**trade, "side": "BUY", "when": trade["entry_date"], "price": trade["entry"]})
-            if st in ("target", "stop", "time") and pd.Timestamp(s["exit_date"]) >= cutoff:
+            if st in CLOSED and pd.Timestamp(s["exit_date"]) >= cutoff:
                 activity.append({**trade, "side": "SELL", "when": _iso(s["exit_date"]), "price": _r(s["exit"]),
                                  "reason": st, "pnl": int(s["ret"] / 100 * STAKE)})
     order = {"zone": 0, "dip": 1, "breakout": 2}
@@ -341,8 +384,8 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     holding.sort(key=lambda x: x["entry_date"], reverse=True)
     activity.sort(key=lambda x: (x["when"], x["side"] == "SELL"), reverse=True)
     skipped = sum(s.get("status") == "skipped" for s in states)
-    return {"rule": {"dip": DIP_PCT, "floor": FLOOR_PCT, "zone_days": ZONE_DAYS, "target": TARGET_PCT,
-                     "stop": STOP_PCT, "stop_by": STOP_BY_SCANNER, "atr_max": ATR_MAX_PCT, "max_hold": MAX_HOLD, "stake": STAKE,
+    return {"rule": {"dip": DIP_PCT, "floor": FLOOR_PCT, "zone_days": ZONE_DAYS, "target": None, "exit_ma": EXIT_MA,
+                     "stop": STOP_PCT, "stop_by": STOP_BY_SCANNER, "atr_max": ATR_MAX_PCT, "max_hold": RIDE_MAX_HOLD, "stake": STAKE,
                      "near_high": NEAR_HIGH_PCT},
             "skipped": skipped,
             "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity}
@@ -360,8 +403,8 @@ def backtest_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.D
             continue
         if not passes_filter(h["scanner_name"], dist_52w_high(df, sig["end_pos"]), atr_pct(df, sig["end_pos"])):
             continue
-        s = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"])
-        if s["status"] in ("target", "stop", "time"):
+        s = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"], exit_ma(df, sig["end_pos"] + 1))
+        if s["status"] in CLOSED:
             rows.append({"scanner": h["scanner_name"], "symbol": h["symbol"], "cap": h["marketcap"],
                          "status": s["status"], "ret": s["ret"],
                          "entry_date": pd.Timestamp(s["entry_date"]), "exit_date": pd.Timestamp(s["exit_date"]),
@@ -378,18 +421,18 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], d: pd.
     L = ["", "## Buy-the-dip rule (the live alert rule)", "",
          f"After the breakout, buy at the next open once a close is {DIP_PCT['63_30_daily']:g}% below the highest close "
          f"since the breakout ({DIP_PCT['Wkly_upswing']:g}% for Wkly_upswing), within {ZONE_DAYS} sessions and no more than "
-         f"{FLOOR_PCT:g}% below the trigger. Exit at +{TARGET_PCT:g}%, a {STOP_PCT:g}% stop "
-         f"({', '.join(f'{k} {v:g}%' for k, v in STOP_BY_SCANNER.items())}), or after {MAX_HOLD} sessions. "
+         f"{FLOOR_PCT:g}% below the trigger. Sell at the next open after a close below the {EXIT_MA}-day average, "
+         f"a {STOP_PCT:g}% stop ({', '.join(f'{k} {v:g}%' for k, v in STOP_BY_SCANNER.items())}), or after {RIDE_MAX_HOLD} sessions. "
          f"Wkly_upswing only when daily ATR(14) is under {ATR_MAX_PCT.get('Wkly_upswing', 0):g}% of the close. "
          f"Filter: {', '.join(f'{k} only within {v:g}% of the 52-week high' for k, v in NEAR_HIGH_PCT.items())}. "
          f"{bs.COST_PCT}% costs.", "",
-         "| Group | Trades | Win rate | Avg | Avg win / loss | Target / stop / time | Avg days | ₹ on ₹1L a trade |",
+         "| Group | Trades | Win rate | Avg | Avg win / loss | Average / stop / time | Avg days | ₹ on ₹1L a trade |",
          "|---|---|---|---|---|---|---|---|"]
     groups = [(k, g) for k, g in d.groupby("scanner")] + [(f"{k}", g) for k, g in d.groupby("cap") if k] + [("**All**", d)]
     for name, x in groups:
         r = x["ret"]
         L.append(f"| {name} | {len(x)} | {(r > 0).mean():.0%} | {r.mean():+.2f}% | {r[r > 0].mean():+.1f}% / "
-                 f"{r[r <= 0].mean():+.1f}% | {(x.status == 'target').mean():.0%} / {(x.status == 'stop').mean():.0%} / "
+                 f"{r[r <= 0].mean():+.1f}% | {(x.status == 'average').mean():.0%} / {(x.status == 'stop').mean():.0%} / "
                  f"{(x.status == 'time').mean():.0%} | {x['days'].mean():.0f} | {r.sum() * 1000:,.0f} |")
     return L
 
@@ -436,11 +479,11 @@ def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, max_pos: int = 
 
 EXIT_MAX_HOLD = 250  # sessions (~1 year) for the riding exits
 EXIT_RULES = {
-    "target8": "+8% target, 12% stop, 8 weeks (now)",
+    "target8": "+8% target, 12% stop, 8 weeks (old rule)",
     "trail10": "10% trailing stop",
     "trail15": "15% trailing stop",
     "ma20": "close below 20-day average",
-    "ma50": "close below 50-day average",
+    "ma50": "close below 50-day average (now)",
     "half8_ma20": "half at +8%, rest on close below 20-day average",
     "lock8_ma20": "after +8%: stop at cost, sell on close below 20-day average",
     "lock8_ma50": "after +8%: stop at cost, sell on close below 50-day average",

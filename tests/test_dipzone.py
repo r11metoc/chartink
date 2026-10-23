@@ -99,3 +99,25 @@ def test_weekly_atr_filter_and_wider_stop():
     assert "too volatile" in dz.skip_reason("Wkly_upswing", -2.0, 5.5)
     rows = BREAKOUT + [(104, 104, 99, 99.5), (99.5, 100, 99, 99.6), (99.6, 99.6, 86, 87)]   # bought 99.5; 12% would stop, 15% (84.6) not
     assert dz.simulate(frame(rows), 100.0, "Wkly_upswing")["status"] == "holding"
+
+
+def _ma(rows, level):
+    import numpy as np
+    return np.full(len(rows), float(level))
+
+
+def test_live_rule_rides_until_close_below_average():
+    rows = BREAKOUT + [(104, 104, 101, 101.5), (101, 103, 100.5, 102),   # bought at 101
+                       (102, 112, 101.5, 111), (111, 120, 110, 119),     # no target: keeps riding
+                       (119, 119, 108, 109), (108, 109, 107, 108)]       # closes below 110 -> sell next open (108)
+    s = dz.simulate(frame(rows), 100.0, "63_30_daily", _ma(rows, 110))
+    assert s["status"] == "average" and s["exit"] == 108 and s["target"] is None
+
+
+def test_live_rule_sell_signal_on_last_close():
+    rows = BREAKOUT + [(104, 104, 101, 101.5), (101, 103, 100.5, 102), (102, 112, 101.5, 111),
+                       (111, 111, 108, 109)]                              # today's close is below 110
+    s = dz.simulate(frame(rows), 100.0, "63_30_daily", _ma(rows, 110))
+    assert s["status"] == "holding" and s["sell_signal"] == frame(rows).index[-1]
+    assert dz.events([{"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-05", **s}],
+                     frame(rows).index[-1].to_pydatetime())[0][2] == "sell"

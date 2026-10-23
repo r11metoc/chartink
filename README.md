@@ -150,9 +150,16 @@ sends a Telegram alert when:
 - **BUY ZONE**: after the breakout above the trigger (the signal candle's
   high), a daily close is 3% below the highest close since the breakout (5%
   for `Wkly_upswing`), within 20 sessions and no more than 5% below the
-  trigger. Buy at the next open, with a +8% target, a 12% stop and an exit
-  after 8 weeks (all shown in the alert).
-- **CLOSED**: a trade hits its target, its stop or the 8-week limit.
+  trigger. Buy at the next open with a 12% stop, then ride the trend.
+- **SELL**: a holding closes below its 50-day average: sell at the next open.
+- **CLOSED**: a trade was sold below the 50-day average, hit its stop, or
+  was held a year.
+
+The exit used to be a +8% target with an 8-week limit. Riding until a close
+below the 50-day average made +4.2% a trade against +1.9% (2021-26), and a
+₹10L portfolio grew ~18% a year against ~12% (median over 40 random slot
+orderings) with a smaller worst fall. It wins only ~40% of trades: many small
+losses, fewer but bigger winners (`EXIT_MA`, `RIDE_MAX_HOLD`).
 
 Wkly_upswing signals are only taken when the daily ATR(14) is under 4% of the
 close, with a 15% stop instead of 12% (`ATR_MAX_PCT`, `STOP_BY_SCANNER`).

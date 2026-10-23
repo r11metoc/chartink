@@ -189,7 +189,7 @@ const STAGE = {
   dip: ["HOLD", "WAIT DIP"],
   breakout: ["WAIT", "WAIT B/O"],
 };
-const SELL = { target: "target", stop: "stop", time: "8 weeks" };
+const SELL = { target: "target", stop: "stop", time: "time limit", average: "below 50-day avg" };
 const tags = (x) => (x.confirmed_by && x.confirmed_by.length ? ` · <b class="up">⭐ also on ${x.confirmed_by.map(esc).join(", ")}</b>` : "")
   + (x.off_high != null ? ` · ${Math.abs(x.off_high).toFixed(0)}% off 52w high` : "");
 
@@ -242,7 +242,7 @@ function renderDip(d) {
   const r = z.rule;
   const intro = `After the breakout above the trigger, buy at the next open when a close is ${r.dip["63_30_daily"]}% below the highest close
     since the breakout (${r.dip["Wkly_upswing"]}% for Wkly_upswing), within ${r.zone_days} sessions and no more than ${r.floor}% below the trigger.
-    Sell at <b>+${r.target}%</b>, a <b>${r.stop}% stop</b>${Object.entries(r.stop_by || {}).map(([k, v]) => ` (${v}% for ${esc(k)})`).join("")}, or after 8 weeks.
+    Then ride the trend: <b>sell at the next open after a close below the ${r.exit_ma}-day average</b>, a <b>${r.stop}% stop</b>${Object.entries(r.stop_by || {}).map(([k, v]) => ` (${v}% for ${esc(k)})`).join("")}, or after a year.
     ${Object.entries(r.atr_max || {}).map(([k, v]) => `${esc(k)} only takes calm stocks (daily ATR under ${v}% of price).`).join(" ")}
     ${Object.entries(r.near_high || {}).map(([k, v]) => `${esc(k)} signals are only taken within ${v}% of the 52-week high${z.skipped ? ` (${z.skipped} skipped)` : ""}.`).join(" ")}
     ⭐ = another scanner flagged it in the 10 days before. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`;
@@ -260,7 +260,7 @@ function renderDip(d) {
     const what = b.stage === "zone" ? `Dipped ${b.dip_pct}%: buy at the next open`
       : b.stage === "dip" ? `Broke out ${fmtDate(b.breakout)} · waiting for a ${b.dip_pct}% dip${b.now != null && b.now < b.floor ? " · now below the floor, not a buy unless it closes back above it" : ""}`
       : `Waiting for price to cross the trigger`;
-    const levels = b.stage === "zone" ? [["Buy ~", money(b.level)], ["Target", money(b.target)], ["Stop", money(b.stop)]]
+    const levels = b.stage === "zone" ? [["Buy ~", money(b.level)], ["Stop", money(b.stop)], ["Sell", "close < 50d avg"]]
       : b.stage === "dip" ? [["Buy at or below", money(b.level)], ["High close", money(b.high_close)], ["Not below", money(b.floor)]]
       : [["Trigger", money(b.trigger)], ["Now", money(b.now)], ["Signal", fmtDate(b.signal)]];
     return `<div class="row" style="border-bottom:0"><div><div class="sym">${esc(b.symbol)}</div>
@@ -271,12 +271,13 @@ function renderDip(d) {
     <div class="row" style="border-bottom:0"><div><div class="sym">${esc(h.symbol)}</div>
       <div class="meta">${esc(h.scanner)} · bought ${fmtDate(h.entry_date)} at ${money(h.entry)} · now ${money(h.now)}${tags(h)}</div></div>
       <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div>
-      <span class="pill ${h.ret > 0 ? "BUY" : "HOLD"}">HOLD</span></div>
-    ${lv([["Target", money(h.target)], ["Stop", money(h.stop)], ["Exit by", fmtDate(h.exit_by)]])}`).join("");
+      ${h.sell_signal ? `<span class="pill SELL">SELL</span>` : `<span class="pill ${h.ret > 0 ? "BUY" : "HOLD"}">HOLD</span>`}</div>
+    ${h.sell_signal ? `<div class="note">Closed below its 50-day average on ${fmtDate(h.sell_signal)}: sell at the next open.</div>` : ""}
+    ${lv([["Sell if closes below", money(h.ma)], ["Stop", money(h.stop)], ["Exit by", fmtDate(h.exit_by)]])}`).join("");
   const actRows = z.activity.map((a) => `
     <div class="row"><div><div class="sym">${esc(a.symbol)}</div>
       <div class="meta">${fmtDate(a.when)} · ${esc(a.scanner)} · ${a.side === "BUY" ? "bought" : "sold (" + SELL[a.reason] + ")"} at ${money(a.price)}
-        ${a.side === "SELL" ? " · bought " + money(a.entry) : " · target " + money(a.target) + " · stop " + money(a.stop)}</div></div>
+        ${a.side === "SELL" ? " · bought " + money(a.entry) : " · stop " + money(a.stop)}</div></div>
       <div class="num">${a.side === "SELL" ? `<div class="chg ${cls(a.ret)}">${pct(a.ret)}</div><div class="tiny ${cls(a.pnl)}">${rupees(a.pnl)}</div>` : ""}</div>
       <span class="pill ${a.side === "BUY" ? "BUY" : "SELL"}">${a.side}</span></div>`).join("");
   return `
