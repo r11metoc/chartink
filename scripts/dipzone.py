@@ -396,16 +396,15 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], d: pd.
 
 # ------------------------------------------------------- portfolio backtest
 
-PF_CAPITAL = 1_000_000   # ₹10 lakh
-PF_STAKE = 100_000       # ₹1 lakh a trade
-PF_MAX_POS = 10
+PF_CAPITAL = 1_000_000   # ₹10 lakh to start
+PF_MAX_POS = 10          # each trade gets 1/10 of the portfolio's value at the time
 
 
-def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, stake: float = PF_STAKE,
-              max_pos: int = PF_MAX_POS) -> dict | None:
-    """Trade the alerts with limited money: first come, first served, a fixed
-    stake per trade, at most max_pos open and one position per stock. Returns
-    the daily equity curve (cash + open positions at cost) and the trades taken."""
+def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, max_pos: int = PF_MAX_POS) -> dict | None:
+    """Trade the alerts with limited money: first come, first served, at most
+    max_pos open, one position per stock. Each buy is 1/max_pos of the
+    portfolio's value that day (cash + open positions at cost), so profits are
+    reinvested. Returns the daily equity curve and the trades taken."""
     if trades.empty:
         return None
     t = trades.sort_values(["entry_date", "scanner", "symbol"]).reset_index(drop=True)
@@ -415,20 +414,142 @@ def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, stake: float = 
         still = []
         for x in open_:
             if x["exit_date"] <= d:
-                cash += stake * (1 + x["ret"] / 100)
+                cash += x["amt"] * (1 + x["ret"] / 100)
             else:
                 still.append(x)
         open_ = still
         for x in by_day.get(d, []):
-            if len(open_) >= max_pos or cash < stake or any(o["symbol"] == x["symbol"] for o in open_):
+            amt = (cash + sum(o["amt"] for o in open_)) / max_pos
+            if len(open_) >= max_pos or cash < amt * 0.999 or any(o["symbol"] == x["symbol"] for o in open_):
                 skipped += 1
                 continue
-            cash -= stake
+            x = {**x, "amt": amt}
+            cash -= amt
             open_.append(x)
             taken.append(x)
-        curve[d] = cash + stake * len(open_)
+        curve[d] = cash + sum(o["amt"] for o in open_)
     return {"equity": pd.Series(curve), "taken": pd.DataFrame(taken), "skipped": skipped,
-            "capital": capital, "stake": stake, "max_pos": max_pos}
+            "capital": capital, "max_pos": max_pos}
+
+
+# ------------------------------------------------- exit rules compared
+
+EXIT_MAX_HOLD = 250  # sessions (~1 year) for the riding exits
+EXIT_RULES = {
+    "target8": "+8% target, 12% stop, 8 weeks (now)",
+    "trail10": "10% trailing stop",
+    "trail15": "15% trailing stop",
+    "ma20": "close below 20-day average",
+    "ma50": "close below 50-day average",
+    "half8_ma20": "half at +8%, rest on close below 20-day average",
+    "lock8_ma20": "after +8%: stop at cost, sell on close below 20-day average",
+    "lock8_ma50": "after +8%: stop at cost, sell on close below 50-day average",
+}
+
+
+def ride(df: pd.DataFrame, e: int, scanner: str, rule: str) -> dict | None:
+    """Exit for a position bought at the open of bar e. Every riding rule keeps
+    the fixed starting stop (12%, 15% Wkly_upswing) and exits after
+    EXIT_MAX_HOLD sessions. None while the trade would still be open."""
+    o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
+    n, ep = len(c), float(o[e])
+    stop = ep * (1 - stop_for(scanner) / 100)
+    ma = None
+    if rule.startswith(("ma", "half", "lock")):
+        w = 50 if rule.endswith("ma50") else 20
+        ma = pd.Series(c).rolling(w, min_periods=w).mean().to_numpy()
+    trail = {"trail10": 0.10, "trail15": 0.15}.get(rule)
+    half = rule.startswith("half")
+    lock = rule.startswith("lock")  # ride only once the trade has worked
+    armed = False
+    tgt = ep * (1 + TARGET_PCT / 100)
+    banked, hi = 0.0, ep  # banked = % already realised on the first half
+    last = min(n - 1, e + EXIT_MAX_HOLD)
+    for i in range(e, last + 1):
+        if i > e and o[i] <= stop:
+            return _close(ep, o[i], banked, half and banked != 0.0, "stop", df.index[i], i - e + 1)
+        if l[i] <= stop:
+            return _close(ep, stop, banked, half and banked != 0.0, "stop", df.index[i], i - e + 1)
+        if half and banked == 0.0 and h[i] >= tgt:
+            banked = max(float(o[i]), tgt) / ep - 1 if i > e else tgt / ep - 1
+        if lock and not armed and h[i] >= tgt:
+            armed, stop = True, max(stop, ep)
+        if lock and not armed and i - e >= MAX_HOLD:  # never worked: the usual 8-week exit
+            return _close(ep, c[i], 0.0, False, "time", df.index[i], i - e + 1)
+        hi = max(hi, c[i])
+        if trail:
+            stop = max(stop, hi * (1 - trail))
+        if ma is not None and (armed or not lock) and not np.isnan(ma[i]) and c[i] < ma[i] and i > e:
+            if i + 1 > n - 1:
+                return None
+            return _close(ep, o[i + 1], banked, half and banked != 0.0, "average", df.index[i + 1], i - e + 2)
+    if e + EXIT_MAX_HOLD <= n - 1:
+        return _close(ep, c[last], banked, half and banked != 0.0, "time", df.index[last], last - e + 1)
+    return None
+
+
+def _close(ep, px, banked, split, why, when, days) -> dict:
+    r = float(px) / ep - 1
+    if split:
+        r = (banked + r) / 2
+    return {"ret": round(r * 100 - bs.COST_PCT, 2), "why": why, "exit_date": pd.Timestamp(when), "days": int(days)}
+
+
+def exit_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Same dip buys as the live rule, sold by each rule in EXIT_RULES."""
+    rows = []
+    for _, h in hits.iterrows():
+        df = prices.get(h["symbol"])
+        sig = bs.signal_bar(df, h["hit_date"], bs.is_weekly(h["scanner_name"])) if df is not None else None
+        if sig is None:
+            continue
+        if not passes_filter(h["scanner_name"], dist_52w_high(df, sig["end_pos"]), atr_pct(df, sig["end_pos"])):
+            continue
+        base = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"])
+        if "entry_date" not in base:
+            continue
+        e = int(df.index.get_loc(base["entry_date"]))
+        common = {"scanner": h["scanner_name"], "symbol": h["symbol"], "cap": h["marketcap"],
+                  "entry_date": pd.Timestamp(base["entry_date"])}
+        if base["status"] in ("target", "stop", "time"):
+            rows.append({**common, "rule": "target8", "ret": base["ret"], "why": base["status"],
+                         "exit_date": pd.Timestamp(base["exit_date"]),
+                         "days": int(df.index.get_loc(base["exit_date"])) - e + 1})
+        for rule in EXIT_RULES:
+            if rule == "target8":
+                continue
+            x = ride(df, e, h["scanner_name"], rule)
+            if x:
+                rows.append({**common, "rule": rule, **x})
+    return pd.DataFrame(rows)
+
+
+def exits_compare(et: pd.DataFrame, start: pd.Timestamp) -> list[dict]:
+    """Per exit rule: trade stats and the ₹10L portfolio, from `start`, using
+    only buys every rule has closed (so all rules see the same buys)."""
+    if et.empty:
+        return []
+    et = et[et["entry_date"] >= start]
+    key = ["scanner", "symbol", "entry_date"]
+    done = et.groupby(key)["rule"].nunique()
+    common = done[done == et["rule"].nunique()].index
+    et = et.set_index(key).loc[common].reset_index()
+    out = []
+    for rule, label in EXIT_RULES.items():
+        g = et[et["rule"] == rule]
+        if g.empty:
+            continue
+        pf = portfolio(g)
+        eq = pf["equity"]
+        r = g["ret"]
+        out.append({"rule": rule, "label": label, "trades": len(g), "win": round((r > 0).mean() * 100),
+                    "avg": round(r.mean(), 2), "avg_win": _rn(r[r > 0].mean()), "avg_loss": _rn(r[r <= 0].mean()),
+                    "days": round(g["days"].mean()),
+                    "final": round(eq.iloc[-1]), "cagr": round(_cagr(pf["capital"], eq.iloc[-1], eq.index[0], eq.index[-1]), 1),
+                    "max_dd": round((eq / eq.cummax() - 1).min() * 100, 1),
+                    "by_scanner": {k: {"trades": len(x), "win": round((x["ret"] > 0).mean() * 100), "avg": round(x["ret"].mean(), 2)}
+                                   for k, x in g.groupby("scanner")}})
+    return out
 
 
 def _rn(x) -> float | None:
@@ -440,7 +561,7 @@ def _cagr(first: float, last: float, start, end) -> float:
     return ((last / first) ** (1 / yrs) - 1) * 100 if yrs > 0 and first > 0 else float("nan")
 
 
-def performance(trades: pd.DataFrame, bench: pd.Series | None) -> dict | None:
+def performance(trades: pd.DataFrame, bench: pd.Series | None, exits: pd.DataFrame | None = None) -> dict | None:
     """Would buying on the alerts have made money? Per-trade stats per
     scanner, plus a ₹10L portfolio from the date all three scanners have
     backtest data, compared with the Nifty 500 over the same days."""
@@ -459,7 +580,7 @@ def performance(trades: pd.DataFrame, bench: pd.Series | None) -> dict | None:
     yearly = eq.resample("YE").last()
     prev = yearly.shift(1).fillna(pf["capital"])
     out = {"start": start.date().isoformat(), "end": eq.index[-1].date().isoformat(), "per_scanner": per,
-           "portfolio": {"capital": pf["capital"], "stake": pf["stake"], "max_pos": pf["max_pos"],
+           "portfolio": {"capital": pf["capital"], "max_pos": pf["max_pos"],
                          "final": round(eq.iloc[-1]), "profit": round(eq.iloc[-1] - pf["capital"]),
                          "cagr": round(_cagr(pf["capital"], eq.iloc[-1], eq.index[0], eq.index[-1]), 1),
                          "max_dd": round((eq / eq.cummax() - 1).min() * 100, 1),
@@ -467,6 +588,8 @@ def performance(trades: pd.DataFrame, bench: pd.Series | None) -> dict | None:
                          "win": round((pf["taken"]["ret"] > 0).mean() * 100)},
            "years": [{"year": int(d.year), "ret": round((v / p - 1) * 100, 1)} for d, v, p in zip(yearly.index, yearly, prev)],
            "monthly": [{"m": d.strftime("%Y-%m"), "v": round(v)} for d, v in eq.resample("ME").last().items()]}
+    if exits is not None and not exits.empty:
+        out["exits"] = exits_compare(exits, start)
     if bench is not None:
         b = bench[(bench.index >= eq.index[0]) & (bench.index <= eq.index[-1])].dropna()
         if len(b) > 1:
@@ -495,8 +618,8 @@ def performance_section(perf: dict | None) -> list[str]:
     p, b = perf["portfolio"], perf.get("bench")
     L = ["", "## If I had bought on the alerts", "",
          f"Every buy alert from {perf['start']} (when all three scanners have backtest data) to {perf['end']}, "
-         f"with ₹{p['capital'] / 1e5:g}L: ₹{p['stake'] / 1e5:g}L a trade, at most {p['max_pos']} open, first come first served, "
-         "one position per stock, after costs.", "",
+         f"starting with ₹{p['capital'] / 1e5:g}L: each buy is 1/{p['max_pos']} of the portfolio's value at the time (profits reinvested), "
+         f"at most {p['max_pos']} open, first come first served, one position per stock, after costs.", "",
          "| Scanner | Trades | Win rate | Avg | Avg win / loss | Avg days |", "|---|---|---|---|---|---|"]
     for r in perf["per_scanner"]:
         L.append(f"| {r['group']} | {r['trades']} | {r['win']}% | {r['avg']:+.2f}% | {_pctx(r['avg_win'])} / {_pctx(r['avg_loss'])} | {r['days']} |")
@@ -510,4 +633,17 @@ def performance_section(perf: dict | None) -> list[str]:
     for y in perf["years"]:
         L.append(f"| {y['year']} | {y['ret']:+.1f}% | " + (f"{y['bench']:+.1f}%" if y.get("bench") is not None else "–") + " |")
     L += ["", "Open positions are counted at cost until sold. The current year is year-to-date."]
+    if perf.get("exits"):
+        L += ["", "### Exit rules compared (same dip buys)", "",
+              "Every rule keeps the starting stop (12%, 15% for Wkly_upswing); the riding rules sell after a year at the latest. "
+              "Only buys that every rule has closed are counted.", "",
+              "| Exit | Trades | Win rate | Avg | Avg win / loss | Avg days | ₹10L became | Per year | Worst fall |",
+              "|---|---|---|---|---|---|---|---|---|"]
+        for x in perf["exits"]:
+            L.append(f"| {x['label']} | {x['trades']} | {x['win']}% | {x['avg']:+.2f}% | {_pctx(x['avg_win'])} / {_pctx(x['avg_loss'])} | "
+                     f"{x['days']} | ₹{x['final'] / 1e5:.1f}L | {x['cagr']:.1f}% | {x['max_dd']:.1f}% |")
+        L += ["", "| Exit | " + " | ".join(sorted(perf["exits"][0]["by_scanner"])) + " |",
+              "|---|" + "---|" * len(perf["exits"][0]["by_scanner"])]
+        for x in perf["exits"]:
+            L.append(f"| {x['label']} | " + " | ".join(f"{v['win']}% · {v['avg']:+.2f}%" for _, v in sorted(x["by_scanner"].items())) + " |")
     return L
