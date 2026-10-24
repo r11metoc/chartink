@@ -165,7 +165,7 @@ def _buy_hold_tables(items: list[dict]) -> str:
     return "\n".join(parts)
 
 
-RULE_LINE = "<i>BUY = price above trigger · HOLD = at or below</i>"
+RULE_LINE = "<i>Trigger = high of the signal candle (week high for Wkly_upswing) · BUY = price above it · HOLD = at or below</i>"
 
 
 def format_scan_message(scans: list, trigger_lookup: dict) -> str:

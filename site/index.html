@@ -99,7 +99,7 @@
   <button data-tab="sectors">Sectors</button>
 </nav>
 <main id="view"></main>
-<footer>A mechanical rule tracked on paper, not advice.</footer>
+<footer>Trigger = high of the signal candle (the day's high; the week's high for Wkly_upswing). "Seen at" = price when the bot first saw it on Chartink. A mechanical rule tracked on paper, not advice.</footer>
 
 <script>
 const state = { tab: "dip", scanner: "All", status: "All", data: null };
@@ -259,7 +259,7 @@ function renderNow(d) {
       ${s.rows.length ? s.rows.map((r) => `
         <div class="row">
           <div><div class="sym">${esc(r.symbol)}</div>
-            <div class="meta">${money(r.now)} · trig ${money(r.trigger)}${r.trigger_date ? " on " + fmtDate(r.trigger_date) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div>${trackLine(r.track, r.learned)}</div>
+            <div class="meta">${money(r.now)} · trigger ${money(r.trigger)}${r.trigger_date ? " (" + fmtDate(r.trigger_date) + " high)" : ""}${r.seen != null && r.seen !== r.trigger ? " · seen at " + money(r.seen) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div>${trackLine(r.track, r.learned)}</div>
           <div class="num chg ${cls(r.chg)}">${pct(r.chg)}</div>
           <span class="pill ${r.status}">${r.status}</span>
         </div>`).join("") : `<div class="empty">No stocks on this scanner right now.</div>`}
@@ -287,7 +287,7 @@ function renderBreakouts(d) {
       ${rows.length ? rows.map((b) => `
         <div class="row">
           <div><div class="sym">${esc(b.symbol)}${b.on_scan ? '<span class="dot" title="still on the scanner"></span>' : ""}</div>
-            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · ${money(b.trigger)} → ${money(b.now)}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div>${trackLine(b.track, b.learned)}</div>
+            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · trigger ${money(b.trigger)} → ${money(b.now)}${b.seen != null && b.seen !== b.trigger ? " · seen at " + money(b.seen) : ""}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div>${trackLine(b.track, b.learned)}</div>
           <div class="num chg ${cls(b.chg)}">${pct(b.chg)}</div>
           <span class="pill ${b.status}">${b.status}</span>
         </div>`).join("") : `<div class="empty">No triggers match.</div>`}

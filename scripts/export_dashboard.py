@@ -67,7 +67,7 @@ def track_for(conn, rec: track_record.TrackRecord, scanner: str, symbol: str, da
     return rec.lookup(scanner, track_record.tier_of(conn, symbol, mcap_cr), track_record.regime_on(conn, day))
 
 
-def scanners_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[dict]:
+def scanners_view(conn, latest_run: int, rec: track_record.TrackRecord, triggers: dict | None = None) -> list[dict]:
     names = set(db.distinct_backtest_scanners(conn))
     names |= {n for (n,) in conn.execute("SELECT DISTINCT scanner_name FROM results WHERE run_id = ?", (latest_run,))}
     out = []
@@ -77,7 +77,8 @@ def scanners_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[
                 "SELECT symbol, row_json FROM results WHERE run_id = ? AND scanner_name = ?", (latest_run, name)):
             row = db._load_row(row_json)
             trigger, when = trigger_info(conn, name, symbol)
-            now, trig = _price(row), _price(trigger)
+            now, seen = _price(row), _price(trigger)
+            trig = (triggers or {}).get((name, symbol), seen)  # signal candle's high
             chg = _pct(trig, now)
             rows.append({
                 "symbol": symbol,
@@ -87,6 +88,7 @@ def scanners_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[
                 "now": now,
                 "day_chg": _num(_col(row, "%")),
                 "trigger": trig,
+                "seen": seen,
                 "trigger_date": _ist(when).date().isoformat() if when else None,
                 "chg": chg,
                 "status": "BUY" if chg is not None and chg > 0 else "HOLD",
@@ -96,14 +98,15 @@ def scanners_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[
     return out
 
 
-def breakouts_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list[dict]:
+def breakouts_view(conn, latest_run: int, rec: track_record.TrackRecord, triggers: dict | None = None) -> list[dict]:
     since = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)).isoformat()
     on_scan = {(n, s) for n, s in conn.execute(
         "SELECT scanner_name, symbol FROM results WHERE run_id = ?", (latest_run,))}
     out = []
     for e in db.breakouts_since(conn, since):
         name, symbol = e["scanner_name"], e["symbol"]
-        trig = _price(e)
+        seen = _price(e)
+        trig = (triggers or {}).get((name, symbol), seen)  # signal candle's high
         when = _ist(e["detected_at"])
         bars = db.daily_prices_since(conn, symbol, when.date().isoformat())
         # Best/worst count from the next session: the trigger day's high or low
@@ -127,6 +130,7 @@ def breakouts_view(conn, latest_run: int, rec: track_record.TrackRecord) -> list
             "date": when.date().isoformat(),
             "time": when.strftime("%H:%M"),
             "trigger": trig,
+            "seen": seen,
             "now": now,
             "now_date": now_date,
             "chg": chg,
@@ -273,7 +277,9 @@ def main() -> int:
     conn = db.connect()
     latest_run, last_scan = conn.execute("SELECT id, run_at FROM runs ORDER BY id DESC LIMIT 1").fetchone()
     rec = track_record.TrackRecord()
-    breakouts = breakouts_view(conn, latest_run, rec)
+    states = dipzone.live_states(conn)
+    triggers = dipzone.trigger_map(states)
+    breakouts = breakouts_view(conn, latest_run, rec, triggers)
     trades = paper.paper_trades(conn)
     learned = paper.paper_trades(conn, "learned")
     data = {
@@ -281,7 +287,7 @@ def main() -> int:
         "last_scan": _ist(last_scan).isoformat(timespec="minutes"),
         "slots": list(SLOTS),
         "window_days": WINDOW_DAYS,
-        "scanners": scanners_view(conn, latest_run, rec),
+        "scanners": scanners_view(conn, latest_run, rec, triggers),
         "breakouts": breakouts,
         "stats": stats_view(breakouts),
         "sectors": sectors_view(conn),
@@ -291,7 +297,7 @@ def main() -> int:
                   "learned": {"start": paper.learned_start(), "summary": paper.summarize(learned),
                               "trades": learned[::-1]}},
         "policy": policy_view(),
-        "dip": dipzone.dashboard_view(dipzone.live_states(conn)),
+        "dip": dipzone.dashboard_view(states),
         "performance": _performance(),
     }
     conn.close()

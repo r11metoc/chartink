@@ -232,6 +232,17 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
     return out
 
 
+def trigger_map(states: list[dict]) -> dict[tuple[str, str], float]:
+    """(scanner, symbol) -> trigger of its latest signal: the signal candle's
+    high (the day's high, or the week's high for Wkly_upswing). One trigger
+    everywhere: website tabs and Telegram use this, as the dip rule does."""
+    out = {}
+    for s in states:  # states are in signal-date order, so the latest wins
+        if s.get("trigger") is not None:
+            out[(s["scanner"], s["symbol"])] = round(float(s["trigger"]), 2)
+    return out
+
+
 def _d(x) -> str:
     return pd.Timestamp(x).strftime("%d %b")
 

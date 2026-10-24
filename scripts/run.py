@@ -100,9 +100,6 @@ def main() -> int:
     else:
         print("No new breakouts this run.")
 
-    if send_snapshot:
-        send_telegram_message(format_scan_message(scans, trigger_lookup))
-
     # Buy-the-dip alerts: new buy zones and closed trades since the last run.
     dip_states, alert = [], None
     dip_conn = db.connect()
@@ -116,6 +113,13 @@ def main() -> int:
         dip_conn.close()
     if alert:
         send_telegram_message(alert)
+
+    if send_snapshot:
+        # Same trigger as the website: the signal candle's high.
+        for key, trig in dipzone.trigger_map(dip_states).items():
+            if key in trigger_lookup:
+                trigger_lookup[key] = {"Price": f"{trig:.2f}"}
+        send_telegram_message(format_scan_message(scans, trigger_lookup))
 
     if send_digest:
         since = (datetime.now(timezone.utc) - timedelta(days=digest_days)).isoformat()
