@@ -93,16 +93,16 @@
 </header>
 <nav>
   <button data-tab="dip" class="on">Dip</button>
+  <button data-tab="portfolio">Portfolio</button>
   <button data-tab="now">Now</button>
   <button data-tab="breakouts">Breakouts</button>
   <button data-tab="sectors">Sectors</button>
-  <button data-tab="paper">Paper</button>
 </nav>
 <main id="view"></main>
-<footer>BUY = price above its trigger price · HOLD = at or below. A mechanical rule, not advice.</footer>
+<footer>A mechanical rule tracked on paper, not advice.</footer>
 
 <script>
-const state = { tab: "dip", scanner: "All", status: "All", book: "base", data: null };
+const state = { tab: "dip", scanner: "All", status: "All", data: null };
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -119,70 +119,56 @@ function trackLine(t, l) {
   return past + learned;
 }
 
-const STATUS = { open: "OPEN", closed: "DONE", waiting: "WAIT", "not filled": "MISS", "no prices yet": "WAIT", skipped: "SKIP" };
-const REASON = { stop: "stop", stop_gap: "stop (gap)", target: "target", target_gap: "target (gap)", time: "time limit", open: "now" };
 const rupees = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + "₹" + Math.abs(v).toLocaleString("en-IN");
 
-function renderPolicy(pol) {
-  if (!pol) return "";
-  const res = (s) => s && s.n ? `${s.n} trades, avg <span class="${cls(s.avg)}">${pct(s.avg)}</span>` : "–";
-  const rows = pol.rows.map((r) => `
-    <div class="row srow" style="grid-template-columns:1fr auto">
-      <div><div class="sym">${esc(r.scanner)}</div>
-        ${r.rule ? `<div class="meta">${esc(r.rule)}${r.skip.length ? " · skips " + esc(r.skip.join(", ")) : ""}</div>
-        <div class="meta">Unseen months: base ${res(r.base)} · learned ${res(r.learned)}</div>` : `<div class="meta">Still learning: not enough closed trades.</div>`}</div>
-      <span class="pill ${r.status === "proven" ? "BUY" : r.status === "promising" ? "HOLD" : "WAIT"}">${esc(r.status)}</span>
-    </div>`).join("");
-  return `<section class="card"><h2>🧠 What it learned <small>updated ${fmtDate(pol.updated)}</small></h2>
-    <div class="note">Every week the system tries 144 exit rules on each scanner and skips setups that lost money.
-      It only counts results on months it had not seen (walk-forward). <b>proven</b> = beat the base rule beyond luck,
-      <b>promising</b> = ahead but could be luck, <b>not better</b> = base rule kept.</div>${rows}</section>`;
-}
+const lv = (items) => `<div class="lv">${items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
 
-function renderPaper(d) {
-  const learnedBook = state.book === "learned";
-  const p = learnedBook ? { ...d.paper, ...(d.paper.learned || { trades: [], summary: [] }) } : d.paper;
-  const toggle = `<div class="filters" style="margin:12px 0 0">
-    <button data-book="base" class="${learnedBook ? "" : "on"}">Base rule</button>
-    <button data-book="learned" class="${learnedBook ? "on" : ""}">Learned</button></div>`;
-  const intro = learnedBook
-    ? `Signals since ${p.start ? fmtDate(p.start) : "the first weekly learning run"}, traded with what the system had learned by each signal's date:
-      setups it learned to lose are skipped, the rest use the exit rule learned for that scanner. ₹${d.paper.stake / 100000}L a trade, after 0.25% costs.`
-    : `Every trigger since ${fmtDate(p.start)}, traded on paper with the backtest's rule:
-      buy above the signal candle's high within 3 sessions (5 for weekly), stop at its low (2–8%), target 2× the risk,
-      exit after 20 sessions. ₹${p.stake / 100000}L a trade, after 0.25% costs.`;
-  if (!p || !p.trades.length) return `${toggle}<section class="card"><div class="note" style="padding-top:12px">${intro}</div>
-    <div class="empty">No paper trades yet.</div></section>${renderPolicy(d.policy)}`;
-  const cards = p.summary.map((g) => `
-    <div class="stat"><b>${esc(g.group)}</b>
-      <div><span>Closed</span><span>${g.closed}${g.win != null ? " · " + g.win + "% won" : ""}</span></div>
-      <div><span>Avg return</span><span class="${cls(g.avg)}">${pct(g.avg)}</span></div>
-      <div><span>vs Nifty 500</span><span class="${cls(g.vs_index)}">${pct(g.vs_index)}</span></div>
-      <div><span>Closed P&amp;L</span><span class="${cls(g.closed_pnl)}">${rupees(g.closed_pnl)}</span></div>
-      <div><span>Open (${g.open})</span><span class="${cls(g.open_pnl)}">${rupees(g.open_pnl)}</span></div>
-      <div><span>Wait / miss / skip</span><span>${g.waiting} / ${g.not_filled} / ${g.skipped ?? 0}</span></div>
-    </div>`).join("");
-  const rows = p.trades.map((t) => {
-    const detail = t.entry != null
-      ? `bought ${money(t.entry)} ${fmtDate(t.entry_date)} → ${REASON[t.exit_reason] || t.exit_reason} ${money(t.exit)} · stop ${money(t.stop)} · ${t.target != null ? "target " + money(t.target) : "no target"}`
-      : t.status === "skipped" ? `skipped: ${esc(t.why)}`
-      : t.trigger != null ? `buy above ${money(t.trigger)}` : "waiting for prices";
-    return `
-      <div class="row">
-        <div><div class="sym">${esc(t.symbol)}</div>
-          <div class="meta">${esc(t.scanner)} · signal ${fmtDate(t.date)}${t.source !== "live" ? " · " + esc(t.source) : ""}</div>
-          <div class="meta">${detail}</div>${t.rule ? `<div class="meta">${esc(t.rule)}</div>` : ""}</div>
-        <div class="num">${t.ret != null ? `<div class="chg ${cls(t.ret)}">${pct(t.ret)}</div><div class="tiny ${cls(t.pnl)}">${rupees(t.pnl)}</div>` : ""}</div>
-        <span class="pill ${t.status === "open" || t.status === "closed" ? (t.ret > 0 ? "BUY" : "HOLD") : "WAIT"}">${STATUS[t.status] || esc(t.status)}</span>
-      </div>`;
-  }).join("");
-  return `${toggle}
-    <section class="card"><div class="note" style="padding-top:12px">${intro}</div></section>
-    <div class="stats">${cards}</div>
-    <section class="card"><h2>Trades <small>${p.trades.length}</small></h2>${rows}</section>
-    ${renderPolicy(d.policy)}`;
+function renderPortfolio(d) {
+  const z = d.dip;
+  if (!z) return `<section class="card"><div class="empty">The portfolio isn't in this scan yet.</div></section>`;
+  const stake = z.rule.stake;
+  const closed = z.closed || [];
+  const scanners = ["All", ...[...new Set([...z.holding, ...closed].map((x) => x.scanner))].sort()];
+  if (!scanners.includes(state.scanner)) state.scanner = "All";
+  const pick = (xs) => (state.scanner === "All" ? xs : xs.filter((x) => x.scanner === state.scanner));
+  const hold = pick(z.holding), done = pick(closed);
+  const invested = hold.length * stake;
+  const value = hold.reduce((a, h) => a + (h.value ?? stake), 0);
+  const openPnl = value - invested;
+  const realised = done.reduce((a, c) => a + c.pnl, 0);
+  const wins = done.filter((c) => c.ret > 0).length;
+  const sellNow = hold.filter((h) => h.sell_signal).length;
+  const L = (v) => "₹" + (v / 100000).toFixed(2) + "L";
+  const chips = `<div class="filters">${scanners.map((s) => `<button data-scanner="${esc(s)}" class="${s === state.scanner ? "on" : ""}">${esc(s)}</button>`).join("")}</div>`;
+  const tile = (label, v, extra = "", c = "") => `<div class="stat"><b>${label}</b><div><span class="big ${c}">${v}</span></div>${extra ? `<div><span>${extra}</span></div>` : ""}</div>`;
+  const tiles = `<div class="stats">
+    ${tile("Invested", L(invested), `${hold.length} stock${hold.length === 1 ? "" : "s"} · ₹${stake / 100000}L each`)}
+    ${tile("Current value", L(value), sellNow ? `🔻 ${sellNow} to sell at next open` : "")}
+    ${tile("Open P&amp;L", rupees(openPnl), invested ? pct(openPnl / invested * 100) : "", cls(openPnl))}
+    ${tile("Booked P&amp;L", rupees(realised), done.length ? `${done.length} sold · ${Math.round(wins / done.length * 100)}% won` : "nothing sold yet", cls(realised))}
+    ${tile("Total P&amp;L", rupees(openPnl + realised), "open + booked", cls(openPnl + realised))}
+  </div>`;
+  const holdRows = hold.map((h) => `
+    <div class="row" style="border-bottom:0"><div><div class="sym">${esc(h.symbol)}</div>
+      <div class="meta">${esc(h.scanner)} · bought ${fmtDate(h.entry_date)} at ${money(h.entry)}${h.days ? " · " + h.days + "d" : ""}${tags(h)}</div>
+      <div class="meta">now ${money(h.now)}${h.now_date ? " (" + fmtDate(h.now_date) + ")" : ""}</div></div>
+      <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div>
+      ${h.sell_signal ? `<span class="pill SELL">SELL</span>` : `<span class="pill ${h.ret > 0 ? "BUY" : "HOLD"}">HOLD</span>`}</div>
+    ${h.sell_signal ? `<div class="note">Closed below its 50-day average on ${fmtDate(h.sell_signal)}: sell at the next open.</div>` : ""}
+    ${lv([["Sell if closes below", money(h.ma)], ["Stop", money(h.stop)], ["Exit by", fmtYear(h.exit_by)]])}`).join("");
+  const doneRows = done.map((c) => `
+    <div class="row"><div><div class="sym">${esc(c.symbol)}</div>
+      <div class="meta">${esc(c.scanner)} · ${money(c.entry)} on ${fmtDate(c.entry_date)} → ${money(c.exit)} on ${fmtDate(c.exit_date)} · ${c.days}d</div>
+      <div class="meta">sold: ${SELL[c.reason] || esc(c.reason)}</div></div>
+      <div class="num"><div class="chg ${cls(c.ret)}">${pct(c.ret)}</div><div class="tiny ${cls(c.pnl)}">${rupees(c.pnl)}</div></div>
+      <span class="pill SELL">SOLD</span></div>`).join("");
+  return `${chips}${tiles}
+    <section class="card"><h2>📦 Holdings <small>${hold.length}</small></h2>
+      ${holdRows || `<div class="empty">No open positions.</div>`}</section>
+    <section class="card"><h2>🧾 Sold <small>${done.length}</small></h2>
+      ${doneRows || `<div class="empty">Nothing sold yet.</div>`}</section>
+    <div class="note">Every buy alert since ${fmtDate(z.summary.start)} bought with ₹${stake / 100000}L at the next open; prices from the last completed daily candle, after 0.25% costs. A paper portfolio, not advice.</div>`;
 }
-
 
 const STAGE = {
   zone: ["BUY", "BUY ZONE"],
@@ -246,15 +232,6 @@ function renderDip(d) {
     ${Object.entries(r.atr_max || {}).map(([k, v]) => `${esc(k)} only takes calm stocks (daily ATR under ${v}% of price).`).join(" ")}
     ${Object.entries(r.near_high || {}).map(([k, v]) => `${esc(k)} signals are only taken within ${v}% of the 52-week high${z.skipped ? ` (${z.skipped} skipped)` : ""}.`).join(" ")}
     ⭐ = another scanner flagged it in the 10 days before. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`;
-  const cards = z.summary.rows.map((g) => `
-    <div class="stat"><b>${esc(g.group)}</b>
-      <div><span>Watching</span><span>${g.watching}</span></div>
-      <div><span>Holding</span><span>${g.holding}</span></div>
-      <div><span>Closed</span><span>${g.closed}${g.win != null ? " · " + g.win + "% won" : ""}</span></div>
-      <div><span>Closed P&amp;L</span><span class="${cls(g.pnl)}">${rupees(g.pnl)}</span></div>
-      <div><span>Open P&amp;L</span><span class="${cls(g.open_pnl)}">${rupees(g.open_pnl)}</span></div>
-    </div>`).join("");
-  const lv = (items) => `<div class="lv">${items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
   const buyRows = z.buy_list.map((b) => {
     const [pill, label] = STAGE[b.stage];
     const what = b.stage === "zone" ? `Dipped ${b.dip_pct}%: buy at the next open`
@@ -267,28 +244,11 @@ function renderDip(d) {
         <div class="meta">${esc(b.scanner)} · signal ${fmtDate(b.signal)} · now ${money(b.now)}${tags(b)}</div><div class="meta">${what}</div></div>
         <div></div><span class="pill ${pill}">${label}</span></div>${lv(levels)}`;
   }).join("");
-  const holdRows = z.holding.map((h) => `
-    <div class="row" style="border-bottom:0"><div><div class="sym">${esc(h.symbol)}</div>
-      <div class="meta">${esc(h.scanner)} · bought ${fmtDate(h.entry_date)} at ${money(h.entry)} · now ${money(h.now)}${tags(h)}</div></div>
-      <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div>
-      ${h.sell_signal ? `<span class="pill SELL">SELL</span>` : `<span class="pill ${h.ret > 0 ? "BUY" : "HOLD"}">HOLD</span>`}</div>
-    ${h.sell_signal ? `<div class="note">Closed below its 50-day average on ${fmtDate(h.sell_signal)}: sell at the next open.</div>` : ""}
-    ${lv([["Sell if closes below", money(h.ma)], ["Stop", money(h.stop)], ["Exit by", fmtDate(h.exit_by)]])}`).join("");
-  const actRows = z.activity.map((a) => `
-    <div class="row"><div><div class="sym">${esc(a.symbol)}</div>
-      <div class="meta">${fmtDate(a.when)} · ${esc(a.scanner)} · ${a.side === "BUY" ? "bought" : "sold (" + SELL[a.reason] + ")"} at ${money(a.price)}
-        ${a.side === "SELL" ? " · bought " + money(a.entry) : " · stop " + money(a.stop)}</div></div>
-      <div class="num">${a.side === "SELL" ? `<div class="chg ${cls(a.ret)}">${pct(a.ret)}</div><div class="tiny ${cls(a.pnl)}">${rupees(a.pnl)}</div>` : ""}</div>
-      <span class="pill ${a.side === "BUY" ? "BUY" : "SELL"}">${a.side}</span></div>`).join("");
   return `
     <section class="card"><div class="note" style="padding-top:12px">${intro}</div></section>
-    <div class="stats">${cards}</div>
     <section class="card"><h2>🛒 Buy list <small>${z.buy_list.length}</small></h2>
       ${buyRows || `<div class="empty">Nothing waiting to be bought.</div>`}</section>
-    <section class="card"><h2>📦 Holding <small>${z.holding.length}</small></h2>
-      ${holdRows || `<div class="empty">No open positions.</div>`}</section>
-    <section class="card"><h2>🧾 Recent buys and sells <small>last 60 days</small></h2>
-      ${actRows || `<div class="empty">No trades yet.</div>`}</section>
+    <div class="note">${z.holding.length} stock${z.holding.length === 1 ? "" : "s"} held: profit and loss is on the <b>Portfolio</b> tab.</div>
     ${renderPerformance(d.performance)}`;
 }
 
@@ -378,7 +338,7 @@ function renderSectors(d) {
 function render() {
   const d = state.data;
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
-  $("#view").innerHTML = { dip: renderDip, now: renderNow, breakouts: renderBreakouts, sectors: renderSectors, paper: renderPaper }[state.tab](d);
+  $("#view").innerHTML = { dip: renderDip, now: renderNow, breakouts: renderBreakouts, sectors: renderSectors, portfolio: renderPortfolio }[state.tab](d);
 }
 
 document.addEventListener("click", (e) => {
@@ -387,7 +347,6 @@ document.addEventListener("click", (e) => {
   if (t.dataset.tab) state.tab = t.dataset.tab;
   else if (t.dataset.scanner) state.scanner = t.dataset.scanner;
   else if (t.dataset.status) state.status = t.dataset.status;
-  else if (t.dataset.book) state.book = t.dataset.book;
   else return;
   render();
 });

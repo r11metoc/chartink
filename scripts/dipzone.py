@@ -350,7 +350,7 @@ def _r(x) -> float | None:
 
 def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     """JSON for site/data.json: buy list, holdings, recent buys and sells."""
-    buy_list, holding, activity = [], [], []
+    buy_list, holding, activity, closed = [], [], [], []
     cutoff = pd.Timestamp(date.today()) - pd.Timedelta(days=activity_days)
     for s in states:
         base = {"scanner": s["scanner"], "symbol": s["symbol"], "signal": s["date"],
@@ -373,7 +373,14 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
                      "sell_signal": _iso(s.get("sell_signal")), "exit_by": _iso(
                          pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(RIDE_MAX_HOLD)), "ret": s.get("ret")}
             if st == "holding":
-                holding.append({**trade, "pnl": int(s["ret"] / 100 * STAKE)})
+                held = int(np.busday_count(pd.Timestamp(s["entry_date"]).date(), pd.Timestamp(s["last_date"]).date())) + 1
+                holding.append({**trade, "pnl": int(s["ret"] / 100 * STAKE), "days": held,
+                                "value": int(STAKE * (1 + s["ret"] / 100))})
+            if st in CLOSED:
+                closed.append({**trade, "exit_date": _iso(s["exit_date"]), "exit": _r(s["exit"]), "reason": st,
+                               "pnl": int(s["ret"] / 100 * STAKE),
+                               "days": int(np.busday_count(pd.Timestamp(s["entry_date"]).date(),
+                                                           pd.Timestamp(s["exit_date"]).date())) + 1})
             if pd.Timestamp(s["entry_date"]) >= cutoff:
                 activity.append({**trade, "side": "BUY", "when": trade["entry_date"], "price": trade["entry"]})
             if st in CLOSED and pd.Timestamp(s["exit_date"]) >= cutoff:
@@ -383,12 +390,14 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     buy_list.sort(key=lambda x: (order[x["stage"]], x["signal"]), reverse=False)
     holding.sort(key=lambda x: x["entry_date"], reverse=True)
     activity.sort(key=lambda x: (x["when"], x["side"] == "SELL"), reverse=True)
+    closed.sort(key=lambda x: x["exit_date"], reverse=True)
     skipped = sum(s.get("status") == "skipped" for s in states)
     return {"rule": {"dip": DIP_PCT, "floor": FLOOR_PCT, "zone_days": ZONE_DAYS, "target": None, "exit_ma": EXIT_MA,
                      "stop": STOP_PCT, "stop_by": STOP_BY_SCANNER, "atr_max": ATR_MAX_PCT, "max_hold": RIDE_MAX_HOLD, "stake": STAKE,
                      "near_high": NEAR_HIGH_PCT},
             "skipped": skipped,
-            "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity}
+            "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity,
+            "closed": closed}
 
 
 # ------------------------------------------------------------ backtest report
