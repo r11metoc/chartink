@@ -507,15 +507,18 @@ EXIT_RULES = {
     "half8_ma20": "half at +8%, rest on close below 20-day average",
     "lock8_ma20": "after +8%: stop at cost, sell on close below 20-day average",
     "lock8_ma50": "after +8%: stop at cost, sell on close below 50-day average",
+    "bo_ma50": "no pullback: buy at the breakout, sell on close below 50-day average",
 }
+BO_ALL = "bo_ma50_all"  # breakout buys of every signal, not only those that later dipped
 
 
-def ride(df: pd.DataFrame, e: int, scanner: str, rule: str) -> dict | None:
+def ride(df: pd.DataFrame, e: int, scanner: str, rule: str, ep: float | None = None) -> dict | None:
     """Exit for a position bought at the open of bar e. Every riding rule keeps
     the fixed starting stop (12%, 15% Wkly_upswing) and exits after
-    EXIT_MAX_HOLD sessions. None while the trade would still be open."""
+    EXIT_MAX_HOLD sessions. None while the trade would still be open. `ep`
+    overrides the buy price (a breakout buy fills at the trigger on bar e)."""
     o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
-    n, ep = len(c), float(o[e])
+    n, ep = len(c), float(o[e]) if ep is None else float(ep)
     stop = ep * (1 - stop_for(scanner) / 100)
     ma = None
     if rule.startswith(("ma", "half", "lock")):
@@ -559,7 +562,8 @@ def _close(ep, px, banked, split, why, when, days) -> dict:
 
 
 def exit_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """Same dip buys as the live rule, sold by each rule in EXIT_RULES."""
+    """Same dip buys as the live rule, sold by each rule in EXIT_RULES, plus
+    buying at the breakout itself (no pullback) with the 50-day-average exit."""
     rows = []
     for _, h in hits.iterrows():
         df = prices.get(h["symbol"])
@@ -568,22 +572,38 @@ def exit_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.DataF
             continue
         if not passes_filter(h["scanner_name"], dist_52w_high(df, sig["end_pos"]), atr_pct(df, sig["end_pos"])):
             continue
-        base = simulate(df.iloc[sig["end_pos"] + 1:], sig["trigger"], h["scanner_name"])
+        sp, trig = sig["end_pos"], sig["trigger"]
+        info = {"scanner": h["scanner_name"], "symbol": h["symbol"], "cap": h["marketcap"],
+                "hit_date": pd.Timestamp(h["hit_date"])}
+        # Breakout buy: first session within the entry window trading above the
+        # trigger, filled at the trigger (or the open on a gap-up).
+        hi, op = df["High"].to_numpy(dtype=float), df["Open"].to_numpy(dtype=float)
+        win = range(sp + 1, min(len(df), sp + 1 + bs.entry_window_for(h["scanner_name"])))
+        b = next((i for i in win if hi[i] > trig), None)
+        bo = None
+        if b is not None:
+            px = max(op[b], trig)
+            x = ride(df, b, h["scanner_name"], "ma50", ep=px)
+            if x:
+                bo = {**info, "entry_date": df.index[b], "entry": px, **x}
+                rows.append({**bo, "rule": BO_ALL})
+        base = simulate(df.iloc[sp + 1:], trig, h["scanner_name"])
         if "entry_date" not in base:
             continue
         e = int(df.index.get_loc(base["entry_date"]))
-        common = {"scanner": h["scanner_name"], "symbol": h["symbol"], "cap": h["marketcap"],
-                  "entry_date": pd.Timestamp(base["entry_date"])}
+        common = {**info, "entry_date": pd.Timestamp(base["entry_date"])}
         if base["status"] in ("target", "stop", "time"):
             rows.append({**common, "rule": "target8", "ret": base["ret"], "why": base["status"],
                          "exit_date": pd.Timestamp(base["exit_date"]),
                          "days": int(df.index.get_loc(base["exit_date"])) - e + 1})
         for rule in EXIT_RULES:
-            if rule == "target8":
+            if rule in ("target8", "bo_ma50"):
                 continue
             x = ride(df, e, h["scanner_name"], rule)
             if x:
                 rows.append({**common, "rule": rule, **x})
+        if bo:  # the same signal, bought at the breakout instead of the dip
+            rows.append({**bo, "rule": "bo_ma50"})
     return pd.DataFrame(rows)
 
 
@@ -593,13 +613,18 @@ def exits_compare(et: pd.DataFrame, start: pd.Timestamp) -> list[dict]:
     if et.empty:
         return []
     et = et[et["entry_date"] >= start]
-    key = ["scanner", "symbol", "entry_date"]
+    if "hit_date" not in et:
+        et = et.assign(hit_date=et["entry_date"])
+    every = et[et["rule"] == BO_ALL]
+    et = et[et["rule"] != BO_ALL]
+    key = ["scanner", "symbol", "hit_date"]
     done = et.groupby(key)["rule"].nunique()
     common = done[done == et["rule"].nunique()].index
     et = et.set_index(key).loc[common].reset_index()
     out = []
-    for rule, label in EXIT_RULES.items():
-        g = et[et["rule"] == rule]
+    labels = {**EXIT_RULES, BO_ALL: "no pullback, every breakout (incl. stocks that never dipped)"}
+    for rule, label in labels.items():
+        g = every if rule == BO_ALL else et[et["rule"] == rule]
         if g.empty:
             continue
         pf = portfolio(g)

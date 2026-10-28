@@ -60,3 +60,9 @@ def test_lock_rule_ignores_average_until_plus_8():
     c = [100.0] * 25 + [99.0, 98.0, 99.0] + [109.0] * 3 + [90.0] * 3
     x = dz.ride(_df(c), 21, "Bullish_Scanner", "lock8_ma20")
     assert x["why"] == "stop" and x["ret"] < 0.5   # armed at +8%, then gapped below cost: sold at the open
+
+
+def test_ride_uses_given_entry_price():
+    c = [100.0] * 60 + [101.0 + i for i in range(10)] + [95.0] * 3
+    x = dz.ride(_df(c), 60, "Bullish_Scanner", "ma50", ep=100.5)
+    assert x["why"] == "average" and abs(x["ret"] - ((95 / 100.5 - 1) * 100 - 0.25)) < 0.02
