@@ -66,3 +66,10 @@ def test_ride_uses_given_entry_price():
     c = [100.0] * 60 + [101.0 + i for i in range(10)] + [95.0] * 3
     x = dz.ride(_df(c), 60, "Bullish_Scanner", "ma50", ep=100.5)
     assert x["why"] == "average" and abs(x["ret"] - ((95 / 100.5 - 1) * 100 - 0.25)) < 0.02
+
+
+def test_portfolio_takes_midcaps_first_on_a_full_day():
+    a = _t("S1", "2024-01-01", "2024-01-10", 8.0); a["cap"] = "Smallcap"
+    b = _t("M1", "2024-01-01", "2024-01-10", 8.0); b["cap"] = "Midcap"
+    pf = dz.portfolio(pd.DataFrame([a, b]), capital=100_000, max_pos=1)
+    assert list(pf["taken"]["symbol"]) == ["M1"]

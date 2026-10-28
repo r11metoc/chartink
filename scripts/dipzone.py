@@ -49,7 +49,17 @@ ALERT_DAYS = 4        # only alert on events this recent (no flood on the first 
 STAKE = 100_000
 MARKET_CLOSE = (15, 30)
 ACTIVE = {"waiting for breakout", "watching for dip", "buy zone", "holding"}
-LIVE_MODE = "breakout"  # "breakout" (buy-stop at the trigger) or "dip" (wait for the pullback)
+LIVE_MODE = "breakout"
+# When more signals than free slots: mid caps first, then large, then small.
+# Backtest 2021-26 (10 slots, 12 shuffles): 17.4% a year vs 14.3% first come,
+# better in both 2021-23 (22.1% vs 17.3%) and 2024-26 (10.8% vs 7.1%), worst
+# fall -11.8% vs -13.0%. "Two scanners first" helped 2021-23 but hurt 2024-26.
+CAP_PRIORITY = {"Midcap": 0, "Largecap": 1, "Smallcap": 2}
+CHOICE = {0: "1st choice", 1: "2nd choice", 2: "3rd choice"}
+
+
+def priority(cap: str | None) -> int:
+    return CAP_PRIORITY.get(cap or "", 3)  # "breakout" (buy-stop at the trigger) or "dip" (wait for the pullback)
 
 
 def dip_for(scanner: str) -> float:
@@ -212,6 +222,7 @@ def _completed(df: pd.DataFrame, now: datetime) -> pd.DataFrame:
 
 def live_states(conn, now: datetime | None = None) -> list[dict]:
     import paper  # local import: paper imports policy/track_record
+    import track_record
     now = now or datetime.now(IST)
     lookback = (date.fromisoformat(START) - timedelta(days=HISTORY_DAYS)).isoformat()
     confirm_from = (date.fromisoformat(START) - timedelta(days=CONFIRM_DAYS)).isoformat()
@@ -234,7 +245,9 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
             earlier = df.index[df.index <= hit]
             hit = earlier[-1] if len(earlier) else hit
         sig = bs.signal_bar(df, hit, bs.is_weekly(scanner)) if not df.empty else None
-        base = {"scanner": scanner, "symbol": symbol, "date": day, "source": source, "confirmed_by": others}
+        cap = track_record.tier_of(conn, symbol)
+        base = {"scanner": scanner, "symbol": symbol, "date": day, "source": source, "confirmed_by": others,
+                "cap": cap, "priority": priority(cap)}
         if sig is None:
             out.append({**base, "status": "no prices yet"})
             continue
@@ -324,13 +337,15 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
     if not fresh:
         return None
     lines = ["🎯 <b>Breakout alerts</b>"]
-    setups = [s for _, s, k in fresh if k == "setup"]
+    setups = sorted((s for _, s, k in fresh if k == "setup"), key=lambda s: s.get("priority", 3))
     if setups:
-        lines += ["", "<b>SET A BUY-STOP</b> (buy only if the price trades above the trigger):"]
+        lines += ["", "<b>SET A BUY-STOP</b> (buy only if the price trades above the trigger; "
+                      "if slots are short, take mid caps first, then large, then small):"]
         for s in setups:
             stp = s["trigger"] * (1 - stop_for(s["scanner"]) / 100)
             until = f" until {_d(s['valid_until'])}" if s.get("valid_until") is not None else ""
-            lines.append(f"🟡 <b>{s['symbol']}</b> ({s['scanner']}){_tags(s)}: buy above {s['trigger']:.2f}{until}. "
+            choice = f" · {s['cap']} ({CHOICE[s['priority']]})" if s.get("priority", 3) in CHOICE else ""
+            lines.append(f"🟡 <b>{s['symbol']}</b> ({s['scanner']}{choice}){_tags(s)}: buy above {s['trigger']:.2f}{until}. "
                          f"Stop ~{stp:.2f} (-{stop_for(s['scanner']):g}%), then hold while it closes above its {EXIT_MA}-day average")
     bought = [s for _, s, k in fresh if k == "bought"]
     if bought:
@@ -415,7 +430,8 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     for s in states:
         base = {"scanner": s["scanner"], "symbol": s["symbol"], "signal": s["date"],
                 "confirmed_by": s.get("confirmed_by", []), "off_high": s.get("dist_52w_high"),
-                "trigger": _r(s.get("trigger")), "now": _r(s.get("last_close")), "now_date": _iso(s.get("last_date"))}
+                "trigger": _r(s.get("trigger")), "now": _r(s.get("last_close")), "now_date": _iso(s.get("last_date")),
+                "cap": s.get("cap"), "priority": s.get("priority", 3)}
         st = s.get("status")
         if st == "waiting for breakout":
             buy_list.append({**base, "stage": "breakout", "level": _r(s["trigger"]),
@@ -449,7 +465,7 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
                 activity.append({**trade, "side": "SELL", "when": _iso(s["exit_date"]), "price": _r(s["exit"]),
                                  "reason": st, "pnl": int(s["ret"] / 100 * STAKE)})
     order = {"zone": 0, "dip": 1, "breakout": 2}
-    buy_list.sort(key=lambda x: (order[x["stage"]], x["signal"]), reverse=False)
+    buy_list.sort(key=lambda x: (order[x["stage"]], x["priority"], x["signal"]))
     holding.sort(key=lambda x: x["entry_date"], reverse=True)
     activity.sort(key=lambda x: (x["when"], x["side"] == "SELL"), reverse=True)
     closed.sort(key=lambda x: x["exit_date"], reverse=True)
@@ -517,13 +533,15 @@ PF_MAX_POS = 10          # each trade gets 1/10 of the portfolio's value at the 
 
 
 def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, max_pos: int = PF_MAX_POS) -> dict | None:
-    """Trade the alerts with limited money: first come, first served, at most
+    """Trade the alerts with limited money: first come, first served (on the
+    same day mid caps first, then large, then small: CAP_PRIORITY), at most
     max_pos open, one position per stock. Each buy is 1/max_pos of the
     portfolio's value that day (cash + open positions at cost), so profits are
     reinvested. Returns the daily equity curve and the trades taken."""
     if trades.empty:
         return None
-    t = trades.sort_values(["entry_date", "scanner", "symbol"]).reset_index(drop=True)
+    t = trades.assign(_p=trades["cap"].map(CAP_PRIORITY).fillna(3) if "cap" in trades else 3)
+    t = t.sort_values(["entry_date", "_p", "scanner", "symbol"]).reset_index(drop=True)
     by_day = {d: g.to_dict("records") for d, g in t.groupby("entry_date")}
     cash, open_, taken, skipped, curve = float(capital), [], [], 0, {}
     for d in pd.bdate_range(t["entry_date"].min(), t["exit_date"].max()):

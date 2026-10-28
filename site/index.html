@@ -175,6 +175,7 @@ const STAGE = {
   dip: ["HOLD", "WAIT DIP"],
   breakout: ["BUY", "BUY-STOP"],
 };
+const CHOICE = { 0: "1st choice", 1: "2nd choice", 2: "3rd choice" };
 const SELL = { target: "target", stop: "stop", time: "time limit", average: "below 50-day avg" };
 const tags = (x) => (x.confirmed_by && x.confirmed_by.length ? ` · <b class="up">⭐ also on ${x.confirmed_by.map(esc).join(", ")}</b>` : "")
   + (x.off_high != null ? ` · ${Math.abs(x.off_high).toFixed(0)}% off 52w high` : "");
@@ -232,7 +233,8 @@ function renderDip(d) {
     Then ride the trend: <b>sell at the next open after a close below the ${r.exit_ma}-day average</b>, a <b>${r.stop}% stop</b>${Object.entries(r.stop_by || {}).map(([k, v]) => ` (${v}% for ${esc(k)})`).join("")}, or after a year.
     ${Object.entries(r.atr_max || {}).map(([k, v]) => `${esc(k)} only takes calm stocks (daily ATR under ${v}% of price).`).join(" ")}
     ${Object.entries(r.near_high || {}).map(([k, v]) => `${esc(k)} signals are only taken within ${v}% of the 52-week high${z.skipped ? ` (${z.skipped} skipped)` : ""}.`).join(" ")}
-    ⭐ = another scanner flagged it in the 10 days before. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`
+    ⭐ = another scanner flagged it in the 10 days before. <b>More buy-stops than free slots? Take mid caps first, then large caps, then small caps</b> (the list is in that order).
+    Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`
     : `After the breakout, buy a ${r.dip["63_30_daily"]}% pullback, then sell on a close below the ${r.exit_ma}-day average. Not advice.`;
   const buyRows = z.buy_list.map((b) => {
     const [pill, label] = STAGE[b.stage];
@@ -243,8 +245,8 @@ function renderDip(d) {
       : b.stage === "dip" ? [["Buy at or below", money(b.level)], ["High close", money(b.high_close)], ["Not below", money(b.floor)]]
       : [["Buy above", money(b.trigger)], ["Stop if bought", money(b.stop)], ["Now", money(b.now)]];
     return `<div class="row" style="border-bottom:0"><div><div class="sym">${esc(b.symbol)}</div>
-        <div class="meta">${esc(b.scanner)} · signal ${fmtDate(b.signal)} · now ${money(b.now)}${tags(b)}</div><div class="meta">${what}</div></div>
-        <div></div><span class="pill ${pill}">${label}</span></div>${lv(levels)}`;
+        <div class="meta">${esc(b.scanner)}${b.cap ? " · " + esc(b.cap) : ""} · signal ${fmtDate(b.signal)} · now ${money(b.now)}${tags(b)}</div><div class="meta">${what}</div></div>
+        <div class="num tiny">${CHOICE[b.priority] || ""}</div><span class="pill ${pill}">${label}</span></div>${lv(levels)}`;
   }).join("");
   return `
     <section class="card"><div class="note" style="padding-top:12px">${intro}</div></section>
