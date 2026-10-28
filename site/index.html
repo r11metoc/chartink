@@ -92,7 +92,7 @@
   <div class="sub" id="updated">Loading…</div>
 </header>
 <nav>
-  <button data-tab="dip" class="on">Dip</button>
+  <button data-tab="dip" class="on">Buy</button>
   <button data-tab="portfolio">Portfolio</button>
   <button data-tab="now">Now</button>
   <button data-tab="breakouts">Breakouts</button>
@@ -173,7 +173,7 @@ function renderPortfolio(d) {
 const STAGE = {
   zone: ["BUY", "BUY ZONE"],
   dip: ["HOLD", "WAIT DIP"],
-  breakout: ["WAIT", "WAIT B/O"],
+  breakout: ["BUY", "BUY-STOP"],
 };
 const SELL = { target: "target", stop: "stop", time: "time limit", average: "below 50-day avg" };
 const tags = (x) => (x.confirmed_by && x.confirmed_by.length ? ` · <b class="up">⭐ also on ${x.confirmed_by.map(esc).join(", ")}</b>` : "")
@@ -226,20 +226,22 @@ function renderDip(d) {
   const z = d.dip;
   if (!z) return `<section class="card"><div class="empty">The buy-the-dip data isn't in this scan yet.</div></section>`;
   const r = z.rule;
-  const intro = `After the breakout above the trigger, buy at the next open when a close is ${r.dip["63_30_daily"]}% below the highest close
-    since the breakout (${r.dip["Wkly_upswing"]}% for Wkly_upswing), within ${r.zone_days} sessions and no more than ${r.floor}% below the trigger.
+  const intro = r.mode === "breakout"
+    ? `Buy when the price trades above the <b>trigger</b> (the signal candle's high; the week's high for Wkly_upswing), within
+    ${r.entry_days} sessions of the signal (${r.entry_days_weekly} for weekly). Place a buy-stop at the trigger: it fills there, or at the open on a gap-up.
     Then ride the trend: <b>sell at the next open after a close below the ${r.exit_ma}-day average</b>, a <b>${r.stop}% stop</b>${Object.entries(r.stop_by || {}).map(([k, v]) => ` (${v}% for ${esc(k)})`).join("")}, or after a year.
     ${Object.entries(r.atr_max || {}).map(([k, v]) => `${esc(k)} only takes calm stocks (daily ATR under ${v}% of price).`).join(" ")}
     ${Object.entries(r.near_high || {}).map(([k, v]) => `${esc(k)} signals are only taken within ${v}% of the 52-week high${z.skipped ? ` (${z.skipped} skipped)` : ""}.`).join(" ")}
-    ⭐ = another scanner flagged it in the 10 days before. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`;
+    ⭐ = another scanner flagged it in the 10 days before. Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`
+    : `After the breakout, buy a ${r.dip["63_30_daily"]}% pullback, then sell on a close below the ${r.exit_ma}-day average. Not advice.`;
   const buyRows = z.buy_list.map((b) => {
     const [pill, label] = STAGE[b.stage];
     const what = b.stage === "zone" ? `Dipped ${b.dip_pct}%: buy at the next open`
       : b.stage === "dip" ? `Broke out ${fmtDate(b.breakout)} · waiting for a ${b.dip_pct}% dip${b.now != null && b.now < b.floor ? " · now below the floor, not a buy unless it closes back above it" : ""}`
-      : `Waiting for price to cross the trigger`;
+      : `Buy-stop at the trigger${b.valid_until ? " until " + fmtDate(b.valid_until) : ""}${b.now != null && b.now > b.trigger ? " · already above it" : ""}`;
     const levels = b.stage === "zone" ? [["Buy ~", money(b.level)], ["Stop", money(b.stop)], ["Sell", "close < 50d avg"]]
       : b.stage === "dip" ? [["Buy at or below", money(b.level)], ["High close", money(b.high_close)], ["Not below", money(b.floor)]]
-      : [["Trigger", money(b.trigger)], ["Now", money(b.now)], ["Signal", fmtDate(b.signal)]];
+      : [["Buy above", money(b.trigger)], ["Stop if bought", money(b.stop)], ["Now", money(b.now)]];
     return `<div class="row" style="border-bottom:0"><div><div class="sym">${esc(b.symbol)}</div>
         <div class="meta">${esc(b.scanner)} · signal ${fmtDate(b.signal)} · now ${money(b.now)}${tags(b)}</div><div class="meta">${what}</div></div>
         <div></div><span class="pill ${pill}">${label}</span></div>${lv(levels)}`;

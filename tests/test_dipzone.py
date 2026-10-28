@@ -121,3 +121,20 @@ def test_live_rule_sell_signal_on_last_close():
     assert s["status"] == "holding" and s["sell_signal"] == frame(rows).index[-1]
     assert dz.events([{"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-05", **s}],
                      frame(rows).index[-1].to_pydatetime())[0][2] == "sell"
+
+
+def test_breakout_buy_fills_at_trigger_then_rides():
+    import numpy as np
+    rows = [(99, 101, 98, 100.5), (101, 106, 100, 105), (105, 110, 104, 109),   # crosses 100 on day 1
+            (109, 109, 103, 104), (104, 104, 102, 103)]                        # closes below 105 -> sell next open
+    s = dz.simulate_breakout(frame(rows), 100.0, "Bullish_Scanner", np.full(len(rows), 105.0))
+    assert s["entry"] == 100.0 and s["entry_date"] == frame(rows).index[0]
+    assert s["status"] == "average" and s["exit"] == 104
+
+
+def test_breakout_gap_up_fills_at_open_and_waits_otherwise():
+    import numpy as np
+    s = dz.simulate_breakout(frame([(103, 104, 102, 103.5)]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
+    assert s["entry"] == 103 and s["gap"] and s["status"] == "holding"
+    w = dz.simulate_breakout(frame([(98, 99, 97, 98)]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
+    assert w["status"] == "waiting for breakout" and w["sessions_left"] == 2
