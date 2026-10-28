@@ -529,7 +529,11 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], d: pd.
 # ------------------------------------------------------- portfolio backtest
 
 PF_CAPITAL = 1_000_000   # ₹10 lakh to start
-PF_MAX_POS = 10          # each trade gets 1/10 of the portfolio's value at the time
+PF_MAX_POS = 15          # each trade gets 1/15 of the portfolio's value at the time
+# Backtest 2021-26 (breakout rule, mid caps first, 8 shuffles): 15 slots 23.0% a year
+# vs 17.0% with 10 (2021-23: 27.6% vs 22.7%; 2024-26: 10.9% vs 9.0%), worst fall
+# about the same (-11%). 20 slots 21.6%, 30 slots 18.8% (too thin). Ranking by
+# signal-day volume was tested and dropped: it helped 2021-23 but not 2024-26.
 
 
 def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, max_pos: int = PF_MAX_POS) -> dict | None:

@@ -174,8 +174,8 @@ a paper book for this rule, and the Saturday report
 the full history. Settings are at the top of `scripts/dipzone.py`.
 
 **Would it have made money?** The Saturday run also trades the alerts as a
-₹10L portfolio (each buy 1/10 of the portfolio's value, so profits are
-reinvested; at most 10 open, first come first served, one position per stock) from the first date all three scanners have backtest
+₹10L portfolio (each buy 1/15 of the portfolio's value, so profits are
+reinvested; at most 15 open, mid caps first when slots are short, first come first served, one position per stock) from the first date all three scanners have backtest
 data, and compares it with the Nifty 500: growth per year, worst fall and
 year by year. It is written to `data/model/performance.json`, shown at the
 bottom of the website's Dip tab and in the report ("If I had bought on the
