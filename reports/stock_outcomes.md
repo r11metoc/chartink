@@ -1,6 +1,6 @@
 # If I had bought every scanner stock
 
-Generated 2026-10-24 18:49 UTC by `scripts/stock_outcomes.py` from `data/backtest/*.csv` plus the bot's live triggers.
+Generated 2026-10-28 17:02 UTC by `scripts/stock_outcomes.py` from `data/backtest/*.csv` plus the bot's live triggers.
 
 **Rule:** buy when price crosses the signal candle's high within 3 sessions (5 for `Wkly_upswing`), filled at the trigger or at the open on a gap-up; then hold. No stop, no target, no costs. **Short** = 2 weeks / 1 month, **Medium** = 3 / 6 months, **Long** = 1 / 2 years. **Beat Nifty 500** = share of buys that did better than the index over the same days. Recent buys only count for horizons that have fully passed.
 
@@ -10,31 +10,31 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 
 | Scanner | Signals | Bought | 1 month avg | 6 months avg | 1 year avg | 2 years avg | 1 year vs Nifty 500 |
 |---|---|---|---|---|---|---|---|
-| 63_30_daily | 1831 | 1439 | +3.3% | +14.6% | +24.0% | +46.6% | +9.6% |
-| Bullish_Scanner | 5083 | 4203 | +3.7% | +15.3% | +27.4% | +48.3% | +13.0% |
-| Wkly_upswing | 615 | 415 | +2.1% | +14.4% | +35.6% | +54.2% | +22.4% |
+| 63_30_daily | 1832 | 1440 | +3.3% | +14.6% | +23.8% | +46.5% | +9.5% |
+| Bullish_Scanner | 5083 | 4204 | +3.6% | +15.3% | +27.4% | +48.1% | +13.0% |
+| Wkly_upswing | 615 | 415 | +2.1% | +14.0% | +35.6% | +53.8% | +22.4% |
 
 ## 63_30_daily
 
-1831 signals (01 Jan 2021 to 21 Oct 2026): 1439 bought, 389 never crossed the trigger, 3 without Yahoo prices, 0 still pending.
+1832 signals (01 Jan 2021 to 27 Oct 2026): 1440 bought, 389 never crossed the trigger, 3 without Yahoo prices, 0 still pending.
 
 | Term | Horizon | Trades | Up | Avg | Median | Avg best / worst | Nifty 500 avg | Beat Nifty 500 | Avg vs Nifty 500 |
 |---|---|---|---|---|---|---|---|---|---|
 | Short | 2 weeks | 1437 | 52% | +1.6% | +0.2% | +5.4% / -3.7% | +0.7% | 47% | +0.9% |
-| Short | 1 month | 1434 | 56% | +3.3% | +1.8% | +9.1% / -5.5% | +1.5% | 49% | +1.8% |
-| Medium | 3 months | 1415 | 62% | +8.2% | +4.7% | +19.7% / -9.2% | +4.4% | 51% | +3.8% |
-| Medium | 6 months | 1367 | 64% | +14.6% | +7.8% | +31.5% / -12.4% | +7.5% | 48% | +7.1% |
-| Long | 1 year | 1268 | 62% | +24.0% | +11.0% | +50.5% / -16.4% | +14.4% | 49% | +9.6% |
-| Long | 2 years | 1113 | 66% | +46.6% | +28.5% | +89.3% / -21.0% | +28.2% | 50% | +18.4% |
+| Short | 1 month | 1435 | 56% | +3.3% | +1.8% | +9.1% / -5.4% | +1.5% | 49% | +1.8% |
+| Medium | 3 months | 1416 | 62% | +8.2% | +4.7% | +19.7% / -9.2% | +4.4% | 51% | +3.8% |
+| Medium | 6 months | 1369 | 64% | +14.6% | +7.8% | +31.5% / -12.4% | +7.5% | 49% | +7.1% |
+| Long | 1 year | 1271 | 62% | +23.8% | +10.9% | +50.4% / -16.5% | +14.4% | 49% | +9.5% |
+| Long | 2 years | 1115 | 66% | +46.5% | +28.5% | +89.2% / -21.0% | +28.1% | 50% | +18.4% |
 
 ### By market cap
 
 | Marketcap | 1 month: n / up / avg / vs index | 6 months: n / up / avg / vs index | 1 year: n / up / avg / vs index |
 |---|---|---|---|
 | Unknown | 0 / – / – / – | 0 / – / – / – | 0 / – / – / – |
-| Largecap | 648 / 56% / +1.8% / +0.4% | 629 / 64% / +12.3% / +6.2% | 569 / 68% / +25.0% / +11.6% |
+| Largecap | 648 / 56% / +1.8% / +0.4% | 631 / 64% / +12.3% / +6.2% | 570 / 68% / +24.9% / +11.5% |
 | Midcap | 400 / 59% / +4.8% / +3.6% | 370 / 71% / +22.6% / +14.7% | 338 / 65% / +34.5% / +20.1% |
-| Smallcap | 386 / 55% / +4.2% / +2.5% | 368 / 55% / +10.4% / +1.0% | 361 / 50% / +12.6% / -3.3% |
+| Smallcap | 387 / 55% / +4.2% / +2.5% | 368 / 55% / +10.4% / +1.0% | 363 / 49% / +12.1% / -3.7% |
 
 ### By year bought
 
@@ -44,8 +44,8 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 | 2022 | 168 / 45% / -1.4% / +1.1% | 168 / 43% / +1.5% / +3.5% | 168 / 63% / +24.3% / +17.4% |
 | 2023 | 429 / 66% / +5.2% / +1.5% | 429 / 86% / +30.6% / +14.3% | 429 / 83% / +52.8% / +18.9% |
 | 2024 | 333 / 54% / +3.3% / +2.2% | 333 / 59% / +8.1% / +3.3% | 333 / 50% / +4.2% / +0.1% |
-| 2025 | 170 / 57% / +2.5% / +1.1% | 170 / 51% / +2.9% / +1.8% | 118 / 49% / +2.2% / +1.3% |
-| 2026 | 114 / 52% / +2.4% / +3.6% | 47 / 68% / +25.4% / +25.6% | 0 / – / – / – |
+| 2025 | 170 / 57% / +2.5% / +1.1% | 170 / 51% / +2.9% / +1.8% | 121 / 48% / +0.7% / -0.0% |
+| 2026 | 115 / 52% / +2.5% / +3.7% | 49 / 69% / +24.6% / +25.0% | 0 / – / – / – |
 
 ### By sector (20+ buys)
 
@@ -57,10 +57,10 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 | Chemicals | 83 / 40% / +0.6% / +0.1% | 83 / 45% / +4.0% / -2.7% | 74 / 47% / +15.8% / +7.9% |
 | Consumer Discretionary | 67 / 64% / +3.7% / +2.2% | 65 / 58% / +14.1% / +8.6% | 65 / 66% / +13.6% / +0.7% |
 | Energy | 57 / 56% / +0.8% / -0.1% | 56 / 39% / +0.9% / -2.8% | 49 / 41% / +6.9% / +0.3% |
-| FMCG | 94 / 57% / +2.7% / +0.7% | 91 / 64% / +18.1% / +7.4% | 84 / 56% / +22.9% / +6.2% |
-| Financials | 189 / 49% / +1.4% / +0.5% | 175 / 57% / +7.9% / +2.4% | 156 / 60% / +14.7% / +3.8% |
+| FMCG | 94 / 57% / +2.7% / +0.7% | 91 / 64% / +18.1% / +7.4% | 86 / 55% / +20.8% / +4.7% |
+| Financials | 189 / 49% / +1.4% / +0.5% | 177 / 57% / +7.8% / +2.5% | 157 / 60% / +14.4% / +3.5% |
 | Healthcare | 125 / 68% / +4.3% / +1.7% | 120 / 79% / +17.6% / +10.6% | 104 / 68% / +22.2% / +8.4% |
-| I.T | 66 / 58% / +3.4% / +1.9% | 61 / 69% / +7.1% / +2.1% | 59 / 46% / +2.2% / -5.0% |
+| I.T | 67 / 58% / +3.4% / +2.1% | 61 / 69% / +7.1% / +2.1% | 59 / 46% / +2.2% / -5.0% |
 | Industrials | 74 / 65% / +4.1% / +2.2% | 67 / 75% / +25.8% / +16.8% | 59 / 59% / +29.0% / +12.1% |
 | Metals & Mining | 78 / 55% / +1.5% / +0.3% | 69 / 70% / +27.8% / +19.0% | 64 / 73% / +35.7% / +18.6% |
 | Miscellaneous | 29 / 52% / +0.8% / -0.3% | 27 / 67% / +5.0% / -3.3% | 27 / 52% / +25.2% / +1.7% |
@@ -89,6 +89,7 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 | Stock | Sector | Cap | Buys | Avg 1 month | Avg 6 months | Avg 1 year | Up after 1 year |
 |---|---|---|---|---|---|---|---|
 | FUSION | Financials | Smallcap | 3 | -14.6% | -33.0% | -73.3% | 0% |
+| INDIAGLYCO | FMCG | Smallcap | 3 | +12.8% | -2.9% | -68.8% | 0% |
 | STAR | Healthcare | Midcap | 8 | +10.3% | +4.5% | -65.0% | 0% |
 | DELTACORP | Miscellaneous | Smallcap | 4 | +4.1% | -41.1% | -50.2% | 0% |
 | IONEXCHANG | Realty | Smallcap | 3 | -12.9% | -25.7% | -48.7% | 0% |
@@ -97,7 +98,6 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 | HDFCAMC | Financials | Largecap | 3 | -6.7% | -28.4% | -36.5% | 0% |
 | CHEMCON | Chemicals | Smallcap | 3 | -11.2% | -12.8% | -29.9% | 0% |
 | HINDPETRO | Energy | Largecap | 9 | +5.6% | -13.1% | -29.0% | 0% |
-| STARHEALTH | Financials | Largecap | 7 | +0.3% | -11.2% | -28.9% | 0% |
 
 **Biggest single winners after 1 year**
 
@@ -116,25 +116,25 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 
 ## Bullish_Scanner
 
-5083 signals (01 Jan 2021 to 22 Oct 2026): 4203 bought, 860 never crossed the trigger, 18 without Yahoo prices, 2 still pending.
+5083 signals (01 Jan 2021 to 22 Oct 2026): 4204 bought, 861 never crossed the trigger, 18 without Yahoo prices, 0 still pending.
 
 | Term | Horizon | Trades | Up | Avg | Median | Avg best / worst | Nifty 500 avg | Beat Nifty 500 | Avg vs Nifty 500 |
 |---|---|---|---|---|---|---|---|---|---|
-| Short | 2 weeks | 4196 | 55% | +2.1% | +0.8% | +6.0% / -3.4% | +0.7% | 50% | +1.4% |
-| Short | 1 month | 4183 | 59% | +3.7% | +2.0% | +9.6% / -5.0% | +1.6% | 51% | +2.1% |
-| Medium | 3 months | 4112 | 63% | +8.7% | +5.7% | +19.8% / -8.5% | +4.3% | 53% | +4.5% |
-| Medium | 6 months | 3978 | 65% | +15.3% | +9.2% | +31.8% / -11.4% | +8.0% | 52% | +7.3% |
-| Long | 1 year | 3739 | 64% | +27.4% | +13.5% | +53.7% / -15.3% | +14.4% | 52% | +13.0% |
-| Long | 2 years | 3399 | 69% | +48.3% | +26.9% | +90.1% / -19.6% | +26.6% | 51% | +21.7% |
+| Short | 2 weeks | 4198 | 55% | +2.1% | +0.7% | +6.0% / -3.4% | +0.7% | 50% | +1.4% |
+| Short | 1 month | 4189 | 59% | +3.6% | +2.0% | +9.6% / -5.1% | +1.6% | 51% | +2.1% |
+| Medium | 3 months | 4114 | 63% | +8.7% | +5.6% | +19.8% / -8.5% | +4.3% | 53% | +4.4% |
+| Medium | 6 months | 3987 | 65% | +15.3% | +9.2% | +31.7% / -11.4% | +8.0% | 52% | +7.3% |
+| Long | 1 year | 3743 | 64% | +27.4% | +13.5% | +53.7% / -15.4% | +14.4% | 52% | +13.0% |
+| Long | 2 years | 3405 | 69% | +48.1% | +26.7% | +90.0% / -19.6% | +26.5% | 51% | +21.6% |
 
 ### By market cap
 
 | Marketcap | 1 month: n / up / avg / vs index | 6 months: n / up / avg / vs index | 1 year: n / up / avg / vs index |
 |---|---|---|---|
 | Unknown | 0 / – / – / – | 0 / – / – / – | 0 / – / – / – |
-| Largecap | 2009 / 59% / +2.7% / +1.2% | 1939 / 68% / +14.7% / +7.5% | 1762 / 71% / +29.6% / +15.5% |
-| Midcap | 1111 / 59% / +4.5% / +2.9% | 1040 / 66% / +18.9% / +10.6% | 991 / 62% / +32.6% / +18.5% |
-| Smallcap | 1063 / 57% / +4.6% / +2.8% | 999 / 58% / +12.9% / +3.7% | 986 / 53% / +18.4% / +3.2% |
+| Largecap | 2009 / 59% / +2.7% / +1.2% | 1947 / 68% / +14.6% / +7.5% | 1766 / 71% / +29.5% / +15.4% |
+| Midcap | 1116 / 59% / +4.5% / +2.9% | 1041 / 66% / +18.9% / +10.6% | 991 / 62% / +32.6% / +18.5% |
+| Smallcap | 1064 / 58% / +4.6% / +2.8% | 999 / 58% / +12.9% / +3.7% | 986 / 53% / +18.4% / +3.2% |
 
 ### By year bought
 
@@ -144,8 +144,8 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 | 2022 | 403 / 48% / +1.4% / +3.3% | 403 / 51% / +4.4% / +6.2% | 403 / 69% / +25.7% / +18.0% |
 | 2023 | 1235 / 68% / +5.5% / +2.2% | 1235 / 85% / +30.1% / +12.9% | 1235 / 84% / +58.6% / +24.8% |
 | 2024 | 1007 / 55% / +2.8% / +1.3% | 1007 / 59% / +8.2% / +3.4% | 1007 / 50% / +4.4% / +0.3% |
-| 2025 | 373 / 57% / +2.6% / +1.9% | 373 / 48% / +2.8% / +2.1% | 241 / 48% / +8.0% / +7.2% |
-| 2026 | 312 / 54% / +1.9% / +3.3% | 107 / 48% / +14.0% / +14.7% | 0 / – / – / – |
+| 2025 | 373 / 57% / +2.6% / +1.9% | 373 / 48% / +2.8% / +2.1% | 245 / 47% / +7.8% / +7.1% |
+| 2026 | 318 / 53% / +1.8% / +3.2% | 116 / 48% / +13.0% / +14.0% | 0 / – / – / – |
 
 ### By sector (20+ buys)
 
@@ -153,23 +153,23 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 |---|---|---|---|
 | Aerospace & Defence | 75 / 63% / +8.1% / +6.9% | 74 / 92% / +47.4% / +39.2% | 73 / 93% / +78.1% / +62.8% |
 | Auto | 310 / 64% / +3.7% / +1.5% | 291 / 69% / +18.4% / +8.5% | 281 / 78% / +30.2% / +12.9% |
-| Bank | 271 / 53% / +0.6% / +0.1% | 249 / 63% / +9.3% / +4.7% | 188 / 68% / +16.5% / +3.4% |
+| Bank | 272 / 53% / +0.7% / +0.1% | 249 / 63% / +9.3% / +4.7% | 189 / 68% / +16.4% / +3.4% |
 | Building Materials | 212 / 50% / +2.9% / +1.2% | 204 / 46% / +2.8% / -5.4% | 199 / 40% / +4.7% / -8.6% |
 | Castings, Forgings & Fasteners | 32 / 66% / +6.9% / +4.9% | 30 / 43% / -0.5% / -9.1% | 28 / 43% / +2.2% / -15.1% |
-| Chemicals | 215 / 51% / +3.1% / +1.8% | 210 / 60% / +13.5% / +5.5% | 198 / 58% / +17.6% / +6.8% |
+| Chemicals | 215 / 51% / +3.1% / +1.8% | 211 / 60% / +13.4% / +5.5% | 198 / 58% / +17.6% / +6.8% |
 | Consumer Discretionary | 159 / 55% / +4.3% / +3.5% | 151 / 61% / +14.0% / +9.1% | 149 / 57% / +17.9% / +6.4% |
 | Energy | 175 / 61% / +3.7% / +2.2% | 173 / 53% / +9.5% / +2.9% | 149 / 51% / +21.0% / +8.0% |
-| FMCG | 332 / 59% / +3.1% / +1.1% | 311 / 67% / +14.9% / +4.4% | 303 / 62% / +21.4% / +6.3% |
-| Financials | 437 / 53% / +1.9% / +0.5% | 420 / 58% / +11.2% / +3.6% | 386 / 58% / +28.3% / +14.7% |
-| Healthcare | 458 / 64% / +4.9% / +2.6% | 417 / 71% / +13.1% / +4.2% | 411 / 68% / +24.3% / +8.8% |
-| I.T | 218 / 60% / +3.1% / +1.4% | 209 / 61% / +11.4% / +5.2% | 204 / 48% / +10.8% / +0.3% |
-| Industrials | 324 / 65% / +4.7% / +3.0% | 311 / 76% / +23.4% / +15.8% | 293 / 80% / +55.0% / +38.9% |
+| FMCG | 333 / 59% / +3.1% / +1.1% | 313 / 66% / +14.7% / +4.3% | 303 / 62% / +21.4% / +6.3% |
+| Financials | 437 / 53% / +1.9% / +0.5% | 420 / 58% / +11.2% / +3.6% | 389 / 57% / +28.0% / +14.5% |
+| Healthcare | 458 / 64% / +4.9% / +2.6% | 422 / 72% / +13.1% / +4.4% | 411 / 68% / +24.3% / +8.8% |
+| I.T | 219 / 60% / +3.1% / +1.4% | 209 / 61% / +11.4% / +5.2% | 204 / 48% / +10.8% / +0.3% |
+| Industrials | 325 / 64% / +4.7% / +3.0% | 311 / 76% / +23.4% / +15.8% | 293 / 80% / +55.0% / +38.9% |
 | Media | 34 / 38% / -1.6% / -2.1% | 34 / 24% / -1.9% / -8.0% | 34 / 21% / -10.3% / -19.0% |
-| Metals & Mining | 169 / 57% / +3.4% / +3.1% | 162 / 61% / +15.7% / +9.4% | 137 / 72% / +27.7% / +13.9% |
+| Metals & Mining | 170 / 56% / +3.3% / +3.1% | 162 / 61% / +15.7% / +9.4% | 137 / 72% / +27.7% / +13.9% |
 | Miscellaneous | 93 / 58% / +3.4% / +1.8% | 86 / 58% / +16.6% / +8.3% | 79 / 58% / +25.3% / +9.5% |
 | Plastic products | 22 / 68% / +9.0% / +8.2% | 22 / 77% / +18.8% / +7.3% | 22 / 68% / +27.0% / +4.7% |
-| Power & Utilities | 126 / 57% / +3.8% / +2.9% | 121 / 74% / +26.8% / +19.1% | 113 / 79% / +57.5% / +40.4% |
-| Realty | 208 / 60% / +3.9% / +2.0% | 195 / 80% / +26.6% / +15.5% | 193 / 72% / +41.9% / +24.7% |
+| Power & Utilities | 126 / 57% / +3.8% / +2.9% | 122 / 74% / +26.4% / +18.8% | 113 / 79% / +57.5% / +40.4% |
+| Realty | 209 / 59% / +3.8% / +1.9% | 195 / 80% / +26.6% / +15.5% | 193 / 72% / +41.9% / +24.7% |
 | Services | 99 / 65% / +5.3% / +3.5% | 97 / 81% / +16.5% / +8.1% | 97 / 87% / +35.9% / +18.6% |
 | Telecom-Service | 34 / 76% / +4.2% / -0.4% | 34 / 91% / +17.1% / +4.0% | 34 / 76% / +27.1% / +7.2% |
 | Textiles | 70 / 46% / +3.7% / +2.7% | 70 / 41% / +4.2% / -0.7% | 70 / 39% / +3.9% / -4.1% |
@@ -222,25 +222,25 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 
 ## Wkly_upswing
 
-615 signals (28 Aug 2017 to 14 Oct 2026): 415 bought, 199 never crossed the trigger, 0 without Yahoo prices, 1 still pending.
+615 signals (28 Aug 2017 to 14 Oct 2026): 415 bought, 200 never crossed the trigger, 0 without Yahoo prices, 0 still pending.
 
 | Term | Horizon | Trades | Up | Avg | Median | Avg best / worst | Nifty 500 avg | Beat Nifty 500 | Avg vs Nifty 500 |
 |---|---|---|---|---|---|---|---|---|---|
-| Short | 2 weeks | 411 | 48% | +1.0% | -0.4% | +6.2% / -5.1% | +0.5% | 43% | +0.5% |
+| Short | 2 weeks | 413 | 47% | +1.0% | -0.4% | +6.2% / -5.1% | +0.5% | 43% | +0.4% |
 | Short | 1 month | 406 | 51% | +2.1% | +0.3% | +10.0% / -7.2% | +0.9% | 46% | +1.2% |
 | Medium | 3 months | 391 | 52% | +6.4% | +1.8% | +20.6% / -12.3% | +2.9% | 49% | +3.5% |
-| Medium | 6 months | 372 | 54% | +14.4% | +2.9% | +35.8% / -15.9% | +6.2% | 50% | +8.2% |
+| Medium | 6 months | 375 | 54% | +14.0% | +2.7% | +35.5% / -16.0% | +6.1% | 50% | +7.9% |
 | Long | 1 year | 348 | 58% | +35.6% | +9.0% | +69.4% / -21.5% | +13.2% | 47% | +22.4% |
-| Long | 2 years | 314 | 64% | +54.2% | +21.5% | +117.7% / -26.5% | +28.1% | 46% | +26.1% |
+| Long | 2 years | 315 | 64% | +53.8% | +21.4% | +117.3% / -26.7% | +28.0% | 46% | +25.8% |
 
 ### By market cap
 
 | Marketcap | 1 month: n / up / avg / vs index | 6 months: n / up / avg / vs index | 1 year: n / up / avg / vs index |
 |---|---|---|---|
 | Unknown | 0 / – / – / – | 0 / – / – / – | 0 / – / – / – |
-| Largecap | 162 / 59% / +2.2% / +1.1% | 148 / 63% / +15.3% / +9.6% | 138 / 71% / +36.4% / +22.6% |
+| Largecap | 162 / 59% / +2.2% / +1.1% | 150 / 62% / +14.8% / +9.2% | 138 / 71% / +36.4% / +22.6% |
 | Midcap | 94 / 49% / +3.1% / +2.0% | 87 / 47% / +11.1% / +6.5% | 76 / 54% / +29.6% / +18.4% |
-| Smallcap | 150 / 45% / +1.2% / +0.7% | 137 / 49% / +15.6% / +7.8% | 134 / 48% / +38.2% / +24.5% |
+| Smallcap | 150 / 45% / +1.2% / +0.7% | 138 / 49% / +15.1% / +7.4% | 134 / 48% / +38.2% / +24.5% |
 
 ### By year bought
 
@@ -255,7 +255,7 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 | 2023 | 73 / 59% / +6.4% / +3.9% | 73 / 71% / +36.0% / +18.5% | 73 / 81% / +81.5% / +48.3% |
 | 2024 | 72 / 53% / -0.5% / -1.2% | 72 / 53% / +4.5% / -0.1% | 72 / 35% / -5.2% / -9.2% |
 | 2025 | 32 / 59% / +6.5% / +5.5% | 32 / 38% / -1.4% / -1.4% | 22 / 32% / -5.7% / -6.3% |
-| 2026 | 48 / 42% / +0.3% / +1.5% | 14 / 50% / +10.2% / +13.4% | 0 / – / – / – |
+| 2026 | 48 / 42% / +0.3% / +1.5% | 17 / 41% / +2.3% / +5.5% | 0 / – / – / – |
 
 ### By sector (20+ buys)
 
@@ -264,7 +264,7 @@ Per-trade data: `data/model/stock_outcomes.csv`; per-stock: `data/model/stock_su
 | Building Materials | 28 / 32% / -0.5% / -2.0% | 27 / 44% / -0.4% / -5.9% | 26 / 50% / +5.8% / -7.5% |
 | Chemicals | 29 / 38% / -5.7% / -5.6% | 24 / 50% / +15.9% / +10.1% | 24 / 62% / +37.5% / +28.8% |
 | Consumer Discretionary | 23 / 57% / +4.9% / +3.0% | 21 / 48% / +11.6% / +8.6% | 21 / 52% / +47.3% / +33.2% |
-| FMCG | 25 / 44% / +1.5% / +1.1% | 23 / 39% / -3.4% / -7.8% | 22 / 50% / +6.8% / -5.0% |
+| FMCG | 25 / 44% / +1.5% / +1.1% | 24 / 38% / -4.0% / -8.1% | 22 / 50% / +6.8% / -5.0% |
 | Financials | 33 / 55% / +1.8% / +0.4% | 30 / 67% / +26.6% / +15.9% | 30 / 63% / +38.6% / +25.0% |
 | Healthcare | 34 / 68% / +4.8% / +3.3% | 33 / 61% / +24.4% / +15.3% | 33 / 67% / +48.7% / +32.0% |
 | I.T | 31 / 45% / +4.7% / +5.5% | 29 / 52% / +20.5% / +16.7% | 28 / 57% / +55.4% / +48.5% |
@@ -329,61 +329,61 @@ Return = all the buys and sells of one signal compounded. Nifty 500 = from the f
 
 | Scanner | Signals bought | Buys per signal | Profitable | Avg return | Median | Worst 10% avg | Avg days invested | Still holding | Nifty 500 avg | Avg vs Nifty 500 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 63_30_daily | 1751 | 5.3 | 23% | +25.9% | -5.4% | -22.7% | 257 | 426 | +9.9% | +15.9% |
-| Bullish_Scanner | 4947 | 5.5 | 22% | +21.4% | -5.8% | -23.0% | 250 | 1110 | +9.4% | +12.0% |
-| Wkly_upswing | 560 | 5.3 | 19% | +33.7% | -7.2% | -24.5% | 229 | 107 | +10.6% | +23.0% |
-| **All** | 7258 | 5.5 | 22% | +23.4% | -5.8% | -23.1% | 250 | 1643 | +9.6% | +13.8% |
+| 63_30_daily | 1752 | 5.3 | 24% | +27.3% | -5.4% | -22.7% | 258 | 422 | +10.4% | +17.0% |
+| Bullish_Scanner | 4948 | 5.5 | 22% | +22.8% | -5.8% | -23.0% | 251 | 1101 | +9.8% | +13.1% |
+| Wkly_upswing | 560 | 5.3 | 19% | +35.6% | -7.2% | -24.5% | 230 | 105 | +11.0% | +24.6% |
+| **All** | 7260 | 5.5 | 22% | +24.9% | -5.8% | -23.1% | 251 | 1628 | +10.0% | +14.9% |
 
 | Scanner | Cap | Signals | Profitable | Avg return | Median | Avg days invested |
 |---|---|---|---|---|---|---|
-| 63_30_daily | Largecap | 769 | 27% | +40.9% | -4.6% | 274 |
-| 63_30_daily | Midcap | 493 | 28% | +26.9% | -5.3% | 292 |
-| 63_30_daily | Smallcap | 488 | 13% | +1.2% | -7.5% | 197 |
-| Bullish_Scanner | Largecap | 2353 | 28% | +33.2% | -4.3% | 278 |
-| Bullish_Scanner | Midcap | 1334 | 21% | +20.4% | -6.5% | 250 |
-| Bullish_Scanner | Smallcap | 1257 | 13% | +0.4% | -7.8% | 198 |
-| Wkly_upswing | Largecap | 200 | 26% | +75.0% | -5.5% | 301 |
-| Wkly_upswing | Midcap | 136 | 21% | +25.5% | -7.3% | 212 |
-| Wkly_upswing | Smallcap | 219 | 13% | +1.9% | -9.2% | 179 |
+| 63_30_daily | Largecap | 770 | 27% | +43.0% | -4.6% | 275 |
+| 63_30_daily | Midcap | 493 | 29% | +28.6% | -5.3% | 292 |
+| 63_30_daily | Smallcap | 488 | 13% | +1.4% | -7.6% | 197 |
+| Bullish_Scanner | Largecap | 2354 | 28% | +35.0% | -4.3% | 279 |
+| Bullish_Scanner | Midcap | 1334 | 22% | +22.2% | -6.5% | 251 |
+| Bullish_Scanner | Smallcap | 1257 | 12% | +0.8% | -7.8% | 198 |
+| Wkly_upswing | Largecap | 200 | 26% | +80.4% | -5.5% | 302 |
+| Wkly_upswing | Midcap | 136 | 21% | +24.2% | -7.3% | 213 |
+| Wkly_upswing | Smallcap | 219 | 13% | +2.8% | -9.3% | 179 |
 
 | Buys per signal | Signals | Profitable | Avg return |
 |---|---|---|---|
-| 1 | 1099 | 39% | +52.1% |
-| 2 | 967 | 29% | +34.2% |
-| 3 | 775 | 24% | +32.5% |
-| 4 | 747 | 19% | +32.3% |
-| 5 | 629 | 21% | +23.2% |
-| 6+ | 3041 | 14% | +5.2% |
+| 1 | 1097 | 39% | +54.7% |
+| 2 | 967 | 30% | +35.7% |
+| 3 | 773 | 24% | +34.2% |
+| 4 | 748 | 19% | +34.2% |
+| 5 | 632 | 21% | +24.5% |
+| 6+ | 3043 | 15% | +6.2% |
 
 ### Stop on any trade below the trigger
 
 | Scanner | Signals bought | Buys per signal | Profitable | Avg return | Median | Worst 10% avg | Avg days invested | Still holding | Nifty 500 avg | Avg vs Nifty 500 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 63_30_daily | 1751 | 6.6 | 20% | +23.1% | -5.9% | -23.7% | 235 | 373 | +9.4% | +13.7% |
-| Bullish_Scanner | 4947 | 6.9 | 19% | +17.9% | -6.2% | -23.8% | 225 | 975 | +8.8% | +9.0% |
-| Wkly_upswing | 560 | 6.5 | 16% | +29.3% | -6.9% | -24.7% | 200 | 91 | +9.7% | +19.6% |
-| **All** | 7258 | 6.8 | 19% | +20.0% | -6.2% | -23.9% | 226 | 1439 | +9.0% | +11.0% |
+| 63_30_daily | 1752 | 6.6 | 20% | +24.5% | -5.9% | -23.7% | 236 | 371 | +9.8% | +14.7% |
+| Bullish_Scanner | 4948 | 6.9 | 19% | +19.1% | -6.2% | -23.8% | 225 | 975 | +9.2% | +9.9% |
+| Wkly_upswing | 560 | 6.5 | 16% | +31.1% | -6.9% | -24.7% | 201 | 90 | +10.0% | +21.1% |
+| **All** | 7260 | 6.8 | 19% | +21.3% | -6.2% | -23.9% | 226 | 1436 | +9.4% | +11.9% |
 
 | Scanner | Cap | Signals | Profitable | Avg return | Median | Avg days invested |
 |---|---|---|---|---|---|---|
-| 63_30_daily | Largecap | 769 | 23% | +37.3% | -5.1% | 247 |
-| 63_30_daily | Midcap | 493 | 25% | +23.9% | -5.7% | 274 |
-| 63_30_daily | Smallcap | 488 | 11% | -0.2% | -7.4% | 178 |
-| Bullish_Scanner | Largecap | 2353 | 23% | +28.6% | -5.0% | 248 |
-| Bullish_Scanner | Midcap | 1334 | 19% | +16.5% | -6.5% | 228 |
-| Bullish_Scanner | Smallcap | 1257 | 10% | -0.8% | -8.4% | 177 |
-| Wkly_upswing | Largecap | 200 | 20% | +67.3% | -5.6% | 263 |
-| Wkly_upswing | Midcap | 136 | 18% | +22.7% | -8.9% | 178 |
-| Wkly_upswing | Smallcap | 219 | 10% | -0.5% | -7.5% | 162 |
+| 63_30_daily | Largecap | 770 | 23% | +39.3% | -5.1% | 248 |
+| 63_30_daily | Midcap | 493 | 26% | +25.5% | -5.5% | 275 |
+| 63_30_daily | Smallcap | 488 | 10% | +0.1% | -7.5% | 178 |
+| Bullish_Scanner | Largecap | 2354 | 24% | +30.2% | -5.0% | 249 |
+| Bullish_Scanner | Midcap | 1334 | 19% | +18.0% | -6.4% | 229 |
+| Bullish_Scanner | Smallcap | 1257 | 10% | -0.5% | -8.4% | 178 |
+| Wkly_upswing | Largecap | 200 | 21% | +72.4% | -5.5% | 264 |
+| Wkly_upswing | Midcap | 136 | 18% | +21.3% | -8.9% | 178 |
+| Wkly_upswing | Smallcap | 219 | 10% | +0.3% | -7.5% | 162 |
 
 | Buys per signal | Signals | Profitable | Avg return |
 |---|---|---|---|
-| 1 | 722 | 28% | +42.5% |
-| 2 | 822 | 30% | +45.7% |
-| 3 | 690 | 23% | +49.3% |
-| 4 | 621 | 24% | +24.7% |
-| 5 | 569 | 19% | +11.1% |
-| 6+ | 3834 | 13% | +5.6% |
+| 1 | 722 | 28% | +43.9% |
+| 2 | 817 | 30% | +48.6% |
+| 3 | 693 | 23% | +51.2% |
+| 4 | 621 | 23% | +26.3% |
+| 5 | 569 | 19% | +11.9% |
+| 6+ | 3838 | 13% | +6.5% |
 
 
 ## The pullback after the breakout
@@ -392,10 +392,10 @@ For every signal that crossed its trigger, the 20 sessions after the first cross
 
 | Scanner | Breakouts | Back at the trigger | Median days to get there | Closed below the trigger | Closed 5%+ below | Median dip from the high | 3 months later: retested / not |
 |---|---|---|---|---|---|---|---|
-| 63_30_daily | 1746 | 96% | 1 | 82% | 42% | -11.6% | +7.7% / +27.7% |
-| Bullish_Scanner | 4929 | 96% | 1 | 80% | 41% | -11.4% | +7.7% / +30.0% |
-| Wkly_upswing | 549 | 95% | 1 | 83% | 54% | -13.6% | +4.1% / +41.5% |
-| **All** | 7224 | 96% | 1 | 81% | 42% | -11.6% | +7.4% / +30.5% |
+| 63_30_daily | 1747 | 96% | 1 | 82% | 42% | -11.6% | +7.7% / +27.7% |
+| Bullish_Scanner | 4933 | 96% | 1 | 80% | 41% | -11.4% | +7.6% / +30.0% |
+| Wkly_upswing | 552 | 95% | 1 | 83% | 54% | -13.7% | +4.1% / +41.5% |
+| **All** | 7232 | 96% | 1 | 81% | 42% | -11.6% | +7.4% / +30.5% |
 
 ## Why a stop at the buy price still loses
 
@@ -403,10 +403,10 @@ Every round trip of the *breakout* rule (buy above the trigger, sell after a clo
 
 | Scanner | Stopped round trips | Avg bought above trigger | Avg sold below trigger | Costs | Avg loss per stop | Bought on a gap-up | Sold 3%+ below trigger | Avg days held |
 |---|---|---|---|---|---|---|---|---|
-| 63_30_daily | 8941 | +0.2% | -1.3% | -0.25% | -1.7% | 9% | 11% | 17 |
-| Bullish_Scanner | 26147 | +0.2% | -1.2% | -0.25% | -1.6% | 9% | 11% | 16 |
-| Wkly_upswing | 2863 | +0.2% | -1.5% | -0.25% | -1.9% | 10% | 16% | 13 |
-| **All** | 37951 | +0.2% | -1.3% | -0.25% | -1.7% | 9% | 11% | 16 |
+| 63_30_daily | 8950 | +0.2% | -1.3% | -0.25% | -1.7% | 9% | 11% | 17 |
+| Bullish_Scanner | 26171 | +0.2% | -1.2% | -0.25% | -1.6% | 9% | 11% | 16 |
+| Wkly_upswing | 2866 | +0.2% | -1.5% | -0.25% | -1.9% | 10% | 16% | 13 |
+| **All** | 37987 | +0.2% | -1.3% | -0.25% | -1.7% | 9% | 11% | 16 |
 
 Signals are bought 5.5 times on average under this rule, so the small loss per stop (-1.7%) repeats: 5 stops in a row is about -8.0%.
 
@@ -423,62 +423,62 @@ Same signals, every market cap, no target, no time limit, new buys for 3 months 
 
 | Rule | Scanner | Signals bought | Buys per signal | Profitable | Avg return | Median | Worst 10% avg | Avg days invested |
 |---|---|---|---|---|---|---|---|---|
-| breakout | 63_30_daily | 1751 | 5.3 | 23% | +25.9% | -5.4% | -22.7% | 257 |
-| breakout | Bullish_Scanner | 4947 | 5.5 | 22% | +21.4% | -5.8% | -23.0% | 250 |
-| breakout | Wkly_upswing | 560 | 5.3 | 19% | +33.7% | -7.2% | -24.5% | 229 |
-| breakout | **All** | 7258 | 5.5 | 22% | +23.4% | -5.8% | -23.1% | 250 |
-| breakout5 | 63_30_daily | 1751 | 1.5 | 28% | +30.6% | -6.4% | -23.3% | 308 |
-| breakout5 | Bullish_Scanner | 4947 | 1.5 | 28% | +28.2% | -6.5% | -23.5% | 312 |
-| breakout5 | Wkly_upswing | 560 | 1.6 | 21% | +39.8% | -7.6% | -25.1% | 272 |
-| breakout5 | **All** | 7258 | 1.5 | 27% | +29.7% | -6.5% | -23.6% | 308 |
-| retest | 63_30_daily | 1537 | 1.3 | 30% | +31.9% | -7.5% | -24.5% | 324 |
-| retest | Bullish_Scanner | 4466 | 1.3 | 28% | +26.9% | -7.9% | -24.7% | 316 |
-| retest | Wkly_upswing | 476 | 1.3 | 22% | +38.3% | -8.6% | -25.9% | 278 |
-| retest | **All** | 6479 | 1.3 | 28% | +28.9% | -7.8% | -24.8% | 315 |
-| dip5 | 63_30_daily | 1458 | 1.7 | 28% | +28.4% | -6.7% | -26.9% | 307 |
-| dip5 | Bullish_Scanner | 4296 | 1.8 | 28% | +25.2% | -6.8% | -27.6% | 310 |
-| dip5 | Wkly_upswing | 469 | 1.8 | 24% | +44.7% | -7.5% | -25.2% | 303 |
-| dip5 | **All** | 6223 | 1.8 | 27% | +27.4% | -6.9% | -27.3% | 309 |
-| ema20 | 63_30_daily | 1661 | 1.5 | 28% | +29.5% | -6.7% | -25.2% | 306 |
-| ema20 | Bullish_Scanner | 4730 | 1.6 | 28% | +26.5% | -7.5% | -25.5% | 313 |
-| ema20 | Wkly_upswing | 498 | 1.6 | 24% | +42.3% | -7.5% | -26.8% | 285 |
-| ema20 | **All** | 6889 | 1.6 | 28% | +28.4% | -7.3% | -25.6% | 309 |
+| breakout | 63_30_daily | 1751 | 5.3 | 24% | +27.3% | -5.4% | -22.7% | 258 |
+| breakout | Bullish_Scanner | 4948 | 5.5 | 22% | +22.8% | -5.8% | -23.0% | 251 |
+| breakout | Wkly_upswing | 560 | 5.3 | 19% | +35.6% | -7.2% | -24.5% | 230 |
+| breakout | **All** | 7259 | 5.5 | 22% | +24.9% | -5.8% | -23.1% | 251 |
+| breakout5 | 63_30_daily | 1751 | 1.5 | 28% | +32.4% | -6.4% | -23.4% | 309 |
+| breakout5 | Bullish_Scanner | 4948 | 1.5 | 28% | +30.1% | -6.5% | -23.5% | 313 |
+| breakout5 | Wkly_upswing | 560 | 1.6 | 22% | +42.0% | -7.6% | -25.1% | 273 |
+| breakout5 | **All** | 7259 | 1.5 | 28% | +31.6% | -6.5% | -23.6% | 309 |
+| retest | 63_30_daily | 1537 | 1.3 | 30% | +33.8% | -7.5% | -24.5% | 325 |
+| retest | Bullish_Scanner | 4468 | 1.3 | 28% | +28.7% | -7.9% | -24.7% | 317 |
+| retest | Wkly_upswing | 477 | 1.3 | 22% | +41.2% | -8.6% | -26.0% | 279 |
+| retest | **All** | 6482 | 1.3 | 28% | +30.9% | -7.8% | -24.8% | 316 |
+| dip5 | 63_30_daily | 1458 | 1.7 | 28% | +30.1% | -6.7% | -26.8% | 308 |
+| dip5 | Bullish_Scanner | 4300 | 1.8 | 28% | +26.9% | -6.8% | -27.6% | 311 |
+| dip5 | Wkly_upswing | 470 | 1.8 | 24% | +47.2% | -7.4% | -25.2% | 303 |
+| dip5 | **All** | 6228 | 1.8 | 28% | +29.2% | -6.8% | -27.3% | 310 |
+| ema20 | 63_30_daily | 1663 | 1.5 | 29% | +31.3% | -6.6% | -25.2% | 306 |
+| ema20 | Bullish_Scanner | 4730 | 1.6 | 28% | +28.3% | -7.5% | -25.5% | 314 |
+| ema20 | Wkly_upswing | 498 | 1.6 | 24% | +44.7% | -7.5% | -26.8% | 285 |
+| ema20 | **All** | 6891 | 1.6 | 28% | +30.2% | -7.3% | -25.6% | 310 |
 
 | Rule | Cap | Signals bought | Profitable | Avg return | Median |
 |---|---|---|---|---|---|
-| breakout | Largecap | 3322 | 27% | +37.5% | -4.5% |
-| breakout | Midcap | 1963 | 23% | +22.4% | -6.2% |
-| breakout | Smallcap | 1964 | 13% | +0.8% | -7.9% |
-| breakout5 | Largecap | 3322 | 36% | +48.5% | -5.7% |
-| breakout5 | Midcap | 1963 | 26% | +26.4% | -6.6% |
-| breakout5 | Smallcap | 1964 | 15% | +1.4% | -9.0% |
-| dip5 | Largecap | 2770 | 36% | +46.2% | -4.6% |
-| dip5 | Midcap | 1707 | 27% | +25.6% | -7.2% |
-| dip5 | Smallcap | 1742 | 14% | -0.7% | -10.4% |
-| ema20 | Largecap | 3163 | 36% | +47.7% | -5.8% |
-| ema20 | Midcap | 1881 | 27% | +24.1% | -7.4% |
-| ema20 | Smallcap | 1839 | 14% | -0.2% | -10.0% |
-| retest | Largecap | 3054 | 37% | +49.1% | -6.6% |
-| retest | Midcap | 1732 | 27% | +22.5% | -7.9% |
-| retest | Smallcap | 1688 | 14% | -0.9% | -10.6% |
+| breakout | Largecap | 3323 | 27% | +39.6% | -4.5% |
+| breakout | Midcap | 1963 | 23% | +23.9% | -6.2% |
+| breakout | Smallcap | 1964 | 13% | +1.2% | -8.0% |
+| breakout5 | Largecap | 3323 | 36% | +51.2% | -5.7% |
+| breakout5 | Midcap | 1963 | 27% | +28.1% | -6.7% |
+| breakout5 | Smallcap | 1964 | 15% | +1.9% | -9.0% |
+| dip5 | Largecap | 2771 | 36% | +48.9% | -4.6% |
+| dip5 | Midcap | 1710 | 28% | +27.4% | -7.1% |
+| dip5 | Smallcap | 1743 | 14% | -0.3% | -10.4% |
+| ema20 | Largecap | 3164 | 36% | +50.3% | -5.8% |
+| ema20 | Midcap | 1882 | 28% | +25.8% | -7.3% |
+| ema20 | Smallcap | 1839 | 14% | +0.3% | -10.0% |
+| retest | Largecap | 3055 | 37% | +51.9% | -6.6% |
+| retest | Midcap | 1733 | 27% | +24.4% | -7.9% |
+| retest | Smallcap | 1689 | 14% | -0.5% | -10.6% |
 
 ## If I had bought on the alerts
 
-Every buy alert from 2021-01-11 (when all three scanners have backtest data) to 2026-10-22, starting with ₹10L: each buy is 1/10 of the portfolio's value at the time (profits reinvested), at most 10 open, first come first served, one position per stock, after costs.
+Every buy alert from 2021-01-11 (when all three scanners have backtest data) to 2026-10-27, starting with ₹10L: each buy is 1/10 of the portfolio's value at the time (profits reinvested), at most 10 open, first come first served, one position per stock, after costs.
 
 | Scanner | Trades | Win rate | Avg | Avg win / loss | Avg days |
 |---|---|---|---|---|---|
 | 63_30_daily | 1218 | 42% | +5.22% | +20.8% / -6.0% | 38 |
-| Bullish_Scanner | 3604 | 41% | +3.82% | +18.7% / -6.3% | 37 |
-| Wkly_upswing | 101 | 43% | +2.06% | +12.9% / -6.0% | 35 |
-| All | 4923 | 41% | +4.13% | +19.1% / -6.2% | 37 |
+| Bullish_Scanner | 3607 | 41% | +3.82% | +18.7% / -6.3% | 37 |
+| Wkly_upswing | 102 | 43% | +2.18% | +13.0% / -6.0% | 35 |
+| All | 4927 | 41% | +4.13% | +19.1% / -6.2% | 37 |
 
 | | Alerts portfolio | Nifty 500 |
 |---|---|---|
-| ₹10L became | ₹31.4L | ₹18.1L |
-| Yearly growth (CAGR) | 21.9% | 10.8% |
+| ₹10L became | ₹31.3L | ₹18.1L |
+| Yearly growth (CAGR) | 21.8% | 10.8% |
 | Worst fall from a peak | -17.9% | -18.8% |
-| Trades taken / skipped (no free slot) | 389 / 4534 | |
+| Trades taken / skipped (no free slot) | 390 / 4537 | |
 | Win rate of trades taken | 38% | |
 
 | Year | Alerts portfolio | Nifty 500 |
@@ -488,7 +488,7 @@ Every buy alert from 2021-01-11 (when all three scanners have backtest data) to 
 | 2023 | +32.8% | +25.8% |
 | 2024 | +26.0% | +15.2% |
 | 2025 | +22.6% | +6.7% |
-| 2026 | +12.7% | -9.1% |
+| 2026 | +12.3% | -9.0% |
 
 Open positions are counted at cost until sold. The current year is year-to-date.
 
@@ -498,25 +498,29 @@ Every rule keeps the starting stop (12%, 15% for Wkly_upswing); the riding rules
 
 | Exit | Trades | Win rate | Avg | Avg win / loss | Avg days | ₹10L became | Per year | Worst fall |
 |---|---|---|---|---|---|---|---|---|
-| +8% target, 12% stop, 8 weeks (old rule) | 4857 | 69% | +1.93% | +7.6% / -10.4% | 17 | ₹14.7L | 6.9% | -28.8% |
-| 10% trailing stop | 4857 | 43% | +3.37% | +16.7% / -6.7% | 36 | ₹20.7L | 13.5% | -28.9% |
-| 15% trailing stop | 4857 | 43% | +6.94% | +28.1% / -9.2% | 68 | ₹12.9L | 4.5% | -20.6% |
-| close below 20-day average | 4857 | 38% | +1.32% | +9.3% / -3.7% | 12 | ₹17.9L | 10.6% | -19.7% |
-| close below 50-day average (now) | 4857 | 41% | +4.17% | +19.1% / -6.3% | 35 | ₹30.2L | 21.1% | -17.9% |
-| half at +8%, rest on close below 20-day average | 4857 | 44% | +0.99% | +7.0% / -3.8% | 12 | ₹17.1L | 9.8% | -17.4% |
-| after +8%: stop at cost, sell on close below 20-day average | 4857 | 51% | +2.89% | +12.2% / -6.8% | 27 | ₹15.6L | 7.9% | -31.0% |
-| after +8%: stop at cost, sell on close below 50-day average | 4857 | 37% | +3.98% | +19.7% / -5.4% | 37 | ₹15.5L | 7.8% | -30.4% |
+| +8% target, 12% stop, 8 weeks (old rule) | 4830 | 69% | +1.95% | +7.6% / -10.4% | 17 | ₹14.1L | 6.1% | -28.8% |
+| 10% trailing stop | 4830 | 43% | +3.41% | +16.7% / -6.7% | 36 | ₹19.1L | 11.9% | -29.7% |
+| 15% trailing stop | 4830 | 43% | +6.96% | +28.1% / -9.2% | 68 | ₹13.1L | 4.7% | -20.6% |
+| close below 20-day average | 4830 | 39% | +1.36% | +9.3% / -3.7% | 12 | ₹20.2L | 13.0% | -19.7% |
+| close below 50-day average (now) | 4830 | 41% | +4.23% | +19.1% / -6.2% | 36 | ₹32.8L | 22.8% | -17.6% |
+| half at +8%, rest on close below 20-day average | 4830 | 44% | +1.03% | +7.0% / -3.8% | 12 | ₹18.7L | 11.5% | -17.4% |
+| after +8%: stop at cost, sell on close below 20-day average | 4830 | 51% | +2.93% | +12.2% / -6.8% | 27 | ₹15.5L | 7.9% | -31.0% |
+| after +8%: stop at cost, sell on close below 50-day average | 4830 | 37% | +4.02% | +19.7% / -5.4% | 37 | ₹16.6L | 9.2% | -28.7% |
+| no pullback: buy at the breakout, sell on close below 50-day average | 4830 | 46% | +5.86% | +21.1% / -7.0% | 44 | ₹22.5L | 15.0% | -10.4% |
+| no pullback, every breakout (incl. stocks that never dipped) | 5744 | 46% | +5.60% | +20.6% / -7.3% | 43 | ₹19.2L | 11.9% | -13.7% |
 
 | Exit | 63_30_daily | Bullish_Scanner | Wkly_upswing |
 |---|---|---|---|
-| +8% target, 12% stop, 8 weeks (old rule) | 71% · +2.28% | 68% · +1.81% | 71% · +2.09% |
-| 10% trailing stop | 44% · +4.05% | 43% · +3.10% | 42% · +4.89% |
-| 15% trailing stop | 43% · +7.56% | 43% · +6.75% | 42% · +6.52% |
-| close below 20-day average | 38% · +1.45% | 38% · +1.27% | 49% · +1.19% |
-| close below 50-day average (now) | 42% · +5.30% | 41% · +3.85% | 44% · +2.22% |
-| half at +8%, rest on close below 20-day average | 43% · +1.08% | 44% · +0.97% | 55% · +0.91% |
-| after +8%: stop at cost, sell on close below 20-day average | 52% · +3.29% | 50% · +2.77% | 55% · +2.30% |
-| after +8%: stop at cost, sell on close below 50-day average | 39% · +4.82% | 37% · +3.77% | 33% · +1.49% |
+| +8% target, 12% stop, 8 weeks (old rule) | 71% · +2.28% | 68% · +1.83% | 72% · +2.14% |
+| 10% trailing stop | 44% · +4.04% | 43% · +3.14% | 42% · +5.07% |
+| 15% trailing stop | 43% · +7.55% | 43% · +6.77% | 42% · +6.61% |
+| close below 20-day average | 38% · +1.46% | 39% · +1.32% | 49% · +1.42% |
+| close below 50-day average (now) | 42% · +5.30% | 41% · +3.91% | 44% · +2.34% |
+| half at +8%, rest on close below 20-day average | 43% · +1.09% | 44% · +1.01% | 56% · +1.06% |
+| after +8%: stop at cost, sell on close below 20-day average | 52% · +3.28% | 51% · +2.82% | 56% · +2.53% |
+| after +8%: stop at cost, sell on close below 50-day average | 39% · +4.81% | 37% · +3.81% | 33% · +1.62% |
+| no pullback: buy at the breakout, sell on close below 50-day average | 46% · +6.37% | 46% · +5.72% | 44% · +4.68% |
+| no pullback, every breakout (incl. stocks that never dipped) | 47% · +6.17% | 46% · +5.44% | 44% · +4.79% |
 
 ## Buy-the-dip rule (the live alert rule)
 
@@ -525,12 +529,12 @@ After the breakout, buy at the next open once a close is 3% below the highest cl
 | Group | Trades | Win rate | Avg | Avg win / loss | Average / stop / time | Avg days | ₹ on ₹1L a trade |
 |---|---|---|---|---|---|---|---|
 | 63_30_daily | 1219 | 42% | +5.21% | +20.7% / -6.0% | 92% / 8% / 0% | 38 | 6,356,280 |
-| Bullish_Scanner | 3604 | 41% | +3.82% | +18.7% / -6.3% | 89% / 11% / 0% | 37 | 13,781,530 |
-| Wkly_upswing | 134 | 40% | +2.53% | +15.0% / -5.6% | 95% / 5% / 0% | 34 | 339,570 |
+| Bullish_Scanner | 3607 | 41% | +3.82% | +18.7% / -6.3% | 89% / 11% / 0% | 37 | 13,776,180 |
+| Wkly_upswing | 135 | 40% | +2.62% | +15.0% / -5.6% | 95% / 5% / 0% | 34 | 353,700 |
 | Largecap | 2257 | 43% | +3.54% | +15.8% / -5.6% | 95% / 5% / 0% | 37 | 7,999,550 |
-| Midcap | 1366 | 41% | +5.35% | +22.3% / -6.4% | 89% / 11% / 0% | 39 | 7,313,840 |
-| Smallcap | 1333 | 38% | +3.88% | +21.9% / -7.0% | 84% / 16% / 0% | 36 | 5,176,240 |
-| **All** | 4957 | 41% | +4.13% | +19.1% / -6.2% | 90% / 10% / 0% | 37 | 20,477,380 |
+| Midcap | 1367 | 41% | +5.35% | +22.3% / -6.4% | 89% / 11% / 0% | 39 | 7,310,230 |
+| Smallcap | 1336 | 38% | +3.88% | +21.9% / -7.0% | 84% / 16% / 0% | 36 | 5,188,630 |
+| **All** | 4961 | 41% | +4.13% | +19.1% / -6.2% | 90% / 10% / 0% | 37 | 20,486,160 |
 
 ## Reading this
 
