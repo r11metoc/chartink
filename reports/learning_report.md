@@ -14,9 +14,9 @@ Updated 2026-10-28. For each scanner 144 exit rules were tried; the setup filter
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 1301 | 33% | -0.26% | -0.57% | -333,100 |  |
-| Learned rule | 1301 | 53% | +3.83% | +1.78% | +4,983,100 | +4.09% (t 9.9) |
-| Learned rule + filter | 1111 | 51% | +3.46% | +1.71% | +3,844,600 | +3.21% (t 8.2) |
+| Base rule, every signal | 1300 | 33% | -0.26% | -0.57% | -331,900 |  |
+| Learned rule | 1300 | 53% | +3.83% | +1.77% | +4,977,800 | +4.08% (t 9.9) |
+| Learned rule + filter | 1110 | 51% | +3.46% | +1.71% | +3,839,300 | +3.21% (t 8.2) |
 
 ## Bullish_Scanner
 
@@ -26,9 +26,9 @@ Updated 2026-10-28. For each scanner 144 exit rules were tried; the setup filter
 
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
-| Base rule, every signal | 4118 | 42% | +0.73% | +0.21% | +2,988,200 |  |
-| Learned rule | 4118 | 56% | +4.43% | +2.37% | +18,253,700 | +3.71% (t 16.5) |
-| Learned rule + filter | 3984 | 55% | +4.44% | +2.42% | +17,670,600 | +3.57% (t 16.0) |
+| Base rule, every signal | 4118 | 42% | +0.73% | +0.21% | +2,988,900 |  |
+| Learned rule | 4118 | 56% | +4.43% | +2.36% | +18,240,600 | +3.70% (t 16.5) |
+| Learned rule + filter | 3984 | 55% | +4.43% | +2.42% | +17,657,500 | +3.56% (t 16.0) |
 
 ## Wkly_upswing
 
@@ -39,5 +39,5 @@ Updated 2026-10-28. For each scanner 144 exit rules were tried; the setup filter
 | Walk-forward | Trades | Won | Avg | vs Nifty 500 | ₹ on ₹1L a trade | Gain per signal vs base |
 |---|---|---|---|---|---|---|
 | Base rule, every signal | 350 | 42% | +0.42% | -0.05% | +146,600 |  |
-| Learned rule | 350 | 41% | +2.02% | +1.17% | +707,300 | +1.60% (t 2.1) |
+| Learned rule | 350 | 41% | +2.02% | +1.17% | +707,900 | +1.60% (t 2.1) |
 | Learned rule + filter | 274 | 41% | +1.28% | +0.75% | +349,500 | +0.58% (t 0.9) |

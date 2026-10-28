@@ -50420,8 +50420,6 @@ Bullish_Scanner,SHIVAUM,,2026-09-28,2026-10-22,,-0.48,average,2026-10-26,3,ma20
 Bullish_Scanner,SHIVAUM,,2026-09-28,2026-10-22,,-0.48,average,2026-10-26,3,half8_ma20
 Bullish_Scanner,ZYDUSLIFE,Largecap,2026-09-28,2026-09-29,1228.5999755859375,-7.05,average,2026-10-06,5,bo_ma50_all
 Bullish_Scanner,DPABHUSHAN,,2026-09-29,2026-10-19,,-10.13,stop,2026-10-23,4,trail10
-Bullish_Scanner,DPABHUSHAN,,2026-09-29,2026-10-19,,-9.74,average,2026-10-28,7,ma20
-Bullish_Scanner,DPABHUSHAN,,2026-09-29,2026-10-19,,-9.74,average,2026-10-28,7,half8_ma20
 Bullish_Scanner,ALICON,Smallcap,2026-09-30,2026-10-09,,-9.54,stop,2026-10-23,10,trail10
 Bullish_Scanner,ALICON,Smallcap,2026-09-30,2026-10-09,,-7.4,average,2026-10-26,11,ma20
 Bullish_Scanner,ALICON,Smallcap,2026-09-30,2026-10-09,,-7.4,average,2026-10-26,11,half8_ma20
@@ -50460,5 +50458,4 @@ Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-16,,-8.78,stop,2026-10-23,5,t
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-16,,-9.2,average,2026-10-27,7,ma20
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-16,,-9.2,average,2026-10-27,7,half8_ma20
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-13,600.0,-12.25,stop,2026-10-23,8,bo_ma50
-63_30_daily,TIPSMUSIC,Midcap,2026-10-14,2026-10-22,,7.75,target,2026-10-28,5,target8
 Bullish_Scanner,KARURVYSYA,Largecap,2026-10-19,2026-10-21,376.25,-12.25,stop,2026-10-23,3,bo_ma50_all

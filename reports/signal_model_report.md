@@ -1,6 +1,6 @@
 # Scanner signal model report
 
-Generated 2026-10-28 17:21 UTC by `scripts/signal_model.py train`.
+Generated 2026-10-28 21:17 UTC by `scripts/signal_model.py train`.
 
 ## The rule being tested
 
@@ -71,8 +71,8 @@ Fixed set of alternatives, not optimized. Cells: trades · avg return · vs inde
 | Candle-low stop, 2R target, 20d | 1439 · -0.20% · -0.57% (t -4.1) | 4199 · +0.71% · +0.20% (t +2.0) | 414 · +0.14% · -0.31% (t -0.7) |
 | Candle-low stop, no target, 20d | 1439 · +0.66% · -0.05% (t -0.2) | 4198 · +1.47% · +0.68% (t +4.4) | 414 · +1.07% · +0.39% (t +0.6) |
 | Wide stop (≤15%), no target, 20d | 1439 · +0.67% · -0.04% (t -0.2) | 4196 · +1.51% · +0.70% (t +4.5) | 414 · +1.20% · +0.52% (t +0.7) |
-| No stop, exit after 10d | 1437 · +1.37% · +0.64% (t +2.8) | 4198 · +1.88% · +1.14% (t +8.0) | 413 · +0.71% · +0.17% (t +0.3) |
-| No stop, exit after 20d | 1435 · +2.86% · +1.49% (t +4.8) | 4190 · +3.22% · +1.75% (t +9.5) | 409 · +1.64% · +0.83% (t +1.1) |
+| No stop, exit after 10d | 1437 · +1.37% · +0.64% (t +2.8) | 4197 · +1.88% · +1.14% (t +8.1) | 413 · +0.71% · +0.17% (t +0.3) |
+| No stop, exit after 20d | 1435 · +2.86% · +1.49% (t +4.8) | 4189 · +3.22% · +1.75% (t +9.5) | 407 · +1.76% · +0.92% (t +1.2) |
 
 ## 2. Model: which triggers to take
 
