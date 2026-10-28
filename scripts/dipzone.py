@@ -49,7 +49,7 @@ ALERT_DAYS = 4        # only alert on events this recent (no flood on the first 
 STAKE = 100_000
 MARKET_CLOSE = (15, 30)
 ACTIVE = {"waiting for breakout", "watching for dip", "buy zone", "holding"}
-LIVE_MODE = "breakout"
+LIVE_MODE = "breakout"  # "breakout" (buy-stop at the trigger) or "dip" (wait for the pullback)
 # When more signals than free slots: mid caps first, then large, then small.
 # Backtest 2021-26 (10 slots, 12 shuffles): 17.4% a year vs 14.3% first come,
 # better in both 2021-23 (22.1% vs 17.3%) and 2024-26 (10.8% vs 7.1%), worst
@@ -59,7 +59,7 @@ CHOICE = {0: "1st choice", 1: "2nd choice", 2: "3rd choice"}
 
 
 def priority(cap: str | None) -> int:
-    return CAP_PRIORITY.get(cap or "", 3)  # "breakout" (buy-stop at the trigger) or "dip" (wait for the pullback)
+    return CAP_PRIORITY.get(cap or "", 3)
 
 
 def dip_for(scanner: str) -> float:
@@ -221,7 +221,7 @@ def _completed(df: pd.DataFrame, now: datetime) -> pd.DataFrame:
 
 
 def live_states(conn, now: datetime | None = None) -> list[dict]:
-    import paper  # local import: paper imports policy/track_record
+    import live_signals as paper
     import track_record
     now = now or datetime.now(IST)
     lookback = (date.fromisoformat(START) - timedelta(days=HISTORY_DAYS)).isoformat()

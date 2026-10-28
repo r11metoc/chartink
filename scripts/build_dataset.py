@@ -29,7 +29,7 @@ import pandas as pd
 import breakout_sim as bs
 import db
 from market_data import BENCHMARK_TICKERS, NIFTY_TICKER, fetch_daily
-from paper import live_hit_date
+from live_signals import live_hit_date
 
 ROOT = Path(__file__).resolve().parent.parent
 BACKTEST_DIR = ROOT / "data" / "backtest"

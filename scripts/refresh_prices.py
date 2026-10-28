@@ -16,9 +16,8 @@ from dipzone import HISTORY_DAYS
 from market_data import fetch_daily
 
 TRACK_DAYS = 120
-# Backtest picks feed the sector view's "average move since pick" and the paper
-# portfolio (3-5 session entry window + up to 40 sessions held by a learned rule).
-BACKTEST_DAYS = 120  # also covers the buy-the-dip rule: 5 + 20 + 40 sessions
+# Backtest picks feed the sector view's "average move since pick".
+BACKTEST_DAYS = 120
 # Nifty 50 for the market regime (50-day average), Nifty 500 for "vs index".
 BENCHMARKS = ["^NSEI", "^CRSLDX"]
 BENCHMARK_DAYS = 120

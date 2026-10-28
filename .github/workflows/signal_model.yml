@@ -2,8 +2,8 @@ name: Scanner signal model
 
 # mode=train (also every Saturday): rebuild the trade dataset from
 #   data/backtest/*.csv and the bot's live triggers with fresh Yahoo prices,
-#   retrain, re-learn the trading setup (learn.py -> data/model/policy.json),
-#   and commit. Re-run after dropping new Chartink backtest exports into
+#   retrain, re-run the backtests and the portfolio / exit comparison
+#   (stock_outcomes.py), and commit. Re-run after dropping new Chartink backtest exports into
 #   data/backtest/.
 # mode=predict: score scanner results (the symbols given, or else the latest
 #   dashboard scan in data/chartink.db) and send the setups to Telegram.
@@ -65,16 +65,6 @@ jobs:
         working-directory: scripts
         run: python signal_model.py train
 
-      - name: Learn the trading setup (walk-forward)
-        if: github.event_name == 'schedule' || inputs.mode == 'train'
-        working-directory: scripts
-        run: python learn.py
-
-      - name: Price 2-12 weeks after the trigger
-        if: github.event_name == 'schedule' || inputs.mode == 'train'
-        working-directory: scripts
-        run: python horizon_returns.py
-
       - name: Every scanner stock short, medium and long term
         if: github.event_name == 'schedule' || inputs.mode == 'train'
         working-directory: scripts
@@ -98,7 +88,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/model reports/signal_model_report.md reports/horizon_returns.md reports/learning_report.md reports/stock_outcomes.md
+          git add data/model reports/signal_model_report.md reports/stock_outcomes.md
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else

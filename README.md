@@ -72,12 +72,12 @@ message Telegram rejects is resent as plain text rather than dropped.
 
 ## Web dashboard
 
-**Dip** (first tab): the buy-the-dip paper book: a 🛒 *Buy list* (signals
-waiting for the breakout, waiting for the dip with the price to buy at or
-below, or in the buy zone with buy / target / stop), 📦 *Holding* (entry,
-target, stop, exit-by date, P&L now) and 🧾 *Recent buys and sells* (last
-60 days), plus totals per scanner. Built by `dipzone.dashboard_view()` into
-`site/data.json` on every scan.
+**Buy** (first tab): the live breakout rule. A 🛒 *Buy list* of signals
+waiting for the price to cross the trigger (buy-stop price, stop if bought,
+expiry), in priority order (mid caps first), plus the backtest of buying on
+the alerts and the exit-rule comparison. **Portfolio**: every stock the
+alerts bought, with open and booked P&L, sell level, stop and every sale.
+Built by `dipzone.dashboard_view()` into `site/data.json` on every scan.
 
 `site/index.html` is a phone-friendly dashboard, published to GitHub Pages
 after every scan (open it on your iPhone and use Share → Add to Home Screen):
@@ -92,45 +92,15 @@ after every scan (open it on your iPhone and use Share → Add to Home Screen):
   agree, the average move of those picks since they were picked, and an
   8-week bar chart; then the per-scanner backtest tables
 
-- **Paper**: the forward test. Every trigger since 25 Sep 2026 (live
-  triggers plus backtest-export hits from that date on) is traded on paper
-  with the backtest's own rule from `breakout_sim.py`: buy above the signal
-  candle's high within 3 sessions (5 after a weekly signal), stop at its low
-  (kept 2–8% below entry), target 2× the risk, out after 20 sessions, 0.25%
-  costs, ₹1L a trade. Shows each trade and, per scanner, win rate, average
-  return, return vs the Nifty 500 and P&L (`scripts/paper.py`). The
-  **Learned** switch shows the second book, traded with what the system had
-  learned by each signal's date (below), and a card with what it learned.
 
-Every stock row (Now, Breakouts) and every Telegram breakout alert also shows
-**how similar past setups did** in the backtest (`scripts/track_record.py`,
-from `data/model/trades.csv`): same scanner, market-cap tier and market
-regime (Nifty 50 above/below its 50-day average), falling back to scanner ×
-tier and then the scanner alone when a group has fewer than 20 trades. The
-Telegram digest also carries a paper portfolio summary, with both books.
+### Weekly retraining
 
-### Self-learning
-
-Every Saturday `signal_model.yml` rebuilds the trade dataset (the Chartink
+Every Saturday `signal_model.yml` rebuilds the trade dataset from the Chartink
 backtest exports **plus every trigger the bot caught live**, so it keeps
-growing), and `scripts/learn.py` re-learns the trading setup per scanner:
-
-- it tries 144 exit rules (stop at the candle low or a fixed 4–12%, target
-  1.5–3× the risk or none, optional 8% trailing stop, out after 10/20/40
-  sessions) and a filter that skips market-cap × market-regime groups that
-  lost money (20+ trades);
-- it is judged **walk-forward**: each month the rule and filter are picked
-  using only trades that had already closed, then used on that month's
-  signals, and compared with the base rule on the same signals;
-- *proven* = ahead of the base rule by at least 1.65 standard errors,
-  *promising* = ahead but could be luck, *not better* = the base rule is
-  kept. The filter is kept only if it helped out of sample.
-
-The choice goes to `data/model/policy.json` (with every earlier choice, so
-the Learned paper book uses what was known at each signal's date) and the
-evidence to `reports/learning_report.md`. Every breakout alert and dashboard
-row carries the learned call: 🧠 *Take* with the exit rule to use, or
-*Skip* with the reason.
+growing. It then re-runs the backtest of the live breakout rule, the ₹10L
+portfolio (15 slots, mid caps first) and the exit-rule comparison
+(`reports/stock_outcomes.md`, `data/model/performance.json`), and retrains
+the signal model (`reports/signal_model_report.md`).
 
 Each scan runs `scripts/refresh_prices.py`, which fetches daily prices from
 Yahoo Finance (`daily_prices` table) for every stock that triggered in the
@@ -212,11 +182,6 @@ tests the actual trade and scores new scanner results:
   with holding the Nifty 500, compares a fixed set of exit rules, and
   walk-forward-validates a model that tries to pick the winning triggers.
   Full results: `reports/signal_model_report.md`.
-  `horizon_returns.py` then shows where each stock was 2, 4, 6, 8 and 12
-  weeks after crossing the trigger (plain hold, no stop), against the
-  Nifty 500, and compares 10/15/20% trailing stops with plain holding
-  on the same trades: `reports/horizon_returns.md`, per-trade prices in
-  `data/model/horizon_returns.csv`.
   `export_daily_prices.py` writes `reports/daily_prices_after_signal.xlsx`:
   every signal's trigger and entry, then daily Open/High/Low/Close for the
   70 sessions after it (% vs trigger per day), plus a colour-coded grid of

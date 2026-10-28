@@ -112,13 +112,6 @@ const fmtDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN",
 const fmtYear = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 const fmtWhen = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }) + " IST";
 
-function trackLine(t, l) {
-  const past = t ? `<div class="meta track">📊 Past ${esc(t.group)}: ${t.n} trades, ${t.win}% won, avg <span class="${cls(t.avg)}">${pct(t.avg)}</span></div>` : "";
-  const note = l && l.take && (l.status === "proven" || l.status === "promising") ? ` (${l.status})` : "";
-  const learned = l ? `<div class="meta track">🧠 <b class="${l.take ? "up" : "down"}">${l.take ? "Take" : "Skip"}</b>: ${esc(l.why)}${note}</div>` : "";
-  return past + learned;
-}
-
 const rupees = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + "₹" + Math.abs(v).toLocaleString("en-IN");
 
 const lv = (items) => `<div class="lv">${items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
@@ -263,7 +256,7 @@ function renderNow(d) {
       ${s.rows.length ? s.rows.map((r) => `
         <div class="row">
           <div><div class="sym">${esc(r.symbol)}</div>
-            <div class="meta">${money(r.now)} · trigger ${money(r.trigger)}${r.trigger_date ? " (" + fmtDate(r.trigger_date) + " high)" : ""}${r.seen != null && r.seen !== r.trigger ? " · seen at " + money(r.seen) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div>${trackLine(r.track, r.learned)}</div>
+            <div class="meta">${money(r.now)} · trigger ${money(r.trigger)}${r.trigger_date ? " (" + fmtDate(r.trigger_date) + " high)" : ""}${r.seen != null && r.seen !== r.trigger ? " · seen at " + money(r.seen) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div></div>
           <div class="num chg ${cls(r.chg)}">${pct(r.chg)}</div>
           <span class="pill ${r.status}">${r.status}</span>
         </div>`).join("") : `<div class="empty">No stocks on this scanner right now.</div>`}
@@ -291,7 +284,7 @@ function renderBreakouts(d) {
       ${rows.length ? rows.map((b) => `
         <div class="row">
           <div><div class="sym">${esc(b.symbol)}${b.on_scan ? '<span class="dot" title="still on the scanner"></span>' : ""}</div>
-            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · trigger ${money(b.trigger)} → ${money(b.now)}${b.seen != null && b.seen !== b.trigger ? " · seen at " + money(b.seen) : ""}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div>${trackLine(b.track, b.learned)}</div>
+            <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · trigger ${money(b.trigger)} → ${money(b.now)}${b.seen != null && b.seen !== b.trigger ? " · seen at " + money(b.seen) : ""}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div></div>
           <div class="num chg ${cls(b.chg)}">${pct(b.chg)}</div>
           <span class="pill ${b.status}">${b.status}</span>
         </div>`).join("") : `<div class="empty">No triggers match.</div>`}

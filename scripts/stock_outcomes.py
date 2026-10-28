@@ -20,8 +20,6 @@ Writes:
   reports/stock_outcomes.md          the report
   data/model/stock_outcomes.csv      one row per trade
   data/model/stock_summary.csv       one row per scanner x stock
-  data/model/reentry_trades.csv      trigger-price stop with re-entry, one row per signal
-  data/model/pullback_rules.csv      pullback buy rules (scripts/pullback.py), one row per signal x rule
 
 Usage: python stock_outcomes.py
 """
@@ -37,7 +35,6 @@ import pandas as pd
 
 import breakout_sim as bs
 import dipzone
-import pullback
 from build_dataset import load_hits
 from market_data import fetch_daily
 
@@ -45,8 +42,6 @@ ROOT = Path(__file__).resolve().parent.parent
 REPORT = ROOT / "reports" / "stock_outcomes.md"
 TRADES_CSV = ROOT / "data" / "model" / "stock_outcomes.csv"
 SUMMARY_CSV = ROOT / "data" / "model" / "stock_summary.csv"
-REENTRY_CSV = ROOT / "data" / "model" / "reentry_trades.csv"
-PULLBACK_CSV = ROOT / "data" / "model" / "pullback_rules.csv"
 PERF_JSON = ROOT / "data" / "model" / "performance.json"
 EXITS_CSV = ROOT / "data" / "model" / "exit_trades.csv"
 
@@ -56,125 +51,6 @@ LABEL = {"2w": "2 weeks", "1m": "1 month", "3m": "3 months", "6m": "6 months",
          "1y": "1 year", "2y": "2 years"}
 BENCH_TICKERS = ["^CRSLDX", "^NSEI"]  # Nifty 500, else Nifty 50
 MIN_STOCK_TRADES = 3
-
-
-REENTRY_WINDOW = 63  # sessions after the signal in which a (re-)entry is allowed (3 months)
-REENTRY_MODES = {
-    "close": "sell at the next open after a daily close below the trigger",
-    "intraday": "sell the moment price trades below the trigger (at the trigger, or the open on a gap-down)",
-}
-
-
-def simulate_reentry(o, h, l, c, trigger: float, mode: str, window: int = REENTRY_WINDOW) -> dict:
-    """Buy above the trigger, sell below it, buy again above it, for as long
-    as entries are allowed (`window` sessions); a position opened in the
-    window is held with no target and no time limit until the stop."""
-    legs, pos, e_i, e_px, sell_next_open = [], False, 0, 0.0, False
-    n = len(c)
-    for i in range(n):
-        if pos and sell_next_open:  # close-mode exit decided yesterday
-            legs.append((e_i, i, e_px, float(o[i]), "stop"))
-            pos, sell_next_open = False, False
-        if not pos:
-            if i >= window or h[i] <= trigger:
-                continue
-            e_px, e_i, pos = max(float(o[i]), trigger), i, True
-            gapped_in = o[i] >= trigger
-            if mode == "intraday" and gapped_in and l[i] < trigger:
-                legs.append((e_i, i, e_px, trigger, "stop"))
-                pos = False
-                continue
-            if mode == "close" and c[i] < trigger:
-                sell_next_open = True
-            continue
-        if mode == "intraday":
-            if o[i] < trigger:
-                legs.append((e_i, i, e_px, float(o[i]), "stop")); pos = False
-            elif l[i] < trigger:
-                legs.append((e_i, i, e_px, trigger, "stop")); pos = False
-        elif c[i] < trigger:
-            sell_next_open = True
-    if pos:
-        legs.append((e_i, n - 1, e_px, float(c[-1]), "holding"))
-    growth = 1.0
-    for _, _, a, b, _ in legs:
-        growth *= (b / a) * (1 - bs.COST_PCT / 100)
-    return {"legs": legs, "total_ret": (growth - 1) * 100 if legs else np.nan,
-            "days_in": sum(x - e + 1 for e, x, *_ in legs)}
-
-
-def reentry_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], bench: pd.Series | None) -> pd.DataFrame:
-    rows = []
-    for _, h in hits.iterrows():
-        df = prices.get(h["symbol"])
-        sig = bs.signal_bar(df, h["hit_date"], bs.is_weekly(h["scanner_name"])) if df is not None else None
-        if sig is None:
-            continue
-        fwd = df.iloc[sig["end_pos"] + 1:]
-        if len(fwd) == 0:
-            continue
-        arr = [fwd[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close")]
-        for mode in REENTRY_MODES:
-            r = simulate_reentry(*arr, sig["trigger"], mode)
-            if not r["legs"]:
-                continue
-            first, last = r["legs"][0], r["legs"][-1]
-            d0, d1 = fwd.index[first[0]], fwd.index[last[1]]
-            row = {"mode": mode, "scanner_name": h["scanner_name"], "symbol": h["symbol"],
-                   "marketcap": h["marketcap"], "sector": h["sector"], "hit_date": h["hit_date"].date(),
-                   "trigger": round(sig["trigger"], 2), "entries": len(r["legs"]),
-                   "first_entry": d0.date(), "last_exit": d1.date(), "status": last[4],
-                   "total_ret": round(r["total_ret"], 2), "days_invested": r["days_in"],
-                   "span_days": last[1] - first[0] + 1,
-                   "last_leg_ret": round((last[3] / last[2] - 1) * 100, 2)}
-            if bench is not None:
-                b0 = bench[bench.index < d0]
-                b1 = bench[bench.index <= d1]
-                if len(b0) and len(b1):
-                    row["index_ret"] = round((b1.iloc[-1] / b0.iloc[-1] - 1) * 100, 2)
-            rows.append(row)
-    return pd.DataFrame(rows)
-
-
-def reentry_section(rt: pd.DataFrame) -> list[str]:
-    if rt.empty:
-        return []
-    L = ["", "## Trigger-price stop with re-entry", "",
-         "Buy when price crosses above the trigger (the signal candle's high). No target and no time limit. "
-         "Sell when price falls below the trigger; buy again each time it climbs back above it, for "
-         f"{REENTRY_WINDOW} sessions (3 months) after the signal. A position bought inside those 3 months is "
-         "held until the stop, however long that takes; open positions are valued at the latest close. "
-         f"Every buy/sell pays {bs.COST_PCT}% costs. Two versions of the stop:", ""]
-    L += [f"- **{m}**: {d}" for m, d in REENTRY_MODES.items()]
-    L += ["", "Return = all the buys and sells of one signal compounded. Nifty 500 = from the first buy to the "
-          "last sell (or today).", ""]
-    for mode in REENTRY_MODES:
-        x = rt[rt["mode"] == mode]
-        L += [f"### Stop on {'a close' if mode == 'close' else 'any trade'} below the trigger", "",
-              "| Scanner | Signals bought | Buys per signal | Profitable | Avg return | Median | Worst 10% avg | "
-              "Avg days invested | Still holding | Nifty 500 avg | Avg vs Nifty 500 |",
-              "|---|---|---|---|---|---|---|---|---|---|---|"]
-        for name, y in [(n, g) for n, g in x.groupby("scanner_name")] + [("**All**", x)]:
-            r = y["total_ret"]
-            worst = r[r <= r.quantile(0.10)].mean()
-            idx = y["index_ret"] if "index_ret" in y else pd.Series(dtype=float)
-            L.append(f"| {name} | {len(y)} | {y['entries'].mean():.1f} | {(r > 0).mean():.0%} | {_pct(r.mean())} | "
-                     f"{_pct(r.median())} | {_pct(worst)} | {y['days_invested'].mean():.0f} | "
-                     f"{(y['status'] == 'holding').sum()} | {_pct(idx.mean())} | {_pct((r - idx).mean())} |")
-        L += ["", "| Scanner | Cap | Signals | Profitable | Avg return | Median | Avg days invested |",
-              "|---|---|---|---|---|---|---|"]
-        for (name, cap), y in x.groupby(["scanner_name", "marketcap"]):
-            if len(y) < 20:
-                continue
-            r = y["total_ret"]
-            L.append(f"| {name} | {cap or 'Unknown'} | {len(y)} | {(r > 0).mean():.0%} | {_pct(r.mean())} | "
-                     f"{_pct(r.median())} | {y['days_invested'].mean():.0f} |")
-        L += ["", "| Buys per signal | Signals | Profitable | Avg return |", "|---|---|---|---|"]
-        for k, y in x.groupby(x["entries"].clip(upper=6)):
-            r = y["total_ret"]
-            L.append(f"| {k if k < 6 else '6+'} | {len(y)} | {(r > 0).mean():.0%} | {_pct(r.mean())} |")
-        L.append("")
-    return L
 
 
 def trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], bench: pd.Series | None) -> pd.DataFrame:
@@ -300,8 +176,7 @@ def best_trades(b: pd.DataFrame, key: str = "1y", n: int = 10) -> list[str]:
     return L
 
 
-def build_report(t: pd.DataFrame, s: pd.DataFrame, rt: pd.DataFrame | None = None,
-                 pb: tuple | None = None, dz: list[str] | None = None) -> str:
+def build_report(t: pd.DataFrame, s: pd.DataFrame, dz: list[str] | None = None) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     b = t[t["status"] == "bought"].copy()
     if not b.empty:
@@ -345,10 +220,6 @@ def build_report(t: pd.DataFrame, s: pd.DataFrame, rt: pd.DataFrame | None = Non
         L += stock_lines(s[s["scanner_name"] == name], "1y")
         L += best_trades(y)
 
-    if rt is not None:
-        L += reentry_section(rt)
-    if pb is not None:
-        L += pullback.section(*pb)
     if dz is not None:
         L += dz
 
@@ -380,17 +251,13 @@ def main() -> int:
     TRADES_CSV.parent.mkdir(parents=True, exist_ok=True)
     t.to_csv(TRADES_CSV, index=False)
     s.to_csv(SUMMARY_CSV, index=False)
-    rt = reentry_trades(hits, prices, bench)
-    rt.to_csv(REENTRY_CSV, index=False)
-    pb = pullback.analyse(hits, prices)
-    pb[0].to_csv(PULLBACK_CSV, index=False)
     dt = dipzone.backtest_trades(hits, prices)
     et = dipzone.exit_trades(hits, prices)
     et.to_csv(EXITS_CSV, index=False)  # every dip buy, sold by each exit rule
     perf = dipzone.performance(dt, bench, et)
     PERF_JSON.write_text(json.dumps(perf, allow_nan=False), encoding="utf-8")
     dz = dipzone.performance_section(perf) + dipzone.backtest_section(hits, prices, dt)
-    REPORT.write_text(build_report(t, s, rt, pb, dz), encoding="utf-8")
+    REPORT.write_text(build_report(t, s, dz), encoding="utf-8")
     print(f"Wrote {REPORT} ({len(b)} bought of {len(t)} signals)")
     return 0
 
