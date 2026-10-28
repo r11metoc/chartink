@@ -1,6 +1,6 @@
 # Price after the trigger: 2 to 12 weeks
 
-Generated 2026-10-28 16:59 UTC by `scripts/horizon_returns.py`.
+Generated 2026-10-28 17:24 UTC by `scripts/horizon_returns.py`.
 
 Buy when price crosses the trigger (the signal candle's high; the completed week's candle for `Wkly_upswing`) within 3 sessions (5 for weekly), then just hold. No stop-loss, no target, no costs deducted. **Up** = share of trades above the entry price at that point. **Best / worst close** = the highest and lowest close reached at any time up to that point, averaged across trades. **Beat Nifty 500** = share of trades that did better than the index over the same days. Recent signals only count for horizons that have fully passed, so longer horizons have fewer trades and lean towards older signals.
 

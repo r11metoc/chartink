@@ -1,6 +1,6 @@
 # If I had bought every scanner stock
 
-Generated 2026-10-28 17:02 UTC by `scripts/stock_outcomes.py` from `data/backtest/*.csv` plus the bot's live triggers.
+Generated 2026-10-28 17:27 UTC by `scripts/stock_outcomes.py` from `data/backtest/*.csv` plus the bot's live triggers.
 
 **Rule:** buy when price crosses the signal candle's high within 3 sessions (5 for `Wkly_upswing`), filled at the trigger or at the open on a gap-up; then hold. No stop, no target, no costs. **Short** = 2 weeks / 1 month, **Medium** = 3 / 6 months, **Long** = 1 / 2 years. **Beat Nifty 500** = share of buys that did better than the index over the same days. Recent buys only count for horizons that have fully passed.
 
@@ -464,31 +464,31 @@ Same signals, every market cap, no target, no time limit, new buys for 3 months 
 
 ## If I had bought on the alerts
 
-Every buy alert from 2021-01-11 (when all three scanners have backtest data) to 2026-10-27, starting with ₹10L: each buy is 1/10 of the portfolio's value at the time (profits reinvested), at most 10 open, first come first served, one position per stock, after costs.
+Every buy alert from 2021-01-04 (when all three scanners have backtest data) to 2026-10-27, starting with ₹10L: each buy is 1/10 of the portfolio's value at the time (profits reinvested), at most 10 open, first come first served, one position per stock, after costs.
 
 | Scanner | Trades | Win rate | Avg | Avg win / loss | Avg days |
 |---|---|---|---|---|---|
-| 63_30_daily | 1218 | 42% | +5.22% | +20.8% / -6.0% | 38 |
-| Bullish_Scanner | 3607 | 41% | +3.82% | +18.7% / -6.3% | 37 |
-| Wkly_upswing | 102 | 43% | +2.18% | +13.0% / -6.0% | 35 |
-| All | 4927 | 41% | +4.13% | +19.1% / -6.2% | 37 |
+| 63_30_daily | 1425 | 47% | +6.15% | +21.8% / -7.5% | 46 |
+| Bullish_Scanner | 4177 | 46% | +5.39% | +20.2% / -7.2% | 45 |
+| Wkly_upswing | 171 | 44% | +4.79% | +20.3% / -7.7% | 46 |
+| All | 5773 | 46% | +5.56% | +20.6% / -7.3% | 45 |
 
 | | Alerts portfolio | Nifty 500 |
 |---|---|---|
-| ₹10L became | ₹31.3L | ₹18.1L |
-| Yearly growth (CAGR) | 21.8% | 10.8% |
-| Worst fall from a peak | -17.9% | -18.8% |
-| Trades taken / skipped (no free slot) | 390 / 4537 | |
+| ₹10L became | ₹18.7L | ₹18.6L |
+| Yearly growth (CAGR) | 11.4% | 11.3% |
+| Worst fall from a peak | -15.4% | -18.8% |
+| Trades taken / skipped (no free slot) | 333 / 5440 | |
 | Win rate of trades taken | 38% | |
 
 | Year | Alerts portfolio | Nifty 500 |
 |---|---|---|
-| 2021 | +32.6% | +24.9% |
-| 2022 | +2.4% | +3.0% |
-| 2023 | +32.8% | +25.8% |
-| 2024 | +26.0% | +15.2% |
-| 2025 | +22.6% | +6.7% |
-| 2026 | +12.3% | -9.0% |
+| 2021 | +18.3% | +28.3% |
+| 2022 | +1.3% | +3.0% |
+| 2023 | +14.9% | +25.8% |
+| 2024 | +23.4% | +15.2% |
+| 2025 | +6.1% | +6.7% |
+| 2026 | +3.9% | -9.0% |
 
 Open positions are counted at cost until sold. The current year is year-to-date.
 
@@ -498,43 +498,43 @@ Every rule keeps the starting stop (12%, 15% for Wkly_upswing); the riding rules
 
 | Exit | Trades | Win rate | Avg | Avg win / loss | Avg days | ₹10L became | Per year | Worst fall |
 |---|---|---|---|---|---|---|---|---|
-| +8% target, 12% stop, 8 weeks (old rule) | 4830 | 69% | +1.95% | +7.6% / -10.4% | 17 | ₹14.1L | 6.1% | -28.8% |
-| 10% trailing stop | 4830 | 43% | +3.41% | +16.7% / -6.7% | 36 | ₹19.1L | 11.9% | -29.7% |
-| 15% trailing stop | 4830 | 43% | +6.96% | +28.1% / -9.2% | 68 | ₹13.1L | 4.7% | -20.6% |
-| close below 20-day average | 4830 | 39% | +1.36% | +9.3% / -3.7% | 12 | ₹20.2L | 13.0% | -19.7% |
-| close below 50-day average (now) | 4830 | 41% | +4.23% | +19.1% / -6.2% | 36 | ₹32.8L | 22.8% | -17.6% |
-| half at +8%, rest on close below 20-day average | 4830 | 44% | +1.03% | +7.0% / -3.8% | 12 | ₹18.7L | 11.5% | -17.4% |
-| after +8%: stop at cost, sell on close below 20-day average | 4830 | 51% | +2.93% | +12.2% / -6.8% | 27 | ₹15.5L | 7.9% | -31.0% |
-| after +8%: stop at cost, sell on close below 50-day average | 4830 | 37% | +4.02% | +19.7% / -5.4% | 37 | ₹16.6L | 9.2% | -28.7% |
-| no pullback: buy at the breakout, sell on close below 50-day average | 4830 | 46% | +5.86% | +21.1% / -7.0% | 44 | ₹22.5L | 15.0% | -10.4% |
-| no pullback, every breakout (incl. stocks that never dipped) | 5744 | 46% | +5.60% | +20.6% / -7.3% | 43 | ₹19.2L | 11.9% | -13.7% |
+| wait for pullback, +8% target, 8 weeks (older) | 4857 | 69% | +1.95% | +7.6% / -10.4% | 17 | ₹15.0L | 7.2% | -28.8% |
+| 10% trailing stop | 4857 | 43% | +3.38% | +16.7% / -6.7% | 36 | ₹20.7L | 13.4% | -28.9% |
+| 15% trailing stop | 4857 | 43% | +6.96% | +28.1% / -9.2% | 68 | ₹13.0L | 4.6% | -24.5% |
+| close below 20-day average | 4857 | 39% | +1.34% | +9.3% / -3.7% | 12 | ₹19.0L | 11.7% | -19.7% |
+| wait for pullback, close below 50-day average (old) | 4857 | 41% | +4.19% | +19.1% / -6.2% | 35 | ₹30.6L | 21.3% | -16.7% |
+| half at +8%, rest on close below 20-day average | 4857 | 44% | +1.01% | +7.0% / -3.8% | 12 | ₹17.9L | 10.6% | -17.4% |
+| after +8%: stop at cost, sell on close below 20-day average | 4857 | 51% | +2.91% | +12.2% / -6.8% | 27 | ₹16.5L | 9.1% | -31.0% |
+| after +8%: stop at cost, sell on close below 50-day average | 4857 | 37% | +3.99% | +19.7% / -5.4% | 37 | ₹16.4L | 8.9% | -32.2% |
+| buy at the breakout, close below 50-day average (now) | 4857 | 46% | +5.81% | +21.1% / -7.0% | 43 | ₹24.4L | 16.6% | -9.9% |
+| no pullback, every breakout (incl. stocks that never dipped) | 5773 | 46% | +5.56% | +20.6% / -7.3% | 43 | ₹18.7L | 11.4% | -15.4% |
 
 | Exit | 63_30_daily | Bullish_Scanner | Wkly_upswing |
 |---|---|---|---|
-| +8% target, 12% stop, 8 weeks (old rule) | 71% · +2.28% | 68% · +1.83% | 72% · +2.14% |
-| 10% trailing stop | 44% · +4.04% | 43% · +3.14% | 42% · +5.07% |
-| 15% trailing stop | 43% · +7.55% | 43% · +6.77% | 42% · +6.61% |
-| close below 20-day average | 38% · +1.46% | 39% · +1.32% | 49% · +1.42% |
-| close below 50-day average (now) | 42% · +5.30% | 41% · +3.91% | 44% · +2.34% |
-| half at +8%, rest on close below 20-day average | 43% · +1.09% | 44% · +1.01% | 56% · +1.06% |
-| after +8%: stop at cost, sell on close below 20-day average | 52% · +3.28% | 51% · +2.82% | 56% · +2.53% |
-| after +8%: stop at cost, sell on close below 50-day average | 39% · +4.81% | 37% · +3.81% | 33% · +1.62% |
-| no pullback: buy at the breakout, sell on close below 50-day average | 46% · +6.37% | 46% · +5.72% | 44% · +4.68% |
-| no pullback, every breakout (incl. stocks that never dipped) | 47% · +6.17% | 46% · +5.44% | 44% · +4.79% |
+| wait for pullback, +8% target, 8 weeks (older) | 71% · +2.29% | 68% · +1.82% | 72% · +2.14% |
+| 10% trailing stop | 44% · +4.04% | 43% · +3.11% | 42% · +5.07% |
+| 15% trailing stop | 43% · +7.56% | 43% · +6.76% | 42% · +6.61% |
+| close below 20-day average | 38% · +1.46% | 39% · +1.29% | 49% · +1.42% |
+| wait for pullback, close below 50-day average (old) | 42% · +5.29% | 41% · +3.87% | 44% · +2.34% |
+| half at +8%, rest on close below 20-day average | 43% · +1.09% | 44% · +0.98% | 56% · +1.06% |
+| after +8%: stop at cost, sell on close below 20-day average | 52% · +3.29% | 50% · +2.79% | 56% · +2.53% |
+| after +8%: stop at cost, sell on close below 50-day average | 39% · +4.82% | 37% · +3.78% | 33% · +1.62% |
+| buy at the breakout, close below 50-day average (now) | 46% · +6.36% | 45% · +5.66% | 44% · +4.68% |
+| no pullback, every breakout (incl. stocks that never dipped) | 47% · +6.15% | 46% · +5.39% | 44% · +4.79% |
 
-## Buy-the-dip rule (the live alert rule)
+## Breakout rule (the live alert rule)
 
-After the breakout, buy at the next open once a close is 3% below the highest close since the breakout (5% for Wkly_upswing), within 20 sessions and no more than 5% below the trigger. Sell at the next open after a close below the 50-day average, a 12% stop (Wkly_upswing 15%), or after 250 sessions. Wkly_upswing only when daily ATR(14) is under 4% of the close. Filter: 63_30_daily only within 10% of the 52-week high. 0.25% costs.
+Buy when the price trades above the trigger (the signal candle's high) within 3 sessions (5 after a weekly signal), filled at the trigger or the open on a gap-up. Sell at the next open after a close below the 50-day average, a 12% stop (Wkly_upswing 15%), or after 250 sessions. Wkly_upswing only when daily ATR(14) is under 4% of the close. Filter: 63_30_daily only within 10% of the 52-week high. 0.25% costs.
 
 | Group | Trades | Win rate | Avg | Avg win / loss | Average / stop / time | Avg days | ₹ on ₹1L a trade |
 |---|---|---|---|---|---|---|---|
-| 63_30_daily | 1219 | 42% | +5.21% | +20.7% / -6.0% | 92% / 8% / 0% | 38 | 6,356,280 |
-| Bullish_Scanner | 3607 | 41% | +3.82% | +18.7% / -6.3% | 89% / 11% / 0% | 37 | 13,776,180 |
-| Wkly_upswing | 135 | 40% | +2.62% | +15.0% / -5.6% | 95% / 5% / 0% | 34 | 353,700 |
-| Largecap | 2257 | 43% | +3.54% | +15.8% / -5.6% | 95% / 5% / 0% | 37 | 7,999,550 |
-| Midcap | 1367 | 41% | +5.35% | +22.3% / -6.4% | 89% / 11% / 0% | 39 | 7,310,230 |
-| Smallcap | 1336 | 38% | +3.88% | +21.9% / -7.0% | 84% / 16% / 0% | 36 | 5,188,630 |
-| **All** | 4961 | 41% | +4.13% | +19.1% / -6.2% | 90% / 10% / 0% | 37 | 20,486,160 |
+| 63_30_daily | 1425 | 47% | +6.15% | +21.8% / -7.5% | 88% / 12% / 0% | 46 | 8,760,370 |
+| Bullish_Scanner | 4177 | 46% | +5.39% | +20.2% / -7.2% | 87% / 13% / 0% | 45 | 22,504,890 |
+| Wkly_upswing | 238 | 45% | +4.38% | +19.0% / -7.4% | 93% / 7% / 0% | 46 | 1,041,820 |
+| Largecap | 2782 | 47% | +4.87% | +17.5% / -6.5% | 93% / 7% / 0% | 47 | 13,541,320 |
+| Midcap | 1570 | 46% | +6.55% | +23.0% / -7.7% | 85% / 15% / 0% | 45 | 10,283,030 |
+| Smallcap | 1487 | 43% | +5.71% | +23.9% / -8.2% | 81% / 19% / 0% | 42 | 8,494,980 |
+| **All** | 5840 | 46% | +5.53% | +20.5% / -7.3% | 88% / 12% / 0% | 45 | 32,307,080 |
 
 ## Reading this
 

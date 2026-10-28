@@ -1,6 +1,6 @@
 # Scanner signal model report
 
-Generated 2026-10-28 16:56 UTC by `scripts/signal_model.py train`.
+Generated 2026-10-28 17:21 UTC by `scripts/signal_model.py train`.
 
 ## The rule being tested
 
