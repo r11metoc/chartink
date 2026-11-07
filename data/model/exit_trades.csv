@@ -39852,7 +39852,7 @@ Bullish_Scanner,ARVINDFASN,Smallcap,2024-09-04,2024-09-10,,5.04,average,2024-10-
 Bullish_Scanner,ARVINDFASN,Smallcap,2024-09-04,2024-09-10,,-0.25,stop,2024-10-04,18,lock8_ma20
 Bullish_Scanner,ARVINDFASN,Smallcap,2024-09-04,2024-09-10,,-0.25,stop,2024-10-04,18,lock8_ma50
 Bullish_Scanner,ARVINDFASN,Smallcap,2024-09-04,2024-09-05,583.0,-3.01,average,2024-10-23,34,bo_ma50
-Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-05,1803.6500244140625,1.6,average,2024-10-23,34,bo_ma50_all
+Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-05,901.8250122070312,1.6,average,2024-10-23,34,bo_ma50_all
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-24,,-12.25,stop,2024-09-27,4,target8
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-24,,-10.25,stop,2024-09-26,3,trail10
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-24,,-12.25,stop,2024-09-27,4,trail15
@@ -39861,7 +39861,7 @@ Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-24,,-12.25,stop,2024-09-27,
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-24,,-12.25,stop,2024-09-27,4,half8_ma20
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-24,,-12.25,stop,2024-09-27,4,lock8_ma20
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-24,,-12.25,stop,2024-09-27,4,lock8_ma50
-Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-05,1803.6500244140625,1.6,average,2024-10-23,34,bo_ma50
+Bullish_Scanner,CONCORDBIO,Midcap,2024-09-04,2024-09-05,901.8250122070312,1.6,average,2024-10-23,34,bo_ma50
 63_30_daily,HCG,Midcap,2024-09-05,2024-09-10,415.0,14.88,average,2024-12-27,75,bo_ma50_all
 63_30_daily,HCG,Midcap,2024-09-05,2024-10-04,,7.75,target,2024-11-05,23,target8
 63_30_daily,HCG,Midcap,2024-09-05,2024-10-04,,13.81,stop,2024-12-23,55,trail10
@@ -39882,7 +39882,7 @@ Bullish_Scanner,CENTURYPLY,Midcap,2024-09-05,2024-09-25,,-6.19,average,2024-10-0
 Bullish_Scanner,CENTURYPLY,Midcap,2024-09-05,2024-09-25,,-12.25,stop,2024-11-13,35,lock8_ma20
 Bullish_Scanner,CENTURYPLY,Midcap,2024-09-05,2024-09-25,,-12.25,stop,2024-11-13,35,lock8_ma50
 Bullish_Scanner,CENTURYPLY,Midcap,2024-09-05,2024-09-06,826.4000244140625,1.31,average,2024-10-29,37,bo_ma50
-Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-06,1900.0,-3.57,average,2024-10-23,33,bo_ma50_all
+Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-06,950.0,-3.57,average,2024-10-23,33,bo_ma50_all
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-24,,-12.25,stop,2024-09-27,4,target8
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-24,,-10.25,stop,2024-09-26,3,trail10
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-24,,-12.25,stop,2024-09-27,4,trail15
@@ -39891,7 +39891,7 @@ Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-24,,-12.25,stop,2024-09-27,
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-24,,-12.25,stop,2024-09-27,4,half8_ma20
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-24,,-12.25,stop,2024-09-27,4,lock8_ma20
 Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-24,,-12.25,stop,2024-09-27,4,lock8_ma50
-Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-06,1900.0,-3.57,average,2024-10-23,33,bo_ma50
+Bullish_Scanner,CONCORDBIO,Midcap,2024-09-05,2024-09-06,950.0,-3.57,average,2024-10-23,33,bo_ma50
 Bullish_Scanner,NESCO,Midcap,2024-09-06,2024-09-11,1023.9000244140625,-9.91,average,2024-10-04,17,bo_ma50_all
 Bullish_Scanner,PIDILITIND,Largecap,2024-09-06,2024-09-09,1629.5,-3.37,average,2024-10-08,21,bo_ma50_all
 Bullish_Scanner,PIDILITIND,Largecap,2024-09-06,2024-09-19,,-6.63,time,2024-11-18,41,target8
@@ -47717,6 +47717,7 @@ Bullish_Scanner,CGPOWER,Largecap,2026-04-20,2026-04-21,804.6500244140625,12.1,av
 Bullish_Scanner,GRANULES,Largecap,2026-04-20,2026-04-22,685.0,20.66,average,2026-08-27,89,bo_ma50_all
 Bullish_Scanner,GRANULES,Largecap,2026-04-20,2026-05-13,,7.75,target,2026-05-27,11,target8
 Bullish_Scanner,GRANULES,Largecap,2026-04-20,2026-05-13,,12.0,stop,2026-10-01,99,trail10
+Bullish_Scanner,GRANULES,Largecap,2026-04-20,2026-05-13,,5.77,stop,2026-11-04,121,trail15
 Bullish_Scanner,GRANULES,Largecap,2026-04-20,2026-05-13,,3.52,average,2026-06-11,21,ma20
 Bullish_Scanner,GRANULES,Largecap,2026-04-20,2026-05-13,,13.35,average,2026-08-27,75,ma50
 Bullish_Scanner,GRANULES,Largecap,2026-04-20,2026-05-13,,5.63,average,2026-06-11,21,half8_ma20
@@ -47836,6 +47837,7 @@ Bullish_Scanner,AUROPHARMA,Largecap,2026-04-22,2026-04-23,1425.0999755859375,-1.
 Bullish_Scanner,GRANULES,Largecap,2026-04-22,2026-04-23,689.9000244140625,19.8,average,2026-08-27,88,bo_ma50_all
 Bullish_Scanner,GRANULES,Largecap,2026-04-22,2026-05-13,,7.75,target,2026-05-27,11,target8
 Bullish_Scanner,GRANULES,Largecap,2026-04-22,2026-05-13,,12.0,stop,2026-10-01,99,trail10
+Bullish_Scanner,GRANULES,Largecap,2026-04-22,2026-05-13,,5.77,stop,2026-11-04,121,trail15
 Bullish_Scanner,GRANULES,Largecap,2026-04-22,2026-05-13,,3.52,average,2026-06-11,21,ma20
 Bullish_Scanner,GRANULES,Largecap,2026-04-22,2026-05-13,,13.35,average,2026-08-27,75,ma50
 Bullish_Scanner,GRANULES,Largecap,2026-04-22,2026-05-13,,5.63,average,2026-06-11,21,half8_ma20
@@ -47865,6 +47867,7 @@ Bullish_Scanner,NLCINDIA,Largecap,2026-04-22,2026-04-27,307.6499938964844,-0.14,
 Bullish_Scanner,GRANULES,Largecap,2026-04-23,2026-04-27,696.4000244140625,18.68,average,2026-08-27,86,bo_ma50_all
 Bullish_Scanner,GRANULES,Largecap,2026-04-23,2026-05-13,,7.75,target,2026-05-27,11,target8
 Bullish_Scanner,GRANULES,Largecap,2026-04-23,2026-05-13,,12.0,stop,2026-10-01,99,trail10
+Bullish_Scanner,GRANULES,Largecap,2026-04-23,2026-05-13,,5.77,stop,2026-11-04,121,trail15
 Bullish_Scanner,GRANULES,Largecap,2026-04-23,2026-05-13,,3.52,average,2026-06-11,21,ma20
 Bullish_Scanner,GRANULES,Largecap,2026-04-23,2026-05-13,,13.35,average,2026-08-27,75,ma50
 Bullish_Scanner,GRANULES,Largecap,2026-04-23,2026-05-13,,5.63,average,2026-06-11,21,half8_ma20
@@ -47904,6 +47907,7 @@ Bullish_Scanner,STAR,Midcap,2026-04-23,2026-04-24,1080.9000244140625,-4.5,averag
 Bullish_Scanner,GRANULES,Largecap,2026-04-24,2026-04-27,694.4500122070312,19.01,average,2026-08-27,86,bo_ma50_all
 Bullish_Scanner,GRANULES,Largecap,2026-04-24,2026-05-13,,7.75,target,2026-05-27,11,target8
 Bullish_Scanner,GRANULES,Largecap,2026-04-24,2026-05-13,,12.0,stop,2026-10-01,99,trail10
+Bullish_Scanner,GRANULES,Largecap,2026-04-24,2026-05-13,,5.77,stop,2026-11-04,121,trail15
 Bullish_Scanner,GRANULES,Largecap,2026-04-24,2026-05-13,,3.52,average,2026-06-11,21,ma20
 Bullish_Scanner,GRANULES,Largecap,2026-04-24,2026-05-13,,13.35,average,2026-08-27,75,ma50
 Bullish_Scanner,GRANULES,Largecap,2026-04-24,2026-05-13,,5.63,average,2026-06-11,21,half8_ma20
@@ -47933,6 +47937,7 @@ Bullish_Scanner,NESTLEIND,Largecap,2026-04-24,2026-04-27,1430.9000244140625,-1.7
 Bullish_Scanner,GRANULES,Largecap,2026-04-27,2026-04-29,710.0,16.4,average,2026-08-27,84,bo_ma50_all
 Bullish_Scanner,GRANULES,Largecap,2026-04-27,2026-05-13,,7.75,target,2026-05-27,11,target8
 Bullish_Scanner,GRANULES,Largecap,2026-04-27,2026-05-13,,12.0,stop,2026-10-01,99,trail10
+Bullish_Scanner,GRANULES,Largecap,2026-04-27,2026-05-13,,5.77,stop,2026-11-04,121,trail15
 Bullish_Scanner,GRANULES,Largecap,2026-04-27,2026-05-13,,3.52,average,2026-06-11,21,ma20
 Bullish_Scanner,GRANULES,Largecap,2026-04-27,2026-05-13,,13.35,average,2026-08-27,75,ma50
 Bullish_Scanner,GRANULES,Largecap,2026-04-27,2026-05-13,,5.63,average,2026-06-11,21,half8_ma20
@@ -47973,6 +47978,7 @@ Wkly_upswing,ADANIPORTS,Largecap,2026-04-27,2026-05-04,1702.0,3.45,average,2026-
 Bullish_Scanner,GRANULES,Largecap,2026-04-28,2026-04-29,710.0,16.4,average,2026-08-27,84,bo_ma50_all
 Bullish_Scanner,GRANULES,Largecap,2026-04-28,2026-05-13,,7.75,target,2026-05-27,11,target8
 Bullish_Scanner,GRANULES,Largecap,2026-04-28,2026-05-13,,12.0,stop,2026-10-01,99,trail10
+Bullish_Scanner,GRANULES,Largecap,2026-04-28,2026-05-13,,5.77,stop,2026-11-04,121,trail15
 Bullish_Scanner,GRANULES,Largecap,2026-04-28,2026-05-13,,3.52,average,2026-06-11,21,ma20
 Bullish_Scanner,GRANULES,Largecap,2026-04-28,2026-05-13,,13.35,average,2026-08-27,75,ma50
 Bullish_Scanner,GRANULES,Largecap,2026-04-28,2026-05-13,,5.63,average,2026-06-11,21,half8_ma20
@@ -48032,6 +48038,7 @@ Bullish_Scanner,ADANIPORTS,Largecap,2026-05-04,2026-05-05,1749.800048828125,0.61
 Bullish_Scanner,GRANULES,Largecap,2026-05-04,2026-05-06,716.0,15.42,average,2026-08-27,80,bo_ma50_all
 Bullish_Scanner,GRANULES,Largecap,2026-05-04,2026-05-13,,7.75,target,2026-05-27,11,target8
 Bullish_Scanner,GRANULES,Largecap,2026-05-04,2026-05-13,,12.0,stop,2026-10-01,99,trail10
+Bullish_Scanner,GRANULES,Largecap,2026-05-04,2026-05-13,,5.77,stop,2026-11-04,121,trail15
 Bullish_Scanner,GRANULES,Largecap,2026-05-04,2026-05-13,,3.52,average,2026-06-11,21,ma20
 Bullish_Scanner,GRANULES,Largecap,2026-05-04,2026-05-13,,13.35,average,2026-08-27,75,ma50
 Bullish_Scanner,GRANULES,Largecap,2026-05-04,2026-05-13,,5.63,average,2026-06-11,21,half8_ma20
@@ -50335,6 +50342,7 @@ Bullish_Scanner,BHEL,Largecap,2026-10-06,2026-10-12,,-1.44,average,2026-10-21,7,
 Bullish_Scanner,BHEL,Largecap,2026-10-06,2026-10-12,,-12.25,stop,2026-10-23,9,lock8_ma20
 Bullish_Scanner,BHEL,Largecap,2026-10-06,2026-10-12,,-12.25,stop,2026-10-23,9,lock8_ma50
 Bullish_Scanner,BHEL,Largecap,2026-10-06,2026-10-07,453.8999938964844,-9.97,average,2026-10-22,11,bo_ma50
+Bullish_Scanner,KOTAKBANK,Largecap,2026-10-07,2026-10-26,,7.75,target,2026-11-06,10,target8
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-13,600.0,-12.25,stop,2026-10-23,8,bo_ma50_all
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-16,,-12.25,stop,2026-10-29,9,target8
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-16,,-8.78,stop,2026-10-23,5,trail10
@@ -50346,6 +50354,8 @@ Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-16,,-12.25,stop,2026-10-29,9,
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-16,,-12.25,stop,2026-10-29,9,lock8_ma50
 Bullish_Scanner,GOODLUCK,Midcap,2026-10-12,2026-10-13,600.0,-12.25,stop,2026-10-23,8,bo_ma50
 Wkly_upswing,SINGERIND,Smallcap,2026-10-12,2026-10-27,,7.75,target,2026-10-29,3,target8
+Wkly_upswing,SINGERIND,Smallcap,2026-10-12,2026-10-27,,-0.25,stop,2026-11-03,6,lock8_ma20
+Wkly_upswing,SINGERIND,Smallcap,2026-10-12,2026-10-27,,-0.25,stop,2026-11-03,6,lock8_ma50
 63_30_daily,TIPSMUSIC,Midcap,2026-10-14,2026-10-22,,7.75,target,2026-10-28,5,target8
 Bullish_Scanner,SHYAMMETL,Largecap,2026-10-15,2026-10-26,,7.75,target,2026-10-30,5,target8
 Bullish_Scanner,SOUTHBANK,Midcap,2026-10-15,2026-10-26,,7.75,target,2026-10-29,4,target8
