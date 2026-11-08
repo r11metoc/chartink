@@ -122,7 +122,9 @@ jobs:
             echo "No database changes to commit."
           else
             git commit -m "Update scan data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            git push
+            # Files uploaded from the app may have landed meanwhile.
+            git pull --rebase -q origin "${{ github.ref_name }}"
+            git push origin "HEAD:${{ github.ref_name }}"
           fi
 
       - uses: actions/upload-pages-artifact@v3

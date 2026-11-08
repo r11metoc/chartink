@@ -102,6 +102,13 @@
   details.card summary::after { content: "▾"; color: var(--muted); }
   details[open].card summary::after { content: "▴"; }
   .sub2 { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 0; }
+  .up-card { padding: 4px 14px 14px; }
+  .up-card label { display: block; font-size: 12.5px; color: var(--muted); margin: 10px 0 4px; }
+  .up-card input[type=password], .up-card select, .up-card input[type=file] { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+  .up-card .go { margin-top: 10px; font: inherit; font-weight: 650; padding: 9px 14px; border-radius: 10px; border: 0; background: #0f766e; color: #fff; cursor: pointer; }
+  .up-card .go.ghost { background: var(--chip); color: var(--text); }
+  .up-msg { font-size: 13px; margin-top: 8px; white-space: pre-line; }
+  .up-msg.bad { color: #dc2626; } .up-msg.ok { color: #059669; }
 </style>
 </head>
 <body>
@@ -366,11 +373,144 @@ function renderHighs(d) {
   }).join("");
 }
 
+// ---------------------------------------------------------------- upload (straight to GitHub)
+const GH = { owner: "r11metoc", repo: "chartink", branch: "claude/scanner-github-breakout-tracking-p7spin" };
+const SCANNERS = ["63_30_daily", "Bullish_Scanner", "Wkly_upswing"];
+let memToken = "";
+const getToken = () => { try { return localStorage.getItem("gh_token") || memToken; } catch { return memToken; } };
+const saveToken = (v) => { memToken = v; try { v ? localStorage.setItem("gh_token", v) : localStorage.removeItem("gh_token"); } catch { /* kept for this visit only */ } };
+
+async function gh(path, opts = {}) {
+  const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}${path}`, { ...opts, headers: {
+    Authorization: `Bearer ${getToken()}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+    ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
+  if (!r.ok && r.status !== 404) {
+    const m = (await r.json().catch(() => ({}))).message || "";
+    throw new Error(r.status === 401 ? "GitHub didn't accept the token (expired or mistyped?)."
+      : r.status === 403 || r.status === 404 ? `The token lacks permission (${m}). It needs Contents and Actions: Read and write.` : `GitHub ${r.status}: ${m}`);
+  }
+  return r;
+}
+
+const b64bytes = (buf) => { const u = new Uint8Array(buf); let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const b64text = (t) => b64bytes(new TextEncoder().encode(t).buffer);
+
+async function putFile(path, b64, message) {
+  const g = await gh(`/contents/${path}?ref=${encodeURIComponent(GH.branch)}`);
+  const sha = g.status === 404 ? undefined : (await g.json()).sha;
+  const r = await gh(`/contents/${path}`, { method: "PUT", body: JSON.stringify({ message, content: b64, branch: GH.branch, sha }) });
+  if (!r.ok) throw new Error(`Couldn't save ${path} (GitHub ${r.status}).`);
+}
+
+async function runWorkflow(file, inputs) {
+  const r = await gh(`/actions/workflows/${file}/dispatches`, { method: "POST", body: JSON.stringify({ ref: GH.branch, inputs }) });
+  if (r.status !== 204) throw new Error(`Couldn't start ${file} (GitHub ${r.status}).`);
+}
+
+function checkBacktest(text) {
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
+  const head = (lines[0] || "").split(",").map((h) => h.replace(/"/g, "").trim());
+  if (!head.includes("Date") || !head.includes("Symbol")) return "This isn't a Chartink backtest export: the first row needs Date and Symbol columns.";
+  const di = head.indexOf("Date");
+  const bad = lines.slice(1).find((l) => !/^\d{2}-\d{2}-\d{4}$/.test((l.split(",")[di] || "").replace(/"/g, "").trim()));
+  if (lines.length < 2) return "The file has no rows.";
+  if (bad) return `A date isn't in Chartink's DD-MM-YYYY form: ${bad.slice(0, 60)}`;
+  return null;
+}
+
+async function loadXlsx() {
+  if (window.XLSX) return window.XLSX;
+  await new Promise((ok, no) => { const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = ok; sc.onerror = () => no(new Error("Couldn't load the Excel reader.")); document.head.appendChild(sc); });
+  return window.XLSX;
+}
+
+async function screenerCsv(file) {
+  let rows;
+  if (/\.xlsx?$/i.test(file.name)) {
+    const X = await loadXlsx();
+    const wb = X.read(await file.arrayBuffer(), { type: "array" });
+    rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" });
+  } else {
+    rows = (await file.text()).replace(/^﻿/, "").split(/\r?\n/).map((l) => l.split(","));
+  }
+  const at = rows.findIndex((r) => r.some((c) => /^(NSE|BSE) Code$/.test(String(c).replace(/"/g, "").trim())));
+  if (at < 0) throw new Error("No 'NSE Code' or 'BSE Code' column found. Export the screen from Screener with those columns.");
+  if (!/\.xlsx?$/i.test(file.name)) return { csv: rows.slice(at).map((r) => r.join(",")).join("\n"), n: rows.length - at - 1 };
+  const q = (c) => { const v = String(c ?? ""); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+  const body = rows.slice(at).filter((r) => r.some((c) => String(c).trim()));
+  return { csv: body.map((r) => r.map(q).join(",")).join("\n"), n: body.length - 1 };
+}
+
+function upMsg(id, text, kind) { const el = document.getElementById(id); if (el) { el.textContent = text; el.className = "up-msg " + (kind || ""); } }
+
+function renderUpload() {
+  const has = !!getToken();
+  const token = has
+    ? `<div class="up-msg ok">GitHub token saved on this device.</div><button class="go ghost" data-up="forget">Forget token</button>`
+    : `<label for="up-token">GitHub token (one-time setup)</label><input id="up-token" type="password" autocomplete="off" placeholder="github_pat_…">
+       <button class="go" data-up="save">Save token</button>
+       <div class="note" style="padding:8px 0 0">Create one at <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → Fine-grained tokens</a>:
+       repository access <b>only r11metoc/chartink</b>; permissions <b>Contents</b> and <b>Actions</b>: Read and write. It's kept only in this browser and sent only to GitHub.</div>`;
+  const opts = SCANNERS.map((n) => `<option value="${n}">${esc(SHORT[n] || n)} (${n})</option>`).join("");
+  return `<section class="card up-card"><h2 style="padding-left:0">Access</h2>${token}</section>
+    <section class="card up-card"><h2 style="padding-left:0">Chartink backtest export</h2>
+      <div class="note" style="padding:0">Replaces that scanner's export and retrains (about 30–60 min). The website updates after the next scan.</div>
+      <label for="up-bt-scan">Scanner</label><select id="up-bt-scan">${opts}</select>
+      <label for="up-bt-file">CSV file from Chartink's backtest</label><input id="up-bt-file" type="file" accept=".csv,text/csv">
+      <button class="go" data-up="backtest" ${has ? "" : "disabled"}>Upload and retrain</button><div id="up-bt-msg" class="up-msg"></div></section>
+    <section class="card up-card"><h2 style="padding-left:0">Screener export (fundamentals)</h2>
+      <div class="note" style="padding:0">Excel or CSV export of a Screener screen. Used ahead of Yahoo for the stocks it covers (it has pledge). Re-upload monthly.</div>
+      <label for="up-sc-file">File</label><input id="up-sc-file" type="file" accept=".xlsx,.xls,.csv">
+      <button class="go" data-up="screener" ${has ? "" : "disabled"}>Upload</button><div id="up-sc-msg" class="up-msg"></div></section>`;
+}
+
+document.addEventListener("change", (e) => {
+  if (e.target.id !== "up-bt-file" || !e.target.files[0]) return;
+  const n = e.target.files[0].name, hit = SCANNERS.find((s) => n.includes(s));
+  if (hit) document.getElementById("up-bt-scan").value = hit;
+});
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-up]");
+  if (!b) return;
+  const act = b.dataset.up;
+  if (act === "save") { const v = document.getElementById("up-token").value.trim(); if (v) { saveToken(v); render(); } return; }
+  if (act === "forget") { saveToken(""); render(); return; }
+  const msg = act === "backtest" ? "up-bt-msg" : "up-sc-msg";
+  const file = document.getElementById(act === "backtest" ? "up-bt-file" : "up-sc-file").files[0];
+  if (!file) return upMsg(msg, "Choose a file first.", "bad");
+  b.disabled = true;
+  try {
+    if (act === "backtest") {
+      const scan = document.getElementById("up-bt-scan").value;
+      const bad = checkBacktest(await file.text());
+      if (bad) throw new Error(bad);
+      upMsg(msg, "Uploading…");
+      await putFile(`data/backtest/${scan}.csv`, b64bytes(await file.arrayBuffer()), `New backtest export for ${scan} (uploaded from the app)`);
+      upMsg(msg, "Uploaded. Starting the retrain…");
+      await runWorkflow("signal_model.yml", { mode: "train" });
+      await runWorkflow("scan.yml", {});
+      upMsg(msg, `Done: ${scan} replaced. Retrain started (30–60 min); a scan is also running to refresh the site.`, "ok");
+    } else {
+      upMsg(msg, "Reading the file…");
+      const { csv, n } = await screenerCsv(file);
+      if (n < 1) throw new Error("The export has no rows.");
+      await putFile("data/fundamentals/latest.csv", b64text(csv), `Screener export, ${n} stocks (uploaded from the app)`);
+      await putFile("data/fundamentals/uploaded.txt", b64text(new Date().toISOString().slice(0, 10) + "\n"), "Screener export date");
+      await runWorkflow("scan.yml", {});
+      upMsg(msg, `Done: ${n} stocks saved. A scan is running; the fundamental tags update in a few minutes.`, "ok");
+    }
+  } catch (err) {
+    upMsg(msg, err.message || String(err), "bad");
+  } finally { b.disabled = false; }
+});
+
 function renderMore(d) {
-  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", highs: "Hitting highs", breakouts: "Breakouts", sectors: "Sectors" };
+  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", highs: "Hitting highs", breakouts: "Breakouts", sectors: "Sectors", upload: "Upload" };
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
   const body = { rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
-                 now: renderNow, highs: renderHighs, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
+                 now: renderNow, highs: renderHighs, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
   return chips + body;
 }
 

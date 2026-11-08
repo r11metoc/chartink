@@ -41,7 +41,9 @@ def export_rows(path: Path = FILE) -> dict:
                     code = (r.get("NSE Code") or r.get("BSE Code") or "").strip().upper()
                     if code:
                         out[code] = r
-            out["_asof"] = datetime.fromtimestamp(path.stat().st_mtime).date().isoformat()
+            stamp = path.with_name("uploaded.txt")  # written by the app's upload
+            out["_asof"] = (stamp.read_text().strip()[:10] if stamp.exists() and path == FILE
+                            else datetime.fromtimestamp(path.stat().st_mtime).date().isoformat())
         except Exception as e:  # a bad export must never stop the scan
             print(f"Fundamentals file unreadable ({e}); using Yahoo only")
             out = {}
