@@ -10,7 +10,6 @@ import db
 from notify import (
     _col,
     _num,
-    format_breakout_message,
     format_digest_message,
     format_scan_message,
     format_sector_focus_message,
@@ -22,6 +21,32 @@ from scrape_dashboard import scrape_dashboard
 from slot_gate import IST, current_slot
 
 DEFAULT_URL = "https://chartink.com/dashboard/45863"
+
+
+def digest_messages(digest_conn, digest_days: int, scanner_names: list[str]) -> list[str]:
+    """Sector focus and recent-breakouts digest (sent on request via /breakouts)."""
+    since = (datetime.now(timezone.utc) - timedelta(days=digest_days)).isoformat()
+    entries = db.breakouts_since(digest_conn, since)
+    on_scan = {n: db.symbols_in_latest_run(digest_conn, n) for n in scanner_names}
+    for entry in entries:
+        entry["_current_row"] = db.latest_row(digest_conn, entry["scanner_name"], entry["symbol"])
+        entry["_on_scan"] = entry["symbol"] in on_scan.get(entry["scanner_name"], set())
+        if not entry["_on_scan"]:
+            # Off the scanner, the last scan price is stale; use the latest daily close.
+            bars = db.daily_prices_since(digest_conn, entry["symbol"], entry["detected_at"][:10])
+            if bars:
+                entry["_current_row"] = {"Price": f"{bars[-1][4]:.2f}"}
+    today = datetime.now(timezone.utc).date()
+    weekly_since = (today - timedelta(days=7)).isoformat()
+    monthly_since = (today - timedelta(days=30)).isoformat()
+    sector_focus = {}
+    for scanner_name in db.distinct_backtest_scanners(digest_conn):
+        sector_focus[scanner_name] = {
+            "weekly": db.sector_counts_since(digest_conn, scanner_name, weekly_since),
+            "monthly": db.sector_counts_since(digest_conn, scanner_name, monthly_since),
+        }
+    momentum = sector_momentum_view(digest_conn, datetime.now(IST).date())
+    return [format_sector_focus_message(sector_focus), format_digest_message(entries, digest_days, momentum)]
 
 
 def main() -> int:
@@ -89,10 +114,10 @@ def main() -> int:
     conn.commit()
     conn.close()
 
-    if new_breakouts:
-        send_telegram_message(format_breakout_message(new_breakouts))
-    else:
-        print("No new breakouts this run.")
+    # Telegram gets only today's actions (the alerts below). New scanner entries,
+    # the snapshot and the digest are sent on request (/scanners, /breakouts)
+    # or by a manual run with snap/digest ticked.
+    print(f"{len(new_breakouts)} new scanner entries this run.")
 
     # Buy-the-dip alerts: new buy zones and closed trades since the last run.
     dip_states, alert = [], None
@@ -116,33 +141,11 @@ def main() -> int:
         send_telegram_message(format_scan_message(scans, trigger_lookup))
 
     if send_digest:
-        since = (datetime.now(timezone.utc) - timedelta(days=digest_days)).isoformat()
         digest_conn = db.connect()
-        entries = db.breakouts_since(digest_conn, since)
-        on_scan = {s.scanner_name: db.symbols_in_latest_run(digest_conn, s.scanner_name) for s in scans}
-        for entry in entries:
-            entry["_current_row"] = db.latest_row(digest_conn, entry["scanner_name"], entry["symbol"])
-            entry["_on_scan"] = entry["symbol"] in on_scan.get(entry["scanner_name"], set())
-            if not entry["_on_scan"]:
-                # Off the scanner, the last scan price is stale; use the latest daily close.
-                bars = db.daily_prices_since(digest_conn, entry["symbol"], entry["detected_at"][:10])
-                if bars:
-                    entry["_current_row"] = {"Price": f"{bars[-1][4]:.2f}"}
-
-        today = datetime.now(timezone.utc).date()
-        weekly_since = (today - timedelta(days=7)).isoformat()
-        monthly_since = (today - timedelta(days=30)).isoformat()
-        sector_focus = {}
-        for scanner_name in db.distinct_backtest_scanners(digest_conn):
-            sector_focus[scanner_name] = {
-                "weekly": db.sector_counts_since(digest_conn, scanner_name, weekly_since),
-                "monthly": db.sector_counts_since(digest_conn, scanner_name, monthly_since),
-            }
-
-        momentum = sector_momentum_view(digest_conn, datetime.now(IST).date())
+        msgs = digest_messages(digest_conn, digest_days, [sc.scanner_name for sc in scans])
         digest_conn.close()
-        send_telegram_message(format_sector_focus_message(sector_focus))
-        send_telegram_message(format_digest_message(entries, digest_days, momentum))
+        for m in msgs:
+            send_telegram_message(m)
         send_telegram_message(dipzone.format_summary(dipzone.summary(dip_states)))
 
     return 0

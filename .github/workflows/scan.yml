@@ -13,11 +13,11 @@ on:
         type: boolean
         default: false
       snap:
-        description: "Send current scan results + buy/hold list to Telegram (always on for scheduled runs; this only matters for manual runs)"
+        description: "Also send the current scan results to Telegram (scheduled runs send only today's actions)"
         type: boolean
         default: false
       digest:
-        description: "Send a digest of recent breakouts to Telegram (always on for scheduled runs; this only matters for manual runs)"
+        description: "Also send the recent-breakouts digest to Telegram"
         type: boolean
         default: false
       days:
@@ -47,6 +47,44 @@ jobs:
         if: github.event_name == 'schedule'
         working-directory: scripts
         run: python3 slot_gate.py
+
+  # Telegram commands (/today, /holdings, /scanners, /breakouts, /fundamentals).
+  # Checked on every 15-minute tick; Python only starts when a message is waiting.
+  commands:
+    if: github.event_name == 'schedule'
+    concurrency:
+      group: telegram-commands
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - id: check
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          n=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=0" \
+              | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('result') or []))" || echo 0)
+          echo "waiting=$n" >> "$GITHUB_OUTPUT"
+
+      - if: steps.check.outputs.waiting != '0'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - if: steps.check.outputs.waiting != '0'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - if: steps.check.outputs.waiting != '0'
+        run: pip install -r requirements.txt "pandas>=2.0,<3"
+
+      - if: steps.check.outputs.waiting != '0'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        working-directory: scripts
+        run: python telegram_commands.py
 
   scan:
     needs: gate
@@ -92,8 +130,8 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CHARTINK_DEBUG_DUMP: ${{ inputs.debug && '1' || '0' }}
-          CHARTINK_SEND_SNAPSHOT: ${{ (github.event_name == 'schedule' || inputs.snap) && '1' || '0' }}
-          CHARTINK_SEND_DIGEST: ${{ (github.event_name == 'schedule' || inputs.digest) && '1' || '0' }}
+          CHARTINK_SEND_SNAPSHOT: ${{ inputs.snap && '1' || '0' }}
+          CHARTINK_SEND_DIGEST: ${{ inputs.digest && '1' || '0' }}
           CHARTINK_DIGEST_DAYS: ${{ inputs.days || '30' }}
           CHARTINK_SLOT: ${{ needs.gate.outputs.slot }}
         working-directory: scripts

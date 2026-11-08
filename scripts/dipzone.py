@@ -365,7 +365,7 @@ def _tags(s: dict) -> str:
 def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
     if not fresh:
         return None
-    lines = ["🎯 <b>Breakout alerts</b>"]
+    lines = ["📋 <b>Today's actions</b>"]
     setups = sorted((s for _, s, k in fresh if k == "setup"), key=lambda s: s.get("priority", 3))
     if setups:
         lines += ["", "<b>SET A BUY-STOP</b> (buy only if the price trades above the trigger; "
@@ -405,10 +405,7 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
         for s, k in exits:
             lines.append(f"{icon[k]} <b>{s['symbol']}</b> ({s['scanner']}) {label[k]} {_d(s['exit_date'])}: "
                          f"{s['entry']:.2f} → {s['exit']:.2f} ({s['ret']:+.1f}%)")
-    lines += ["", f"<i>Rule: buy when the price trades above the trigger (the signal candle's high) within "
-                  f"{bs.entry_window_for('63_30_daily')} sessions ({bs.entry_window_for('Wkly_upswing')} weekly); "
-                  f"-{STOP_PCT:g}% stop (-{STOP_BY_SCANNER.get('Wkly_upswing', STOP_PCT):g}% weekly), sell on a close below "
-                  f"the {EXIT_MA}-day average or after a year. Backtest, not advice.</i>"]
+    lines += ["", "<i>Paper trades from your scanners, not advice. Send /help for holdings, scanners and more.</i>"]
     return "\n".join(lines)
 
 
