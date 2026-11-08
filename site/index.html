@@ -110,22 +110,49 @@
   .up-msg { font-size: 13px; margin-top: 8px; white-space: pre-line; }
   .up-msg.bad { color: #dc2626; } .up-msg.ok { color: #059669; }
   details.fs summary::-webkit-details-marker { display: none; }
+  /* ---- phone app */
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+  .refresh { border: 0; background: var(--chip); color: var(--text); border-radius: 999px; width: 38px; height: 38px; font-size: 18px; cursor: pointer; flex: none; }
+  .refresh.spin { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #ptr { height: 0; overflow: hidden; text-align: center; color: var(--muted); font-size: 13px; transition: height .15s; }
+  .offline { margin: 8px 16px 0; padding: 8px 12px; border-radius: 10px; background: var(--hold-bg); color: var(--hold); font-size: 13px; }
+  nav button svg { width: 20px; height: 20px; display: block; margin: 0 auto 2px; }
+  .filters button, .sub2 button { min-height: 38px; }
+  .tag { white-space: nowrap; display: inline-block; }
+  details.about summary { cursor: pointer; color: var(--accent); font-size: 13px; padding: 0 14px 10px; list-style: none; }
+  details.about summary::-webkit-details-marker { display: none; }
+  @media (max-width: 700px) {
+    nav { position: fixed; top: auto; bottom: 0; left: 0; right: 0; padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+          background: var(--card); border-top: 1px solid var(--line); }
+    nav button { padding: 6px 0; background: transparent; font-size: 12px; }
+    nav button.on { background: transparent; color: var(--accent); }
+    main { padding-bottom: 90px; }
+    footer { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+    .sub2 { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: -16px; margin-right: -16px; padding: 0 16px; }
+    .sub2::-webkit-scrollbar { display: none; }
+    .sub2 button { flex: none; white-space: nowrap; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Scanner Tracker</h1>
-  <div class="sub" id="updated">Loading…</div>
+  <div><h1>Scanner Tracker</h1>
+  <div class="sub" id="updated">Loading…</div></div>
+  <button class="refresh" id="refresh" aria-label="Refresh">↻</button>
 </header>
+<div id="ptr">Release to refresh</div>
+<div id="offline"></div>
 <nav>
-  <button data-tab="today" class="on">Today</button>
-  <button data-tab="more">More</button>
+  <button data-tab="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l5-6 4 4 7-9"/></svg>Today</button>
+  <button data-tab="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>More</button>
 </nav>
 <main id="view"></main>
 <footer>Paper trades from your Chartink scanners. Not advice.</footer>
 
 <script>
 const state = { tab: "today", more: "rule", fv: "Shortlist", scanner: "All", status: "All", data: null };
+try { Object.assign(state, JSON.parse(localStorage.getItem("view") || "{}")); } catch { /* defaults */ }
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -523,14 +550,15 @@ function renderFundScan(d) {
       ${why ? `<div class="meta" style="padding-top:6px">${why}</div>` : ""}</details>`;
   }).join("");
   return chips + `<section class="card"><h2>Fundamental scan <small>${all.length} stocks</small></h2>
-    <div class="note">Every stock in your latest Screener export, scored with your Valuepick logic: Shortlist ≥ 65 with no red flags, Check flags = ≥ 65 but with red flags, Maybe ≥ 50.
+    <details class="about"><summary>How it's scored ▾</summary><div class="note">Every stock in your latest Screener export, scored with your Valuepick logic: Shortlist ≥ 65 with no red flags, Check flags = ≥ 65 but with red flags, Maybe ≥ 50.
     The screen tag is your main screen; ? means the export lacks some of its columns (add P/E, Debt to equity, Pledged percentage and YOY Quarterly profit growth to your Screener screen to check them all).
-    Separate from the Chartink scan. Tap a stock for flags and failed checks.${f.asof ? " Latest export " + fmtDate(f.asof) + "." : ""}</div>
+    Separate from the Chartink scan. Tap a stock for flags and failed checks.${f.asof ? " Latest export " + fmtDate(f.asof) + "." : ""}</div></details>
     ${rows || `<div class="empty">None in this group.</div>`}</section>`;
 }
 
 function renderMore(d) {
   const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", fund: "Fundamentals", breakouts: "Breakouts", sectors: "Sectors", upload: "Upload" };
+  if (!tabs[state.more]) state.more = "rule";
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
   const body = { rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
                  now: renderNow, fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
@@ -540,13 +568,16 @@ function renderMore(d) {
 function render() {
   const d = state.data;
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
+  if (!d) return;
+  if (!{ today: 1, more: 1 }[state.tab]) state.tab = "today";
   $("#view").innerHTML = { today: renderToday, more: renderMore }[state.tab](d);
+  try { localStorage.setItem("view", JSON.stringify({ tab: state.tab, more: state.more, fv: state.fv })); } catch { /* fine */ }
 }
 
 document.addEventListener("click", (e) => {
   const t = e.target.closest("button");
   if (!t) return;
-  if (t.dataset.tab) state.tab = t.dataset.tab;
+  if (t.dataset.tab) { state.tab = t.dataset.tab; window.scrollTo(0, 0); }
   else if (t.dataset.scanner) state.scanner = t.dataset.scanner;
   else if (t.dataset.status) state.status = t.dataset.status;
   else if (t.dataset.more) state.more = t.dataset.more;
@@ -555,14 +586,43 @@ document.addEventListener("click", (e) => {
   render();
 });
 
-fetch("data.json", { cache: "no-store" })
-  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then((d) => {
+let loadedAt = 0;
+async function load() {
+  const btn = $("#refresh");
+  btn.classList.add("spin");
+  try {
+    const r = await fetch("data.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const cached = r.headers.get("X-From-Cache") === "1";
+    $("#offline").innerHTML = cached ? `<div class="offline">Offline: showing the data saved on this phone.</div>` : "";
     state.data = d;
+    loadedAt = Date.now();
     $("#updated").textContent = `Updated ${fmtWhen(d.last_scan)}`;
     render();
-  })
-  .catch((e) => { $("#view").innerHTML = `<div class="err">Couldn't load the data (${esc(e.message)}). Pull down to refresh.</div>`; });
+  } catch (e) {
+    if (!state.data) $("#view").innerHTML = `<div class="err">Couldn't load the data (${esc(e.message)}). Pull down to refresh.</div>`;
+    else $("#offline").innerHTML = `<div class="offline">Couldn't refresh (offline?). Showing the last data.</div>`;
+  } finally { btn.classList.remove("spin"); }
+}
+$("#refresh").addEventListener("click", load);
+// Reopening the app after a while fetches fresh data.
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - loadedAt > 5 * 60e3) load(); });
+// Pull to refresh (the home-screen app has no browser pull-down).
+let y0 = null, pulled = 0;
+window.addEventListener("touchstart", (e) => { y0 = window.scrollY <= 0 ? e.touches[0].clientY : null; pulled = 0; }, { passive: true });
+window.addEventListener("touchmove", (e) => {
+  if (y0 == null) return;
+  pulled = Math.max(0, e.touches[0].clientY - y0);
+  $("#ptr").style.height = Math.min(pulled / 2, 40) + "px";
+  $("#ptr").textContent = pulled > 80 ? "Release to refresh" : "Pull to refresh";
+}, { passive: true });
+window.addEventListener("touchend", () => {
+  if (y0 != null && pulled > 80) load();
+  y0 = null; $("#ptr").style.height = "0";
+});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+load();
 </script>
 </body>
 </html>
