@@ -23,6 +23,7 @@ from pathlib import Path
 
 import db
 import dipzone
+import fundamental_scan
 from notify import _col, _num, _price
 from slot_gate import IST, SLOTS
 
@@ -254,6 +255,7 @@ def main() -> int:
         "sector_momentum": sector_momentum_view(conn, datetime.now(IST).date()),
         "dip": dipzone.dashboard_view(states),
         "performance": _performance(),
+        "fundscan": fundamental_scan.view(),
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)

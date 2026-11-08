@@ -109,6 +109,7 @@
   .up-card .go.ghost { background: var(--chip); color: var(--text); }
   .up-msg { font-size: 13px; margin-top: 8px; white-space: pre-line; }
   .up-msg.bad { color: #dc2626; } .up-msg.ok { color: #059669; }
+  details.fs summary::-webkit-details-marker { display: none; }
 </style>
 </head>
 <body>
@@ -124,7 +125,7 @@
 <footer>Paper trades from your Chartink scanners. Not advice.</footer>
 
 <script>
-const state = { tab: "today", more: "rule", scanner: "All", status: "All", data: null };
+const state = { tab: "today", more: "rule", fv: "Shortlist", scanner: "All", status: "All", data: null };
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -489,11 +490,42 @@ document.addEventListener("click", async (e) => {
   } finally { b.disabled = false; }
 });
 
+function renderFundScan(d) {
+  const f = d.fundscan;
+  if (!f) return `<section class="card"><div class="empty">No Screener export yet. Upload one under More → Upload.</div></section>`;
+  const all = f.stocks;
+  const groups = { Shortlist: (x) => /^Shortlist(?! -)/.test(x.verdict), "Check flags": (x) => x.verdict.startsWith("Shortlist -"), Maybe: (x) => x.verdict.startsWith("Maybe"),
+                   "Your screen ✓": (x) => x.screen.ok, All: () => true };
+  if (!groups[state.fv]) state.fv = "Shortlist";
+  const chips = `<div class="sub2 filters">${Object.entries(groups).map(([k, g]) =>
+    `<button data-fv="${esc(k)}" class="${state.fv === k ? "on" : ""}">${esc(k)} ${all.filter(g).length}</button>`).join("")}</div>`;
+  const vcls = (v) => v.startsWith("Shortlist") ? "up" : v.startsWith("Reject") || v.startsWith("Skip") ? "down" : "";
+  const num = (v, u = "") => (v == null || v === "" ? "–" : `${Math.round(v * 10) / 10}${u}`);
+  const rows = all.filter(groups[state.fv]).map((x) => {
+    const sc = x.screen;
+    const scr = sc.ok ? `<span class="tag up">screen ✓ ${sc.passed}/${sc.checked}</span>`
+      : sc.fails.length ? `<span class="tag down">screen ✗ ${sc.fails.length}</span>` : `<span class="tag">screen ? ${sc.checked}/${sc.total}</span>`;
+    const why = [x.flags && "⚠ " + x.flags, sc.fails.length && "Fails: " + sc.fails.join("; "),
+                 sc.unknown.length && "Not in export: " + sc.unknown.join(", ")].filter(Boolean).map(esc).join("<br>");
+    return `<details class="row hrow fs" style="display:block"><summary style="list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:8px">
+      <div><div class="sym">${x.rank}. ${esc(x.name || x.code)} <span class="tag ${vcls(x.verdict)}">${esc(x.verdict || "no score")}</span>${scr}</div>
+        <div class="meta">${esc(x.code)}${x.industry ? " · " + esc(x.industry) : ""}</div>
+        <div class="meta">P/E ${num(x.pe)} · ROCE ${num(x.roce, "%")} · promoter ${num(x.promoter, "%")} · ₹${num(x.mcap)} Cr · ${num(x.from_high, "%")} from high${x.entry ? " · " + esc(x.entry) : ""}</div></div>
+      <div class="num"><div><b>${x.score == null ? "–" : Math.round(x.score)}</b></div><div class="tiny">Valuepick</div></div></summary>
+      ${why ? `<div class="meta" style="padding-top:6px">${why}</div>` : ""}</details>`;
+  }).join("");
+  return chips + `<section class="card"><h2>Fundamental scan <small>${all.length} stocks</small></h2>
+    <div class="note">Every stock in your uploaded Screener exports (newest upload wins), scored with your Valuepick logic: Shortlist ≥ 65 with no red flags, Check flags = ≥ 65 but with red flags, Maybe ≥ 50.
+    The screen tag is your main screen; ? means the export lacks some of its columns (add P/E, Debt to equity, Pledged percentage and YOY Quarterly profit growth to your Screener screen to check them all).
+    Separate from the Chartink scan. Tap a stock for flags and failed checks.${f.asof ? " Latest export " + fmtDate(f.asof) + "." : ""}</div>
+    ${rows || `<div class="empty">None in this group.</div>`}</section>`;
+}
+
 function renderMore(d) {
-  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", breakouts: "Breakouts", sectors: "Sectors", upload: "Upload" };
+  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", fund: "Fundamentals", breakouts: "Breakouts", sectors: "Sectors", upload: "Upload" };
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
   const body = { rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
-                 now: renderNow, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
+                 now: renderNow, fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
   return chips + body;
 }
 
@@ -510,6 +542,7 @@ document.addEventListener("click", (e) => {
   else if (t.dataset.scanner) state.scanner = t.dataset.scanner;
   else if (t.dataset.status) state.status = t.dataset.status;
   else if (t.dataset.more) state.more = t.dataset.more;
+  else if (t.dataset.fv) state.fv = t.dataset.fv;
   else return;
   render();
 });

@@ -117,3 +117,19 @@ def test_main_screen_needs_enough_data():
     import main_screen as ms
     r = ms.evaluate({"Market Capitalization": "2000", "Promoter holding": "70"})
     assert not r["ok"] and not r["fails"] and ms.label(r).startswith("Your screen ? only 2/")
+
+
+def test_fundamental_scan_ranks_export_stocks(tmp_path, monkeypatch):
+    import fundamental_scan as fs
+    from datetime import date
+    up = tmp_path / "uploads"
+    up.mkdir()
+    (up / f"{date.today().isoformat()}_090000.csv").write_text(
+        "Name,NSE Code,BSE Code,Market Capitalization,Profit after tax,Return on capital employed,Promoter holding,Sales growth,Profit growth\n"
+        "Good,GOODCO,500001,1000,100,30,70,30,45\nWeak,WEAKCO,,40000,100,5,20,2,1\n")
+    monkeypatch.setattr(fundamentals, "UPLOADS", up)
+    monkeypatch.setattr(fundamentals, "_export", None)
+    v = fs.view(fundamentals.FILE)
+    assert [x["code"] for x in v["stocks"]] == ["GOODCO", "WEAKCO"]  # listed once despite two codes
+    g = v["stocks"][0]
+    assert g["rank"] == 1 and g["pe"] == 10.0 and "P/E" not in " ".join(g["screen"]["unknown"])
