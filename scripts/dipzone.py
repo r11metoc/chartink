@@ -325,11 +325,14 @@ def new_events(conn, states: list[dict], now: datetime) -> list[tuple[str, dict,
 
 
 def _tags(s: dict) -> str:
+    import fundamentals
     t = ""
     if s.get("confirmed_by"):
         t += " ⭐ also on " + ", ".join(s["confirmed_by"])
     if s.get("dist_52w_high") is not None:
         t += f" · {-s['dist_52w_high']:.0f}% off 52w high"
+    if s.get("symbol") and (f := fundamentals.label(fundamentals.check(s["symbol"]))):
+        t += f" · {f}"
     return t
 
 
@@ -425,11 +428,13 @@ def _r(x) -> float | None:
 
 def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     """JSON for site/data.json: buy list, holdings, recent buys and sells."""
+    import fundamentals
     buy_list, holding, activity, closed = [], [], [], []
     cutoff = pd.Timestamp(date.today()) - pd.Timedelta(days=activity_days)
     for s in states:
         base = {"scanner": s["scanner"], "symbol": s["symbol"], "signal": s["date"],
                 "confirmed_by": s.get("confirmed_by", []), "off_high": s.get("dist_52w_high"),
+                "fund": fundamentals.check(s["symbol"]),
                 "trigger": _r(s.get("trigger")), "now": _r(s.get("last_close")), "now_date": _iso(s.get("last_date")),
                 "cap": s.get("cap"), "priority": s.get("priority", 3)}
         st = s.get("status")
@@ -476,6 +481,7 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
                      "stop": STOP_PCT, "stop_by": STOP_BY_SCANNER, "atr_max": ATR_MAX_PCT, "max_hold": RIDE_MAX_HOLD, "stake": STAKE,
                      "near_high": NEAR_HIGH_PCT},
             "skipped": skipped,
+            "fund_asof": fundamentals.scores().get("_asof"),
             "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity,
             "closed": closed}
 

@@ -267,6 +267,13 @@ function renderSectors(d) {
 
 const SHORT = { "63_30_daily": "63/30", "Bullish_Scanner": "Bullish", "Wkly_upswing": "Weekly" };
 const scanTag = (n) => `<span class="tag">${esc(SHORT[n] || n)}</span>`;
+const fundTag = (f) => {
+  if (!f || f.score == null) return "";
+  const v = f.verdict || "";
+  const c = v.startsWith("Shortlist") && !f.flags ? "up" : v.startsWith("Skip") || v.startsWith("Reject") ? "down" : "";
+  return ` <span class="tag ${c}" title="${esc(v)}${f.flags ? " · " + esc(f.flags) : ""}">F ${Math.round(f.score)}</span>`;
+};
+const fundLine = (f) => (f && f.score != null ? ` · fundamentals ${Math.round(f.score)} ${esc(f.verdict)}${f.flags ? " (" + esc(f.flags) + ")" : ""}` : "");
 const lakh = (v) => "₹" + (v / 100000).toFixed(2) + "L";
 
 function renderToday(d) {
@@ -291,10 +298,10 @@ function renderToday(d) {
     ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
         <div class="meta">At the next open · closed below its 50-day average ${money(h.ma)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
-    ...stops.map((b) => `<div class="row"><div><div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}</div>
-        <div class="meta">Buy-stop${b.valid_until ? " until " + fmtDate(b.valid_until) : ""} · stop ${money(b.stop)} if bought${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""} · now ${money(b.now)}</div></div>
+    ...stops.map((b) => `<div class="row"><div><div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}</div>
+        <div class="meta">Buy-stop${b.valid_until ? " until " + fmtDate(b.valid_until) : ""} · stop ${money(b.stop)} if bought${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""} · now ${money(b.now)}${fundLine(b.fund)}</div></div>
         <div></div></div>`),
-    ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}</div>
+    ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
         <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · stop ${money(h.stop)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
   ];
@@ -302,7 +309,7 @@ function renderToday(d) {
     ${items.join("") || `<div class="empty">Nothing to do today.</div>`}</section>`;
 
   const rows = [...hold].sort((a, b) => b.ret - a.ret).map((h) => `
-    <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
+    <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
       <div class="meta">${money(h.entry)} → ${money(h.now)} · sell below ${money(h.ma)}</div></div>
       <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div></div>`).join("");
   const holdings = `<section class="card"><h2>Holdings <small>${lakh(value)}</small></h2>
@@ -324,6 +331,8 @@ function renderRule(d) {
     for ${r.entry_days} days (${r.entry_days_weekly} for Weekly).<br><br>
     <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day average, or at the ${r.stop}% stop (${Object.values(r.stop_by || {})[0] || r.stop}% for Weekly), or after a year.<br><br>
     <b>Slots</b>: 15 positions of about 6.7% each. If short of slots, take 1st choice (mid caps) first.<br><br>
+    <b>Fundamentals</b> (information only): the <b>F</b> tag is the Valuepick score (0–100) from your Screener export${d.dip.fund_asof ? " of " + fmtDate(d.dip.fund_asof) : " (no export loaded yet)"}:
+    green = Shortlist, red = Skip/Reject, grey = Maybe or check flags. It never changes a buy or sell.<br><br>
     <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.</div></section>`;
 }
 
