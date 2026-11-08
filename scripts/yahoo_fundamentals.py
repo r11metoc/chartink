@@ -59,7 +59,7 @@ def _cagr(vals: list, years: int = 3) -> float | None:
     return round(((vals[0] / vals[years]) ** (1 / years) - 1) * 100, 1)
 
 
-def to_screener(symbol: str, info: dict, inc=None, bal=None, cf=None) -> dict:
+def to_screener(symbol: str, info: dict, inc=None, bal=None, cf=None, qinc=None) -> dict:
     """One Screener-style row (column names as in valuepick_score.COLS)."""
     rev = _row(inc, "Total Revenue", "Operating Revenue")
     ni = _row(inc, "Net Income", "Net Income Common Stockholders")
@@ -69,6 +69,10 @@ def to_screener(symbol: str, info: dict, inc=None, bal=None, cf=None) -> dict:
     debt = _row(bal, "Total Debt")
     recv = _row(bal, "Accounts Receivable", "Receivables")
     cfo = _row(cf, "Operating Cash Flow", "Cash Flow From Continuing Operating Activities")
+    qni = _row(qinc, "Net Income", "Net Income Common Stockholders")  # quarterly, newest first
+    opm = _f(info.get("operatingMargins"))
+    if opm is None and ebit and rev and ebit[0] is not None and rev[0]:
+        opm = ebit[0] / rev[0]
 
     roce = None
     if ebit and assets and cur_liab and ebit[0] is not None and assets[0] and cur_liab[0] is not None:
@@ -98,6 +102,9 @@ def to_screener(symbol: str, info: dict, inc=None, bal=None, cf=None) -> dict:
         "Debtor days": dd[0] if dd else None,
         "Debtor Days Ch": round(dd[0] - dd[1], 1) if len(dd) > 1 and None not in dd[:2] else None,
         "High price": _f(info.get("fiftyTwoWeekHigh")),
+        "OPM": round(opm * 100, 1) if opm is not None else None,
+        "YOY Quarterly profit growth": _growth(qni[0], qni[4]) if len(qni) > 4 else None,
+        "Pledged percentage": None,  # not available from Yahoo
     }
     return {k: ("" if v is None else v) for k, v in out.items()}
 
@@ -114,7 +121,8 @@ def fetch(symbol: str) -> dict | None:
             return getattr(t, attr)
         except Exception:
             return None
-    return to_screener(symbol, info, safe("income_stmt"), safe("balance_sheet"), safe("cashflow"))
+    return to_screener(symbol, info, safe("income_stmt"), safe("balance_sheet"), safe("cashflow"),
+                       safe("quarterly_income_stmt"))
 
 
 def cached(conn, symbol: str) -> dict | None:
@@ -129,8 +137,9 @@ def refresh(conn, symbols: list[str], days: int = REFRESH_DAYS) -> int:
     now = datetime.now(timezone.utc)
     done = 0
     for sym in sorted(set(symbols)):
-        r = conn.execute("SELECT fetched_at FROM fundamentals WHERE symbol = ?", (sym,)).fetchone()
-        if r and (now - datetime.fromisoformat(r[0])).days < days:
+        r = conn.execute("SELECT fetched_at, data FROM fundamentals WHERE symbol = ?", (sym,)).fetchone()
+        # refetch when stale, or cached before OPM / quarterly growth were collected
+        if r and (now - datetime.fromisoformat(r[0])).days < days and "OPM" in json.loads(r[1]):
             continue
         try:
             row = fetch(sym)

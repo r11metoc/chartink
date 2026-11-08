@@ -27,7 +27,8 @@ def test_check_reads_export(tmp_path):
     with open(f, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(ROW)); w.writeheader(); w.writerow(ROW)
     c = fundamentals.check("goodco", f)
-    assert c["verdict"] == "Shortlist" and fundamentals.label(c).startswith("Fundamentals")
+    assert c["verdict"] == "Shortlist" and c["source"] == "Screener"
+    assert "Valuepick" in fundamentals.label(c)
     assert fundamentals.check("MISSING", f) is None
 
 
@@ -62,6 +63,36 @@ def test_check_uses_yahoo_cache(tmp_path, monkeypatch):
     conn.commit(); conn.close()
     fundamentals._yahoo.clear()
     monkeypatch.setattr(fundamentals, "FILE", tmp_path / "none.csv")
-    monkeypatch.setattr(fundamentals, "_cache", None)
+    monkeypatch.setattr(fundamentals, "_export", None)
     c = fundamentals.check("GOODCO", fundamentals.FILE)
     assert c and c["source"] == "Yahoo" and c["verdict"] == "Shortlist"
+
+
+
+SCREEN_OK = {"Current Price": "95", "High price": "100", "Market Capitalization": "2000",
+             "Return on capital employed": "22", "OPM": "14", "Debt to equity": "0.3",
+             "Pledged percentage": "0", "Promoter holding": "62", "Profit growth": "45",
+             "YOY Quarterly profit growth": "", "Debtor days": "60", "Price to Earning": "15"}
+
+
+def test_main_screen_pass_and_fail_reasons():
+    import main_screen as ms
+    r = ms.evaluate(SCREEN_OK)
+    assert r["ok"] and r["passed"] == 10 and not r["unknown"]
+    bad = ms.evaluate({**SCREEN_OK, "Price to Earning": "44", "Market Capitalization": "51593",
+                       "Profit growth": "12", "YOY Quarterly profit growth": "150"})
+    assert not bad["ok"] and len(bad["fails"]) == 2          # quarterly growth > 100 rescues profit growth
+    assert any(f.startswith("P/E 44") for f in bad["fails"])
+    assert ms.label(bad).startswith("Your screen ✗ 2 fail")
+
+
+def test_main_screen_missing_pledge_not_a_fail():
+    import main_screen as ms
+    r = ms.evaluate({**SCREEN_OK, "Pledged percentage": ""})
+    assert r["ok"] and r["unknown"] == ["Pledge"] and "pledge not checked" in ms.label(r)
+
+
+def test_main_screen_needs_enough_data():
+    import main_screen as ms
+    r = ms.evaluate({"Market Capitalization": "2000", "Promoter holding": "70"})
+    assert not r["ok"] and not r["fails"] and ms.label(r).startswith("Your screen ? only 2/")
