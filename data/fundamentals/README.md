@@ -1,8 +1,12 @@
 # Fundamentals (Valuepick check, information only)
 
-Put a Screener.in export here as `latest.csv`. Every scan tags buy-stop alerts,
-recent buys and holdings with the Valuepick score (0-100), verdict and red flags
-(scripts/fundamentals.py, scripts/valuepick_score.py). It never changes a buy or sell.
+Every stock the Chartink scanners pick gets its fundamentals fetched from Yahoo
+Finance automatically (scripts/update_fundamentals.py, each scan, cached 30 days)
+and scored with the Valuepick logic: score 0-100, verdict and red flags on every
+buy-stop alert, recent buy and holding. It never changes a buy or sell.
+
+Optional: a Screener.in export saved here as `latest.csv` takes priority for the
+stocks it covers (Screener has ROCE and promoter holding directly).
 
 Screener columns used (any subset works; more columns = better coverage):
 Name, NSE Code, BSE Code, Industry, Current Price, Market Capitalization,

@@ -331,7 +331,7 @@ function renderRule(d) {
     for ${r.entry_days} days (${r.entry_days_weekly} for Weekly).<br><br>
     <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day average, or at the ${r.stop}% stop (${Object.values(r.stop_by || {})[0] || r.stop}% for Weekly), or after a year.<br><br>
     <b>Slots</b>: 15 positions of about 6.7% each. If short of slots, take 1st choice (mid caps) first.<br><br>
-    <b>Fundamentals</b> (information only): the <b>F</b> tag is the Valuepick score (0–100) from your Screener export${d.dip.fund_asof ? " of " + fmtDate(d.dip.fund_asof) : " (no export loaded yet)"}:
+    <b>Fundamentals</b> (information only): the <b>F</b> tag is the Valuepick score (0–100) of each scanner stock, from Yahoo Finance data refreshed monthly (or your Screener export if loaded):
     green = Shortlist, red = Skip/Reject, grey = Maybe or check flags. It never changes a buy or sell.<br><br>
     <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.</div></section>`;
 }

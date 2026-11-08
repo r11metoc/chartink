@@ -1,10 +1,13 @@
 """Fundamental check for scanner stocks (Valuepick score, information only).
 
-Drop a Screener.in export at data/fundamentals/latest.csv (any screen with
-some of the columns in valuepick_score.COLS; one row per stock). Every scan
-then tags each buy-stop alert and holding with its Valuepick score (0-100),
-verdict (Shortlist / Maybe / Skip / Reject) and red flags. It never changes a
-buy or sell: the price rule decides, this adds confidence or caution.
+Every stock the Chartink scanners pick has its fundamentals fetched from
+Yahoo Finance (yahoo_fundamentals.py, cached in chartink.db) and scored with
+the Valuepick logic (valuepick_score.py): score 0-100, verdict (Shortlist /
+Maybe / Skip / Reject) and red flags, shown on every buy-stop alert and
+holding. A Screener.in export at data/fundamentals/latest.csv, if present,
+takes priority for the stocks it covers (it has ROCE and promoter holding
+straight from Screener). It never changes a buy or sell: the price rule
+decides, this adds confidence or caution.
 
 There is no point-in-time history of fundamentals, so this cannot be
 backtested; judge it on live results.
@@ -42,12 +45,34 @@ def scores(path: Path = FILE) -> dict:
     return out
 
 
+_yahoo: dict = {}
+
+
+def _from_yahoo(symbol: str) -> dict | None:
+    if symbol not in _yahoo:
+        import db
+        import yahoo_fundamentals
+        conn = db.connect()
+        try:
+            row = yahoo_fundamentals.cached(conn, symbol)
+        finally:
+            conn.close()
+        r = vp.score_row(row) if row else None
+        _yahoo[symbol] = r if r and r.get("score") is not None else None
+    return _yahoo[symbol]
+
+
 def check(symbol: str, path: Path = FILE) -> dict | None:
-    """Compact fundamental check for one stock, or None if it isn't in the export."""
-    r = scores(path).get(str(symbol).strip().upper())
+    """Compact fundamental check for one stock: the Screener export if it has
+    the stock, else the Yahoo data fetched for it; None if neither."""
+    sym = str(symbol).strip().upper()
+    r = scores(path).get(sym)
+    src = "Screener"
+    if not r and path == FILE:
+        r, src = _from_yahoo(sym), "Yahoo"
     if not r:
         return None
-    return {"score": r["score"], "verdict": r["verdict"], "flags": r["flags"],
+    return {"score": r["score"], "verdict": r["verdict"], "flags": r["flags"], "source": src,
             "pe": r["pe"], "roce": r["roce"], "promoter": r["promoter"]}
 
 
