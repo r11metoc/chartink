@@ -57,6 +57,10 @@ def _from_yahoo(symbol: str) -> dict | None:
             row = yahoo_fundamentals.cached(conn, symbol)
         finally:
             conn.close()
+        if row and "bank" in str(row.get("Industry", "")).lower():
+            # Banks: widely held (no promoter) and loans are not trade receivables,
+            # so promoter holding and debtor days would give false rejects/flags.
+            row = {**row, "Promoter holding": "", "Debtor days": "", "Debtor Days Ch": ""}
         r = vp.score_row(row) if row else None
         _yahoo[symbol] = r if r and r.get("score") is not None else None
     return _yahoo[symbol]

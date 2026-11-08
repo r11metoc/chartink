@@ -138,3 +138,27 @@ def test_breakout_gap_up_fills_at_open_and_waits_otherwise():
     assert s["entry"] == 103 and s["gap"] and s["status"] == "holding"
     w = dz.simulate_breakout(frame([(98, 99, 97, 98)]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
     assert w["status"] == "waiting for breakout" and w["sessions_left"] == 2
+
+
+def test_apply_slots_limits_and_prefers_midcaps():
+    def st(sym, cap, day, entry, status="holding", exit_=None):
+        s = {"scanner": "Bullish_Scanner", "symbol": sym, "date": day, "status": status,
+             "priority": dz.priority(cap), "entry_date": pd.Timestamp(entry), "entry": 100.0, "ret": 1.0}
+        if exit_:
+            s["exit_date"] = pd.Timestamp(exit_)
+        return s
+    states = [st("A", "Smallcap", "2026-11-01", "2026-11-02"),
+              st("B", "Midcap", "2026-11-01", "2026-11-02", "stop", "2026-11-03"),
+              st("C", "Largecap", "2026-11-03", "2026-11-04", "stop", "2026-11-05"),
+              st("D", "Smallcap", "2026-11-05", "2026-11-06")]
+    out = dz.apply_slots(states, slots=1)
+    s = {x["symbol"]: x["status"] for x in out}
+    # 1 slot: the mid cap beats the small cap on 2 Nov; each sale frees the slot for the next buy
+    assert s == {"A": "no slot", "B": "stop", "C": "stop", "D": "holding"}
+
+
+def test_apply_slots_one_position_per_stock():
+    a = {"scanner": "Bullish_Scanner", "symbol": "X", "date": "2026-11-01", "status": "holding", "priority": 0,
+         "entry_date": pd.Timestamp("2026-11-02"), "entry": 1.0}
+    b = {**a, "scanner": "63_30_daily", "entry_date": pd.Timestamp("2026-11-03")}
+    assert [x["status"] for x in dz.apply_slots([a, b], slots=15)] == ["holding", "no slot"]

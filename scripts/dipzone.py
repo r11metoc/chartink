@@ -263,7 +263,33 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
         if st["status"] in ACTIVE:
             active.add((scanner, symbol))
         out.append({**base, **st, "last_close": float(df["Close"].iloc[-1]), "last_date": df.index[-1]})
-    return out
+    return apply_slots(out)
+
+
+def apply_slots(states: list[dict], slots: int | None = None) -> list[dict]:
+    """Trade the paper portfolio like the backtest: at most PF_MAX_POS open
+    positions, one per stock, and on a day with more buys than free slots,
+    mid caps first, then large, then small. Buys that don't fit become
+    'no slot' (the buy-stop alert still went out; the paper book skips it)."""
+    slots = slots or PF_MAX_POS
+    bought = sorted((s for s in states if "entry_date" in s),
+                    key=lambda s: (pd.Timestamp(s["entry_date"]), s.get("priority", 3), s["date"]))
+    open_: list[dict] = []
+    for s in bought:
+        d = pd.Timestamp(s["entry_date"])
+        open_ = [o for o in open_ if o.get("status") not in CLOSED or pd.Timestamp(o["exit_date"]) > d]
+        if any(o["symbol"] == s["symbol"] for o in open_):
+            why = "already holding this stock from another scanner"
+        elif len(open_) >= slots:
+            why = f"all {slots} slots were full"
+        else:
+            open_.append(s)
+            continue
+        for k in ("entry_date", "entry", "stop", "target", "exit_date", "exit", "ret", "now", "ma",
+                  "sell_signal", "sessions_left", "signal_date", "gap"):
+            s.pop(k, None)
+        s["status"], s["why"] = "no slot", why
+    return states
 
 
 def live_sim(df: pd.DataFrame, sig: dict, scanner: str) -> dict:
