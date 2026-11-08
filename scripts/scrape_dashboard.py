@@ -57,18 +57,17 @@ _EXTRACT_JS = """
     let title = null;
     let named = null;
     let el = table;
-    // The nearest ancestor whose text mentions a known scanner name is the
-    // table's own widget; take the name that appears first in it.
+    // Climb to the nearest ancestor that mentions exactly one known scanner
+    // name: that is the table's own widget. An ancestor mentioning several
+    // names is the whole dashboard, so the table belongs to no widget (e.g.
+    // Chartink's hidden "debug filters" table) and stays unnamed.
     for (let i = 0; i < 10 && el && !named; i++) {
       el = el.parentElement;
       if (!el) break;
       const text = el.innerText || '';
-      let best = null, at = Infinity;
-      for (const n of names) {
-        const k = text.indexOf(n);
-        if (k >= 0 && k < at) { best = n; at = k; }
-      }
-      named = best;
+      const found = names.filter(n => text.includes(n));
+      if (found.length > 1) break;
+      if (found.length === 1) named = found[0];
     }
     el = table;
     for (let i = 0; i < 6 && el; i++) {
