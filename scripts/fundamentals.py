@@ -16,7 +16,7 @@ fundamentals).
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import main_screen
@@ -29,21 +29,19 @@ _yahoo: dict = {}
 
 
 UPLOADS = FILE.parent / "uploads"
-MAX_AGE_DAYS = 180
 
 
 def _files(path: Path) -> list[Path]:
-    """Exports oldest first: latest.csv, then the app's uploads by name (= time),
-    skipping uploads older than MAX_AGE_DAYS."""
+    """Only the newest export: a new upload replaces the old list completely
+    (the app also deletes the older upload files). Falls back to latest.csv."""
     if path != FILE:
         return [path] if path.exists() else []
-    cutoff = (datetime.now() - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
-    ups = sorted(p for p in UPLOADS.glob("*.csv") if p.name[:10] >= cutoff) if UPLOADS.exists() else []
-    return ([FILE] if FILE.exists() else []) + ups
+    ups = sorted(UPLOADS.glob("*.csv")) if UPLOADS.exists() else []
+    return ups[-1:] or ([FILE] if FILE.exists() else [])
 
 
 def export_rows(path: Path = FILE) -> dict:
-    """NSE/BSE code -> raw Screener row (newest export wins), plus '_asof'. {} without a file."""
+    """NSE/BSE code -> raw Screener row from the newest export, plus '_asof'. {} without a file."""
     global _export
     if _export is not None and path == FILE:
         return _export

@@ -420,7 +420,7 @@ async function screenerCsv(file) {
   }
   const at = rows.findIndex((r) => r.some((c) => /^(NSE|BSE) Code$/.test(String(c).replace(/"/g, "").trim())));
   if (at < 0) throw new Error("No 'NSE Code' or 'BSE Code' column found. Export the screen from Screener with those columns.");
-  if (!/\.xlsx?$/i.test(file.name)) return { csv: rows.slice(at).map((r) => r.join(",")).join("\n"), n: rows.length - at - 1 };
+  if (!/\.xlsx?$/i.test(file.name)) { const body = rows.slice(at).filter((r) => r.join("").trim()); return { csv: body.map((r) => r.join(",")).join("\n") + "\n", n: body.length - 1 }; }
   const q = (c) => { const v = String(c ?? ""); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
   const body = rows.slice(at).filter((r) => r.some((c) => String(c).trim()));
   return { csv: body.map((r) => r.map(q).join(",")).join("\n"), n: body.length - 1 };
@@ -444,7 +444,7 @@ function renderUpload() {
       <label for="up-bt-file">CSV file from Chartink's backtest</label><input id="up-bt-file" type="file" accept=".csv,text/csv">
       <button class="go" data-up="backtest" ${has ? "" : "disabled"}>Upload and retrain</button><div id="up-bt-msg" class="up-msg"></div></section>
     <section class="card up-card"><h2 style="padding-left:0">Screener export (fundamentals)</h2>
-      <div class="note" style="padding:0">Excel or CSV export of a Screener screen. Every upload is kept: for a stock in several exports the newest wins, and columns an export lacks come from Yahoo. Only stocks that are also on your scanners show a change.</div>
+      <div class="note" style="padding:0">Excel or CSV export of a Screener screen. A new upload replaces the previous list completely. It feeds More → Fundamentals, and the fundamental tags of scanner stocks that are in it.</div>
       <label for="up-sc-file">File</label><input id="up-sc-file" type="file" accept=".xlsx,.xls,.csv">
       <button class="go" data-up="screener" ${has ? "" : "disabled"}>Upload</button><div id="up-sc-msg" class="up-msg"></div></section>`;
 }
@@ -481,7 +481,15 @@ document.addEventListener("click", async (e) => {
       const { csv, n } = await screenerCsv(file);
       if (n < 1) throw new Error("The export has no rows.");
       const stamp = new Date().toISOString().slice(0, 19).replace("T", "_").replace(/:/g, "");
-      await putFile(`data/fundamentals/uploads/${stamp}.csv`, b64text(csv), `Screener export, ${n} stocks (uploaded from the app)`);
+      const name = `${stamp}.csv`;
+      await putFile(`data/fundamentals/uploads/${name}`, b64text(csv), `Screener export, ${n} stocks (uploaded from the app)`);
+      upMsg(msg, "Saved. Clearing the previous list…");
+      const ls = await gh(`/contents/data/fundamentals/uploads?ref=${encodeURIComponent(GH.branch)}`);
+      for (const f of ls.ok ? await ls.json() : []) {
+        if (f.type !== "file" || f.name === name) continue;
+        const r = await gh(`/contents/${f.path}`, { method: "DELETE", body: JSON.stringify({ message: `Remove old Screener export ${f.name}`, sha: f.sha, branch: GH.branch }) });
+        if (!r.ok) throw new Error(`Couldn't remove the old list ${f.name} (GitHub ${r.status}).`);
+      }
       await runWorkflow("scan.yml", {});
       upMsg(msg, `Done: ${n} stocks saved. A scan is running; tags of scanner stocks in this export update in a few minutes.`, "ok");
     }
@@ -515,7 +523,7 @@ function renderFundScan(d) {
       ${why ? `<div class="meta" style="padding-top:6px">${why}</div>` : ""}</details>`;
   }).join("");
   return chips + `<section class="card"><h2>Fundamental scan <small>${all.length} stocks</small></h2>
-    <div class="note">Every stock in your uploaded Screener exports (newest upload wins), scored with your Valuepick logic: Shortlist ≥ 65 with no red flags, Check flags = ≥ 65 but with red flags, Maybe ≥ 50.
+    <div class="note">Every stock in your latest Screener export, scored with your Valuepick logic: Shortlist ≥ 65 with no red flags, Check flags = ≥ 65 but with red flags, Maybe ≥ 50.
     The screen tag is your main screen; ? means the export lacks some of its columns (add P/E, Debt to equity, Pledged percentage and YOY Quarterly profit growth to your Screener screen to check them all).
     Separate from the Chartink scan. Tap a stock for flags and failed checks.${f.asof ? " Latest export " + fmtDate(f.asof) + "." : ""}</div>
     ${rows || `<div class="empty">None in this group.</div>`}</section>`;

@@ -1,8 +1,8 @@
 """Fundamental scan: every stock in your uploaded Screener exports, ranked.
 
-A separate module from the Chartink technical scan. It uses only the Screener
-exports uploaded from the app (data/fundamentals/uploads/, newest export wins
-for a stock that is in several) and scores each stock with your Valuepick
+A separate module from the Chartink technical scan. It uses only the latest
+Screener export uploaded from the app (data/fundamentals/uploads/; each upload
+replaces the previous list) and scores each stock with your Valuepick
 logic (valuepick_score.py) plus your main screen (main_screen.py). Shown under
 More -> Fundamentals, best Valuepick score first.
 
