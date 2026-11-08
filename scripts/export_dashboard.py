@@ -23,7 +23,6 @@ from pathlib import Path
 
 import db
 import dipzone
-import screener_screens
 from notify import _col, _num, _price
 from slot_gate import IST, SLOTS
 
@@ -255,8 +254,6 @@ def main() -> int:
         "sector_momentum": sector_momentum_view(conn, datetime.now(IST).date()),
         "dip": dipzone.dashboard_view(states),
         "performance": _performance(),
-        "screens": screener_screens.view(conn, {s for (s,) in conn.execute(
-            "SELECT DISTINCT symbol FROM results WHERE run_id = ?", (latest_run,))}),
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)

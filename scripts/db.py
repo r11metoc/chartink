@@ -79,6 +79,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         # i.e. the scan condition re-triggered at the same technical level.
         conn.execute("ALTER TABLE breakouts ADD COLUMN kind TEXT NOT NULL DEFAULT 'fresh'")
     conn.execute("DROP TABLE IF EXISTS backtest_outcomes")  # old model's table, unused
+    conn.execute("DROP TABLE IF EXISTS screen_stocks")  # removed Hitting highs list
 
 
 def connect() -> sqlite3.Connection:

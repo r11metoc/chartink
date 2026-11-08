@@ -1,4 +1,0 @@
-# Public Screener.in screens whose stocks appear under More -> Hitting highs,
-# ranked by technicals. One URL per line; the screen must be public.
-# Only page 1 (25 results) is read, as Screener's robots.txt asks.
-https://www.screener.in/screens/788918/hitting_highs/

@@ -16,7 +16,7 @@ fundamentals).
 from __future__ import annotations
 
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import main_screen
@@ -28,25 +28,41 @@ _export: dict | None = None
 _yahoo: dict = {}
 
 
+UPLOADS = FILE.parent / "uploads"
+MAX_AGE_DAYS = 180
+
+
+def _files(path: Path) -> list[Path]:
+    """Exports oldest first: latest.csv, then the app's uploads by name (= time),
+    skipping uploads older than MAX_AGE_DAYS."""
+    if path != FILE:
+        return [path] if path.exists() else []
+    cutoff = (datetime.now() - timedelta(days=MAX_AGE_DAYS)).strftime("%Y-%m-%d")
+    ups = sorted(p for p in UPLOADS.glob("*.csv") if p.name[:10] >= cutoff) if UPLOADS.exists() else []
+    return ([FILE] if FILE.exists() else []) + ups
+
+
 def export_rows(path: Path = FILE) -> dict:
-    """NSE/BSE code -> raw Screener row, plus '_asof'. {} without a file."""
+    """NSE/BSE code -> raw Screener row (newest export wins), plus '_asof'. {} without a file."""
     global _export
     if _export is not None and path == FILE:
         return _export
     out: dict = {}
-    if path.exists():
+    files = _files(path)
+    for f in files:
         try:
-            with open(path, newline="", encoding="utf-8-sig") as fh:
+            with open(f, newline="", encoding="utf-8-sig") as fh:
                 for r in csv.DictReader(fh):
-                    code = (r.get("NSE Code") or r.get("BSE Code") or "").strip().upper()
-                    if code:
-                        out[code] = r
-            stamp = path.with_name("uploaded.txt")  # written by the app's upload
-            out["_asof"] = (stamp.read_text().strip()[:10] if stamp.exists() and path == FILE
-                            else datetime.fromtimestamp(path.stat().st_mtime).date().isoformat())
+                    for key in ("NSE Code", "BSE Code"):
+                        code = str(r.get(key) or "").strip().upper()
+                        if code:
+                            out[code] = r
         except Exception as e:  # a bad export must never stop the scan
-            print(f"Fundamentals file unreadable ({e}); using Yahoo only")
-            out = {}
+            print(f"Fundamentals file {f.name} unreadable ({e}); skipped")
+    if out and files:
+        last = files[-1]
+        out["_asof"] = (last.name[:10] if last.parent == UPLOADS
+                        else datetime.fromtimestamp(last.stat().st_mtime).date().isoformat())
     if path == FILE:
         _export = out
     return out
@@ -72,11 +88,13 @@ def _yahoo_row(symbol: str) -> dict | None:
 def check(symbol: str, path: Path = FILE) -> dict | None:
     """Fundamental check for one stock, or None without data."""
     sym = str(symbol).strip().upper()
-    row, src = export_rows(path).get(sym), "Screener"
-    if not row and path == FILE:
-        row, src = _yahoo_row(sym), "Yahoo"
-    if not row:
+    scr = export_rows(path).get(sym)
+    yh = _yahoo_row(sym) if path == FILE else None
+    if not scr and not yh:
         return None
+    # Screener's numbers where the export has them, Yahoo's for the columns it lacks.
+    row = {**(yh or {}), **{k: v for k, v in (scr or {}).items() if str(v or "").strip()}}
+    src = "Screener + Yahoo" if scr and yh else "Screener" if scr else "Yahoo"
     screen = main_screen.evaluate(row)
     vrow = row
     if "bank" in str(row.get("Industry", "")).lower():

@@ -63,9 +63,30 @@ def test_check_uses_yahoo_cache(tmp_path, monkeypatch):
     conn.commit(); conn.close()
     fundamentals._yahoo.clear()
     monkeypatch.setattr(fundamentals, "FILE", tmp_path / "none.csv")
+    monkeypatch.setattr(fundamentals, "UPLOADS", tmp_path / "uploads")
     monkeypatch.setattr(fundamentals, "_export", None)
     c = fundamentals.check("GOODCO", fundamentals.FILE)
     assert c and c["source"] == "Yahoo" and c["verdict"] == "Shortlist"
+
+
+def test_uploads_newest_wins_and_yahoo_fills_gaps(tmp_path, monkeypatch):
+    from datetime import date
+    up = tmp_path / "uploads"
+    up.mkdir()
+    today = date.today().isoformat()
+    (up / f"{today}_090000.csv").write_text("Name,NSE Code,Promoter holding,Price to Earning\nOld,GOODCO,40,99\nOther,OTHCO,70,10\n")
+    (up / f"{today}_100000.csv").write_text("Name,NSE Code,BSE Code,Promoter holding\nNew,GOODCO,500001,65\n")
+    (up / "2000-01-01_000000.csv").write_text("Name,NSE Code\nAncient,OLDCO\n")
+    monkeypatch.setattr(fundamentals, "FILE", tmp_path / "none.csv")
+    monkeypatch.setattr(fundamentals, "UPLOADS", up)
+    monkeypatch.setattr(fundamentals, "_export", None)
+    rows = fundamentals.export_rows(fundamentals.FILE)
+    assert rows["GOODCO"]["Name"] == "New" and rows["500001"]["Name"] == "New"
+    assert "OTHCO" in rows and "OLDCO" not in rows and rows["_asof"] == today
+    fundamentals._yahoo.clear()
+    monkeypatch.setattr(fundamentals, "_yahoo_row", lambda s: {**ROW, "Price to Earning": "12"} if s == "GOODCO" else None)
+    c = fundamentals.check("GOODCO", fundamentals.FILE)
+    assert c["source"] == "Screener + Yahoo" and c["promoter"] == 65 and c["pe"] == 12
 
 
 
