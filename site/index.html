@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Scanner">
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
 <meta name="robots" content="noindex">
 <title>Scanner Tracker</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M12 44l12-12 9 9 19-21' stroke='white' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -84,6 +87,19 @@
   .big { font-size: 20px; font-weight: 700; line-height: 1.1; }
   .tiny { font-size: 11.5px; white-space: nowrap; }
   h3.section { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 22px 2px 4px; }
+  .todo .row { grid-template-columns: 1fr auto; }
+  .hrow { grid-template-columns: 1fr auto; padding: 9px 14px; }
+  .hrow .meta { font-size: 12px; }
+  .tag { font-size: 10.5px; font-weight: 700; color: var(--muted); background: var(--chip); border-radius: 6px; padding: 1px 5px; margin-left: 6px; vertical-align: 1px; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+  .summary div { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .summary span { display: block; font-size: 11.5px; color: var(--muted); }
+  .summary b { font-size: 17px; font-variant-numeric: tabular-nums; }
+  details.card summary { cursor: pointer; padding: 12px 14px; font-weight: 650; list-style: none; display: flex; justify-content: space-between; }
+  details.card summary::-webkit-details-marker { display: none; }
+  details.card summary::after { content: "▾"; color: var(--muted); }
+  details[open].card summary::after { content: "▴"; }
+  .sub2 { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 0; }
 </style>
 </head>
 <body>
@@ -92,17 +108,14 @@
   <div class="sub" id="updated">Loading…</div>
 </header>
 <nav>
-  <button data-tab="dip" class="on">Buy</button>
-  <button data-tab="portfolio">Portfolio</button>
-  <button data-tab="now">Now</button>
-  <button data-tab="breakouts">Breakouts</button>
-  <button data-tab="sectors">Sectors</button>
+  <button data-tab="today" class="on">Today</button>
+  <button data-tab="more">More</button>
 </nav>
 <main id="view"></main>
-<footer>Trigger = high of the signal candle (the day's high; the week's high for Wkly_upswing). "Seen at" = price when the bot first saw it on Chartink. A mechanical rule tracked on paper, not advice.</footer>
+<footer>Paper trades from your Chartink scanners. Not advice.</footer>
 
 <script>
-const state = { tab: "dip", scanner: "All", status: "All", data: null };
+const state = { tab: "today", more: "rule", scanner: "All", status: "All", data: null };
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (v) => (v == null ? "–" : "₹" + Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -115,53 +128,6 @@ const fmtWhen = (iso) => new Date(iso).toLocaleString("en-IN", { day: "2-digit",
 const rupees = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + "₹" + Math.abs(v).toLocaleString("en-IN");
 
 const lv = (items) => `<div class="lv">${items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
-
-function renderPortfolio(d) {
-  const z = d.dip;
-  if (!z) return `<section class="card"><div class="empty">The portfolio isn't in this scan yet.</div></section>`;
-  const stake = z.rule.stake;
-  const closed = z.closed || [];
-  const scanners = ["All", ...[...new Set([...z.holding, ...closed].map((x) => x.scanner))].sort()];
-  if (!scanners.includes(state.scanner)) state.scanner = "All";
-  const pick = (xs) => (state.scanner === "All" ? xs : xs.filter((x) => x.scanner === state.scanner));
-  const hold = pick(z.holding), done = pick(closed);
-  const invested = hold.length * stake;
-  const value = hold.reduce((a, h) => a + (h.value ?? stake), 0);
-  const openPnl = value - invested;
-  const realised = done.reduce((a, c) => a + c.pnl, 0);
-  const wins = done.filter((c) => c.ret > 0).length;
-  const sellNow = hold.filter((h) => h.sell_signal).length;
-  const L = (v) => "₹" + (v / 100000).toFixed(2) + "L";
-  const chips = `<div class="filters">${scanners.map((s) => `<button data-scanner="${esc(s)}" class="${s === state.scanner ? "on" : ""}">${esc(s)}</button>`).join("")}</div>`;
-  const tile = (label, v, extra = "", c = "") => `<div class="stat"><b>${label}</b><div><span class="big ${c}">${v}</span></div>${extra ? `<div><span>${extra}</span></div>` : ""}</div>`;
-  const tiles = `<div class="stats">
-    ${tile("Invested", L(invested), `${hold.length} stock${hold.length === 1 ? "" : "s"} · ₹${stake / 100000}L each`)}
-    ${tile("Current value", L(value), sellNow ? `🔻 ${sellNow} to sell at next open` : "")}
-    ${tile("Open P&amp;L", rupees(openPnl), invested ? pct(openPnl / invested * 100) : "", cls(openPnl))}
-    ${tile("Booked P&amp;L", rupees(realised), done.length ? `${done.length} sold · ${Math.round(wins / done.length * 100)}% won` : "nothing sold yet", cls(realised))}
-    ${tile("Total P&amp;L", rupees(openPnl + realised), "open + booked", cls(openPnl + realised))}
-  </div>`;
-  const holdRows = hold.map((h) => `
-    <div class="row" style="border-bottom:0"><div><div class="sym">${esc(h.symbol)}</div>
-      <div class="meta">${esc(h.scanner)} · bought ${fmtDate(h.entry_date)} at ${money(h.entry)}${h.days ? " · " + h.days + "d" : ""}${tags(h)}</div>
-      <div class="meta">now ${money(h.now)}${h.now_date ? " (" + fmtDate(h.now_date) + ")" : ""}</div></div>
-      <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div>
-      ${h.sell_signal ? `<span class="pill SELL">SELL</span>` : `<span class="pill ${h.ret > 0 ? "BUY" : "HOLD"}">HOLD</span>`}</div>
-    ${h.sell_signal ? `<div class="note">Closed below its 50-day average on ${fmtDate(h.sell_signal)}: sell at the next open.</div>` : ""}
-    ${lv([["Sell if closes below", money(h.ma)], ["Stop", money(h.stop)], ["Exit by", fmtYear(h.exit_by)]])}`).join("");
-  const doneRows = done.map((c) => `
-    <div class="row"><div><div class="sym">${esc(c.symbol)}</div>
-      <div class="meta">${esc(c.scanner)} · ${money(c.entry)} on ${fmtDate(c.entry_date)} → ${money(c.exit)} on ${fmtDate(c.exit_date)} · ${c.days}d</div>
-      <div class="meta">sold: ${SELL[c.reason] || esc(c.reason)}</div></div>
-      <div class="num"><div class="chg ${cls(c.ret)}">${pct(c.ret)}</div><div class="tiny ${cls(c.pnl)}">${rupees(c.pnl)}</div></div>
-      <span class="pill SELL">SOLD</span></div>`).join("");
-  return `${chips}${tiles}
-    <section class="card"><h2>📦 Holdings <small>${hold.length}</small></h2>
-      ${holdRows || `<div class="empty">No open positions.</div>`}</section>
-    <section class="card"><h2>🧾 Sold <small>${done.length}</small></h2>
-      ${doneRows || `<div class="empty">Nothing sold yet.</div>`}</section>
-    <div class="note">Every buy alert since ${fmtDate(z.summary.start)} bought with ₹${stake / 100000}L at the next open; prices from the last completed daily candle, after 0.25% costs. A paper portfolio, not advice.</div>`;
-}
 
 const STAGE = {
   zone: ["BUY", "BUY ZONE"],
@@ -214,39 +180,6 @@ function renderPerformance(f) {
       <div class="note" style="padding-top:6px">All keep the starting 12% stop (15% Wkly_upswing); riding exits sell after a year at the latest.</div>` : ""}
     <div class="note" style="padding-top:8px">${p.taken} trades taken, ${p.skipped} skipped for want of a free slot (${p.win}% of those taken won).
       Open positions counted at cost; this year is year-to-date. Past results, not a promise.</div></section>`;
-}
-
-function renderDip(d) {
-  const z = d.dip;
-  if (!z) return `<section class="card"><div class="empty">The buy-the-dip data isn't in this scan yet.</div></section>`;
-  const r = z.rule;
-  const intro = r.mode === "breakout"
-    ? `Buy when the price trades above the <b>trigger</b> (the signal candle's high; the week's high for Wkly_upswing), within
-    ${r.entry_days} sessions of the signal (${r.entry_days_weekly} for weekly). Place a buy-stop at the trigger: it fills there, or at the open on a gap-up.
-    Then ride the trend: <b>sell at the next open after a close below the ${r.exit_ma}-day average</b>, a <b>${r.stop}% stop</b>${Object.entries(r.stop_by || {}).map(([k, v]) => ` (${v}% for ${esc(k)})`).join("")}, or after a year.
-    ${Object.entries(r.atr_max || {}).map(([k, v]) => `${esc(k)} only takes calm stocks (daily ATR under ${v}% of price).`).join(" ")}
-    ${Object.entries(r.near_high || {}).map(([k, v]) => `${esc(k)} signals are only taken within ${v}% of the 52-week high${z.skipped ? ` (${z.skipped} skipped)` : ""}.`).join(" ")}
-    ⭐ = another scanner flagged it in the 10 days before. <b>More buy-stops than free slots? Take mid caps first, then large caps, then small caps</b> (the list is in that order).
-    Paper trades of ₹${r.stake / 100000}L, after 0.25% costs. Not advice.`
-    : `After the breakout, buy a ${r.dip["63_30_daily"]}% pullback, then sell on a close below the ${r.exit_ma}-day average. Not advice.`;
-  const buyRows = z.buy_list.map((b) => {
-    const [pill, label] = STAGE[b.stage];
-    const what = b.stage === "zone" ? `Dipped ${b.dip_pct}%: buy at the next open`
-      : b.stage === "dip" ? `Broke out ${fmtDate(b.breakout)} · waiting for a ${b.dip_pct}% dip${b.now != null && b.now < b.floor ? " · now below the floor, not a buy unless it closes back above it" : ""}`
-      : `Buy-stop at the trigger${b.valid_until ? " until " + fmtDate(b.valid_until) : ""}${b.now != null && b.now > b.trigger ? " · already above it" : ""}`;
-    const levels = b.stage === "zone" ? [["Buy ~", money(b.level)], ["Stop", money(b.stop)], ["Sell", "close < 50d avg"]]
-      : b.stage === "dip" ? [["Buy at or below", money(b.level)], ["High close", money(b.high_close)], ["Not below", money(b.floor)]]
-      : [["Buy above", money(b.trigger)], ["Stop if bought", money(b.stop)], ["Now", money(b.now)]];
-    return `<div class="row" style="border-bottom:0"><div><div class="sym">${esc(b.symbol)}</div>
-        <div class="meta">${esc(b.scanner)}${b.cap ? " · " + esc(b.cap) : ""} · signal ${fmtDate(b.signal)} · now ${money(b.now)}${tags(b)}</div><div class="meta">${what}</div></div>
-        <div class="num tiny">${CHOICE[b.priority] || ""}</div><span class="pill ${pill}">${label}</span></div>${lv(levels)}`;
-  }).join("");
-  return `
-    <section class="card"><div class="note" style="padding-top:12px">${intro}</div></section>
-    <section class="card"><h2>🛒 Buy list <small>${z.buy_list.length}</small></h2>
-      ${buyRows || `<div class="empty">Nothing waiting to be bought.</div>`}</section>
-    <div class="note">${z.holding.length} stock${z.holding.length === 1 ? "" : "s"} held: profit and loss is on the <b>Portfolio</b> tab.</div>
-    ${renderPerformance(d.performance)}`;
 }
 
 function renderNow(d) {
@@ -332,10 +265,80 @@ function renderSectors(d) {
   return momentum + `<h3 class="section">By scanner</h3>` + byScanner;
 }
 
+const SHORT = { "63_30_daily": "63/30", "Bullish_Scanner": "Bullish", "Wkly_upswing": "Weekly" };
+const scanTag = (n) => `<span class="tag">${esc(SHORT[n] || n)}</span>`;
+const lakh = (v) => "₹" + (v / 100000).toFixed(2) + "L";
+
+function renderToday(d) {
+  const z = d.dip;
+  if (!z) return `<section class="card"><div class="empty">No data in this scan yet.</div></section>`;
+  const stake = z.rule.stake, slots = (d.performance && d.performance.portfolio && d.performance.portfolio.max_pos) || 15;
+  const hold = z.holding, sold = z.closed || [];
+  const sells = hold.filter((h) => h.sell_signal);
+  const stops = z.buy_list.filter((b) => b.stage === "breakout");
+  const cutoff = new Date(Date.now() - 4 * 864e5).toISOString().slice(0, 10);
+  const bought = hold.filter((h) => h.entry_date >= cutoff && !h.sell_signal);
+  const invested = hold.length * stake, value = hold.reduce((a, h) => a + (h.value ?? stake), 0);
+  const openPnl = value - invested, booked = sold.reduce((a, c) => a + c.pnl, 0);
+
+  const summary = `<div class="summary">
+    <div><span>Holding</span><b>${hold.length}<small class="meta">/${slots}</small></b></div>
+    <div><span>Open P&amp;L</span><b class="${cls(openPnl)}">${rupees(openPnl)}</b></div>
+    <div><span>Booked P&amp;L</span><b class="${cls(booked)}">${rupees(booked)}</b></div>
+  </div>`;
+
+  const items = [
+    ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
+        <div class="meta">At the next open · closed below its 50-day average ${money(h.ma)}</div></div>
+        <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
+    ...stops.map((b) => `<div class="row"><div><div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}</div>
+        <div class="meta">Buy-stop${b.valid_until ? " until " + fmtDate(b.valid_until) : ""} · stop ${money(b.stop)} if bought${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""} · now ${money(b.now)}</div></div>
+        <div></div></div>`),
+    ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}</div>
+        <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · stop ${money(h.stop)}</div></div>
+        <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
+  ];
+  const todo = `<section class="card todo"><h2>To do <small>${items.length ? items.length : ""}</small></h2>
+    ${items.join("") || `<div class="empty">Nothing to do today.</div>`}</section>`;
+
+  const rows = [...hold].sort((a, b) => b.ret - a.ret).map((h) => `
+    <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
+      <div class="meta">${money(h.entry)} → ${money(h.now)} · sell below ${money(h.ma)}</div></div>
+      <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div></div>`).join("");
+  const holdings = `<section class="card"><h2>Holdings <small>${lakh(value)}</small></h2>
+    ${rows || `<div class="empty">No open positions.</div>`}</section>`;
+
+  const soldRows = sold.map((c) => `
+    <div class="row hrow"><div><div class="sym">${esc(c.symbol)}${scanTag(c.scanner)}</div>
+      <div class="meta">${money(c.entry)} → ${money(c.exit)} · ${fmtDate(c.exit_date)} · ${SELL[c.reason] || esc(c.reason)}</div></div>
+      <div class="num"><div class="chg ${cls(c.ret)}">${pct(c.ret)}</div><div class="tiny ${cls(c.pnl)}">${rupees(c.pnl)}</div></div></div>`).join("");
+  const soldCard = sold.length ? `<details class="card"><summary>Sold <span class="meta">${sold.length} · ${rupees(booked)}</span></summary>${soldRows}</details>` : "";
+  return summary + todo + holdings + soldCard;
+}
+
+function renderRule(d) {
+  const r = d.dip && d.dip.rule;
+  if (!r) return "";
+  return `<section class="card"><div class="note" style="padding-top:12px;font-size:14px;color:var(--text)">
+    <b>Buy</b>: when a stock appears on a scanner, place a buy-stop at its <b>trigger</b> (the signal day's high; the week's high for Weekly)
+    for ${r.entry_days} days (${r.entry_days_weekly} for Weekly).<br><br>
+    <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day average, or at the ${r.stop}% stop (${Object.values(r.stop_by || {})[0] || r.stop}% for Weekly), or after a year.<br><br>
+    <b>Slots</b>: 15 positions of about 6.7% each. If short of slots, take 1st choice (mid caps) first.<br><br>
+    <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.</div></section>`;
+}
+
+function renderMore(d) {
+  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", breakouts: "Breakouts", sectors: "Sectors" };
+  const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
+  const body = { rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
+                 now: renderNow, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
+  return chips + body;
+}
+
 function render() {
   const d = state.data;
   document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
-  $("#view").innerHTML = { dip: renderDip, now: renderNow, breakouts: renderBreakouts, sectors: renderSectors, portfolio: renderPortfolio }[state.tab](d);
+  $("#view").innerHTML = { today: renderToday, more: renderMore }[state.tab](d);
 }
 
 document.addEventListener("click", (e) => {
@@ -344,6 +347,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.tab) state.tab = t.dataset.tab;
   else if (t.dataset.scanner) state.scanner = t.dataset.scanner;
   else if (t.dataset.status) state.status = t.dataset.status;
+  else if (t.dataset.more) state.more = t.dataset.more;
   else return;
   render();
 });
@@ -352,7 +356,7 @@ fetch("data.json", { cache: "no-store" })
   .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then((d) => {
     state.data = d;
-    $("#updated").textContent = `Last scan ${fmtWhen(d.last_scan)} · scans ${d.slots.join(", ")} IST, Mon–Fri`;
+    $("#updated").textContent = `Updated ${fmtWhen(d.last_scan)}`;
     render();
   })
   .catch((e) => { $("#view").innerHTML = `<div class="err">Couldn't load the data (${esc(e.message)}). Pull down to refresh.</div>`; });
