@@ -349,11 +349,28 @@ function renderRule(d) {
     <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.</div></section>`;
 }
 
+function renderHighs(d) {
+  const sc = d.screens || [];
+  if (!sc.length) return `<section class="card"><div class="empty">No Screener screens yet.</div></section>`;
+  return sc.map((g) => {
+    const rows = g.stocks.map((r) => `
+      <div class="row hrow"><div><div class="sym">${r.rank ? r.rank + ". " : ""}${esc(r.symbol)}${r.on_scanner ? ' <span class="tag up">on scanner</span>' : ""}${r.vs50 != null && r.vs50 < 0 ? ' <span class="tag down">below 50-day avg</span>' : ""}</div>
+        <div class="meta">${esc(r.name || "")}${r.close != null ? ` · ${money(r.close)} · 20d ${pct(r.ret20)} · ${pct(r.vs50)} vs 50-day avg · ${pct(r.below_high)} from 52w high` : " · no price data"}</div></div>
+        <div class="num">${r.score != null ? `<div><b>${r.score}</b></div><div class="tiny">score</div>` : ""}</div></div>`).join("");
+    const shown = g.stocks.length < g.total ? ` · top ${g.stocks.length} of ${g.total}` : ` · ${g.total}`;
+    return `<section class="card"><h2>${esc(g.title || "Screener screen")} <small>${shown.slice(3)}</small></h2>
+      <div class="note">Ranked by technicals: 20-day momentum, distance above the 50-day average, and room below the 52-week high (each scored within the list, averaged to 0–100).
+      In the 2019–26 backtest of your scanner breakouts, the top quarter by this score made +7.7% a trade vs +3.2% for the bottom quarter. It's an order to look at, not a buy signal, and it doesn't use the 15 slots.
+      List from <a href="${esc(g.url)}" target="_blank" rel="noopener">Screener</a>, refreshed daily${g.fetched_at ? " (" + fmtWhen(g.fetched_at) + ")" : ""}${g.stocks.length < g.total ? "; Screener shows 25 a page, so only the first 25 are read" : ""}.</div>
+      ${rows}</section>`;
+  }).join("");
+}
+
 function renderMore(d) {
-  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", breakouts: "Breakouts", sectors: "Sectors" };
+  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", highs: "Hitting highs", breakouts: "Breakouts", sectors: "Sectors" };
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
   const body = { rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
-                 now: renderNow, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
+                 now: renderNow, highs: renderHighs, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
   return chips + body;
 }
 

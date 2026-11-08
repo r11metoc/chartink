@@ -82,6 +82,8 @@ jobs:
         run: |
           # New Chartink backtest exports in data/backtest/ feed the sector view.
           python import_backtest.py
+          # Public Screener screens (data/screener_screens.txt), page 1, once a day.
+          python screener_screens.py || echo "Screener screens fetch failed, keeping the last list."
           # Yahoo hiccups shouldn't cost the scan; the dashboard falls back to scan prices.
           python refresh_prices.py || echo "Price refresh failed, using scan prices."
           # Fundamentals of every scanner stock (Yahoo, cached 30 days) for the Valuepick check.

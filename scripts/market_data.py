@@ -17,7 +17,10 @@ BATCH_SIZE = 50
 
 
 def to_yahoo_ticker(symbol: str) -> str:
-    return symbol if symbol.startswith("^") else f"{symbol}.NS"
+    if symbol.startswith("^"):
+        return symbol
+    # Screener uses the BSE code for stocks listed only on BSE
+    return f"{symbol}.BO" if symbol.isdigit() else f"{symbol}.NS"
 
 
 def fetch_daily(symbols: list[str], start: str, end: str | None = None) -> dict[str, pd.DataFrame]:

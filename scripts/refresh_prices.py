@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 
 import db
+import screener_screens
 from dipzone import HISTORY_DAYS
 from market_data import fetch_daily
 
@@ -30,6 +31,7 @@ def tracked_symbols(conn) -> tuple[list[str], str]:
     symbols |= {s for (s,) in conn.execute(
         "SELECT DISTINCT symbol FROM results WHERE run_id = (SELECT MAX(id) FROM runs)")}
     symbols |= {s for (s,) in conn.execute("SELECT DISTINCT symbol FROM backtest_hits WHERE hit_date >= ?", (bt_since,))}
+    symbols |= set(screener_screens.symbols(conn))  # More -> Hitting highs
     first = conn.execute("SELECT MIN(detected_at) FROM breakouts WHERE detected_at >= ?", (since,)).fetchone()[0]
     start = min(date.fromisoformat(first[:10]) if first else date.today(), date.fromisoformat(bt_since)) - timedelta(days=7)
     # A year more for the buy-the-dip rule's 52-week-high filter.
