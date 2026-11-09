@@ -1,7 +1,7 @@
 // Offline support for the home-screen app.
 // Page and data: network first (always fresh when online), saved copy when offline.
 // Icons and manifest: saved copy first.
-const CACHE = "scanner-v1";
+const CACHE = "scanner-v2";
 const SHELL = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "icon-180.png"];
 
 self.addEventListener("install", (e) => {
@@ -16,7 +16,9 @@ self.addEventListener("activate", (e) => {
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
   try {
-    const res = await fetch(req, { cache: "no-store" });
+    // A page navigation can't be re-issued with options (it throws), which made
+    // v1 serve its saved copy of the page forever; fetch the URL instead.
+    const res = await fetch(req.mode === "navigate" ? req.url : req, { cache: "no-store" });
     if (res.ok) cache.put(req, res.clone());
     return res;
   } catch (err) {

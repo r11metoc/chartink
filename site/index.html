@@ -638,7 +638,12 @@ window.addEventListener("touchend", () => {
   if (y0 != null && pulled > 80) load();
   y0 = null; $("#ptr").style.height = "0";
 });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((r) => r.update()).catch(() => {});
+  // When a new version of the app takes over, reload once to show it.
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (!reloaded) { reloaded = true; location.reload(); } });
+}
 load();
 </script>
 </body>
