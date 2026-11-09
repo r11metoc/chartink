@@ -307,8 +307,8 @@ const fundLine = (f) => {
   const src = f.asof ? ` (Screener, ${fmtDate(f.asof)})` : f.source === "Yahoo" ? " (Yahoo)" : "";
   return ` · ${head}${f.score != null ? ` · Valuepick ${Math.round(f.score)}` : ""}${f.bank ? " · bank: ROE used, OPM and debt/equity not applicable" : ""}${src}`;
 };
-const evTag = (sym) => { const d = (state.data && state.data.events || {})[sym];
-  return d ? ` <span class="tag" style="background:var(--hold-bg);color:var(--hold)">📅 results ${fmtDate(d)}</span>` : ""; };
+const evTag = (sym) => { const e = (state.data && state.data.events || {})[sym];
+  return e ? ` <span class="tag" style="background:var(--hold-bg);color:var(--hold)">📅 ${esc(e.what)} ${fmtDate(e.date)}</span>` : ""; };
 
 function renderMarket(d) {
   const m = d.market;
@@ -360,9 +360,9 @@ function renderToday(d, part) {
         ${b.fund ? `<div class="meta" style="padding-top:6px">Fundamentals${fundLine(b.fund)}</div>` : ""}</details>`),
   ];
   const ev = d.events || {};
-  const evRows = Object.entries(ev).filter(([sym]) => held[sym] || waiting[sym]).sort((a, b) => a[1].localeCompare(b[1]));
+  const evRows = Object.entries(ev).filter(([sym]) => held[sym] || waiting[sym]).sort((a, b) => a[1].date.localeCompare(b[1].date));
   if (evRows.length) actions.push(`<div class="row"><div><div class="sym">📅 Results coming</div>
-      <div class="meta">${evRows.map(([sym, dt]) => `<b>${esc(sym)}</b> ${fmtDate(dt)} (${held[sym] ? "holding" : "buy-stop"})`).join(" · ")} · prices can jump either way on results day</div></div><div></div></div>`);
+      <div class="meta">${evRows.map(([sym, e]) => `<b>${esc(sym)}</b> ${fmtDate(e.date)}${e.what !== "results" ? " (" + esc(e.what) + ")" : ""} · ${held[sym] ? "holding" : "buy-stop"}`).join(" · ")} · prices can jump either way on results day</div></div><div></div></div>`);
   const done = [
     ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
         <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · stop ${money(h.stop)}</div></div>

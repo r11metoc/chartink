@@ -113,6 +113,12 @@ def upcoming_results(conn, symbols: list[str], days: int = EVENT_DAYS, today: da
         if not d and screener_company is not None:
             row = screener_company.cached(sym) or {}
             d = by_code.get(str(row.get("BSE Code", "")).strip())
+        if not d and screener_company is not None:
+            ds = sorted((x["date"], x["what"]) for x in screener_company.events(sym) if today.isoformat() <= x["date"] <= until)
+            if ds and ds[0][1] != "results":
+                out[sym] = {"date": ds[0][0], "what": ds[0][1]}
+                continue
+            d = ds[0][0] if ds else None
         if not d:
             try:
                 r = conn.execute("SELECT event_date FROM yahoo_events WHERE symbol = ? AND event_date >= ? AND event_date <= ?",
@@ -121,7 +127,7 @@ def upcoming_results(conn, symbols: list[str], days: int = EVENT_DAYS, today: da
             except Exception:  # no Yahoo table yet
                 d = None
         if d:
-            out[sym] = d
+            out[sym] = {"date": d, "what": "results"}
     return out
 
 

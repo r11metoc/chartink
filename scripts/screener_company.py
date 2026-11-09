@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -106,11 +106,13 @@ def parse(page: str) -> dict:
         return None
 
     ind = soup.select('#peers a[title="Industry"]')
+    cid = re.search(r"/announcements/recent/(\d+)/", page)
     bse = re.search(r"bseindia\.com/stock-share-price/[^/\"]+/[^/\"]+/(\d{6})/", page)
     out = {
         "Name": (soup.find("h1").get_text(strip=True) if soup.find("h1") else ""),
         "Industry": ind[-1].get_text(strip=True) if ind else "",
         "BSE Code": bse.group(1) if bse else None,
+        "Company ID": cid.group(1) if cid else None,
         "Current Price": first("Current Price"),
         "High price": first("High / Low"),
         "Market Capitalization": first("Market Cap"),
@@ -135,6 +137,65 @@ def parse(page: str) -> dict:
         "Debtor Days Ch": round(dd[-1] - dd[-2], 1) if len(dd) >= 2 and None not in dd[-2:] else None,
     }
     return {k: ("" if v is None else v) for k, v in out.items()}
+
+
+_MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+_DATE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*(20\d\d)\b", re.I)
+_DMY = re.compile(r"\b(\d{1,2})[/-](\d{1,2})[/-](20\d\d)\b")
+
+
+def parse_events(fragment: str) -> list[dict]:
+    """Board meetings announced in a Screener announcements list:
+    [{'date': 'YYYY-MM-DD', 'what': 'results' | 'board meeting'}], newest first."""
+    from bs4 import BeautifulSoup
+    out = []
+    for li in BeautifulSoup(fragment, "html.parser").find_all("li"):
+        text = " ".join(li.get_text(" ", strip=True).split())
+        if not re.search(r"board\s+meet", text, re.I):
+            continue
+        dates = [f"{y}-{_MONTHS[m[:3].lower()]:02d}-{int(d):02d}" for d, m, y in _DATE.findall(text)]
+        dates += [f"{y}-{int(mo):02d}-{int(d):02d}" for d, mo, y in _DMY.findall(text) if 1 <= int(mo) <= 12]
+        if dates:
+            out.append({"date": max(dates), "what": "results" if re.search(r"result", text, re.I) else "board meeting"})
+    return out
+
+
+def events(symbol: str) -> list[dict]:
+    cached(symbol)
+    e = (_mem or {}).get(symbol) or {}
+    return e.get("events", [])
+
+
+def refresh_events(symbols: list[str], hours: int = 20, get=None, sleep=time.sleep) -> int:
+    """Re-read the recent announcements (a small page) of the stocks that
+    matter once a day, for board-meeting / results dates."""
+    global _mem
+    data = _load()
+    if get is None:
+        import requests
+        get = lambda url: requests.get(url, headers={"User-Agent": UA}, timeout=30)  # noqa: E731
+    now = datetime.now(timezone.utc)
+    n = fails = 0
+    for sym in sorted(set(symbols)):
+        e = data.get(sym)
+        cid = e and e["data"].get("Company ID")
+        if not cid or (e.get("events_at") and now - datetime.fromisoformat(e["events_at"]) < timedelta(hours=hours)):
+            continue
+        try:
+            r = get(f"https://www.screener.in/announcements/recent/{cid}/")
+            r.raise_for_status()
+            fails = 0
+        except Exception:
+            fails += 1
+            if fails >= MAX_FAILS:
+                break
+            continue
+        e["events"], e["events_at"] = parse_events(r.text), now.isoformat()
+        n += 1
+        sleep(DELAY_S)
+    CACHE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    _mem = data
+    return n
 
 
 def _load() -> dict:
@@ -175,6 +236,7 @@ def fetch(symbol: str, get=None, sleep=time.sleep) -> dict | None:
             return None
         r.raise_for_status()
         row = parse(r.text)
+        row["_events"] = parse_events(r.text)
         if row["Profit after tax"] != "":
             return row
         if row["Market Capitalization"] != "" and best is None:
@@ -189,7 +251,7 @@ def refresh(symbols: list[str], days: int = REFRESH_DAYS, get=None, sleep=time.s
     done = fails = 0
     for sym in sorted(set(symbols)):
         e = data.get(sym)
-        if e and (now - datetime.fromisoformat(e["fetched_at"])).days < days and "BSE Code" in e["data"]:
+        if e and (now - datetime.fromisoformat(e["fetched_at"])).days < days and "Company ID" in e["data"]:
             continue
         try:
             row = fetch(sym, get, sleep)
@@ -202,7 +264,8 @@ def refresh(symbols: list[str], days: int = REFRESH_DAYS, get=None, sleep=time.s
                 break
             continue
         if row:
-            data[sym] = {"fetched_at": now.isoformat(), "data": row}
+            ev = row.pop("_events", [])
+            data[sym] = {"fetched_at": now.isoformat(), "data": row, "events": ev, "events_at": now.isoformat()}
             done += 1
         sleep(DELAY_S)
     CACHE.parent.mkdir(parents=True, exist_ok=True)

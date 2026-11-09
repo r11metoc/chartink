@@ -48,3 +48,31 @@ def test_refresh_caches_and_backs_off(tmp_path, monkeypatch):
     n = sc.refresh([f"BLOCK{i}" for i in range(9)], get=get, sleep=lambda s: None)
     assert n == 0 and len(urls) == sc.MAX_FAILS  # stops after MAX_FAILS failures in a row
     assert "GOOD" in json.loads((tmp_path / "c.json").read_text())
+
+
+FRAG = """<ul class="list-links">
+<li><a href="#"> Announcement under Regulation 30 (LODR)-Analyst / Investor Meet - Intimation
+  <div class="ink-600 smaller"><time datetime="2026-11-07">7 Nov</time> - Intimation of conference call.</div></a></li>
+<li><a href="#"> Board Meeting Intimation for Board Meeting To Be Held On 12Th November, 2026.
+  <div class="ink-600 smaller"><time datetime="2026-10-27">27 Oct</time> - Board meets on 12 Nov 2026 to approve Q2 results.</div></a></li>
+<li><a href="#"> Board Meeting Intimation for dividend <div><time>2 Oct</time> - meeting on 15/12/2026</div></a></li>
+<li><a href="#"> Grant Of Options <div><time>26 Oct</time> - granted on 24 October 2026.</div></a></li>
+</ul>"""
+
+
+def test_parse_events_reads_board_meeting_dates():
+    ev = sc.parse_events(FRAG)
+    assert ev == [{"date": "2026-11-12", "what": "results"}, {"date": "2026-12-15", "what": "board meeting"}]
+
+
+def test_refresh_events_uses_company_id(tmp_path, monkeypatch):
+    import json
+    cache = tmp_path / "c.json"
+    cache.write_text(json.dumps({"ALICON": {"fetched_at": "2026-11-09T00:00:00+00:00", "data": {"Company ID": "127"}},
+                                 "NOID": {"fetched_at": "2026-11-09T00:00:00+00:00", "data": {}}}))
+    monkeypatch.setattr(sc, "CACHE", cache)
+    monkeypatch.setattr(sc, "_mem", None)
+    urls = []
+    assert sc.refresh_events(["ALICON", "NOID"], get=lambda u: urls.append(u) or Resp(200, FRAG), sleep=lambda s: None) == 1
+    assert urls == ["https://www.screener.in/announcements/recent/127/"]
+    assert sc.events("ALICON")[0] == {"date": "2026-11-12", "what": "results"}

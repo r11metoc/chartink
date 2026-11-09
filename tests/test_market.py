@@ -26,7 +26,7 @@ def test_calendar_and_matching(tmp_path, monkeypatch):
     import screener_company
     monkeypatch.setattr(screener_company, "cached", lambda s: {"BSE Code": "500001"} if s == "XYZ" else None)
     ev = market.upcoming_results(c, ["ALICON", "XYZ", "LATER", "NONE"], today=date(2026, 11, 9))
-    assert ev == {"ALICON": "2026-11-12", "XYZ": "2026-11-10"}
+    assert ev == {"ALICON": {"date": "2026-11-12", "what": "results"}, "XYZ": {"date": "2026-11-10", "what": "results"}}
 
 
 def test_pulse_trend(tmp_path, monkeypatch):
@@ -46,4 +46,4 @@ def test_yahoo_dates_fill_in(tmp_path, monkeypatch):
     c.execute("INSERT INTO yahoo_events VALUES ('FAR', '2026-12-30', '2026-11-09T00:00:00+00:00')")
     import screener_company
     monkeypatch.setattr(screener_company, "cached", lambda s: None)
-    assert market.upcoming_results(c, ["TIPS", "FAR"], today=date(2026, 11, 9)) == {"TIPS": "2026-11-11"}
+    assert market.upcoming_results(c, ["TIPS", "FAR"], today=date(2026, 11, 9)) == {"TIPS": {"date": "2026-11-11", "what": "results"}}

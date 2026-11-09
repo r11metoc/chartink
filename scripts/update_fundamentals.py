@@ -17,6 +17,9 @@ def main() -> int:
         import screener_company
         m = screener_company.refresh(sorted(symbols))
         print(f"Screener pages: {m} updated, {sum(screener_company.cached(s) is not None for s in symbols)}/{len(symbols)} cached")
+        import market
+        watch = market.watch_symbols(conn)
+        print(f"Screener announcements: {screener_company.refresh_events(watch)} of {len(watch)} watched stocks re-read")
     except Exception as e:  # Yahoo still covers them
         print(f"Screener pages failed ({e.__class__.__name__}); Yahoo only")
     n = yf_fund.refresh(conn, sorted(symbols))
