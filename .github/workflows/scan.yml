@@ -4,7 +4,7 @@ on:
   schedule:
     # GitHub starts scheduled runs hours late, so this fires every 15 minutes and
     # scripts/slot_gate.py decides by the actual time: one scan per slot at
-    # 09:23, 12:23 and 15:23 IST, Mon-Fri. Every other run stops in seconds.
+    # 10:00, 13:00 and 15:00 IST, Mon-Fri. Every other run stops in seconds.
     - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:

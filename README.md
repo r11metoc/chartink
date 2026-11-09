@@ -94,7 +94,7 @@ read and write), saved in your browser only.
   hours, so this job stays up ~5.5 hours, starts `scan.yml` in auto mode every
   15 minutes, then restarts itself (its own 3-hourly schedule only revives it).
 - **Scan** (`scan.yml`): the gate (`scripts/slot_gate.py`) scans once per slot,
-  09:23, 12:23 and 15:23 IST, Mon–Fri (each slot open until the next, the last
+  10:00, 13:00 and 15:00 IST, Mon–Fri (each slot open until the next, the last
   until 20:00). A scan reads the dashboard (`scrape_dashboard.py`, waits until
   every widget's rows stop changing), repairs half-read scans
   (`db.repair_partial_reads`), refreshes prices (Yahoo), the results calendar

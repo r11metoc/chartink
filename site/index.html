@@ -431,7 +431,7 @@ function renderRule(d) {
     <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.<br><br>
     Paper trades of ₹1L each; returns are after 0.25% costs. Not advice.`)
   + sec("Scans and alerts", `
-    Scans at 09:23, 12:23 and 15:23 IST, Monday to Friday; the header shows the next one.
+    Scans at 10:00, 13:00 and 15:00 IST (within about 15 minutes), Monday to Friday; the header shows the next one.
     Telegram sends only today's actions (set a buy-stop, bought, sell, closed). Ask the bot for more:
     /today, /holdings, /scanners, /breakouts, /fundamentals, /help (replies within about 15 minutes).<br><br>
     <b>Data check</b> on Today re-checks every scan: scan freshness, prices, every paper trade against the daily prices, and fundamentals.`)
@@ -714,7 +714,7 @@ async function load() {
     $("#offline").innerHTML = cached ? `<div class="offline">Offline: showing the data saved on this phone.</div>` : "";
     state.data = d;
     loadedAt = Date.now();
-    $("#updated").textContent = `Updated ${fmtWhen(d.last_scan)} · ${nextScan(d.slots || ["09:23", "12:23", "15:23"])}`;
+    $("#updated").textContent = `Updated ${fmtWhen(d.last_scan)} · ${nextScan(d.slots || ["10:00", "13:00", "15:00"])}`;
     render();
   } catch (e) {
     if (!state.data) $("#view").innerHTML = `<div class="err">Couldn't load the data (${esc(e.message)}). Pull down to refresh.</div>`;
