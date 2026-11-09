@@ -509,9 +509,10 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     passed: dict[str, dict] = {}
     for s in states:
         if s.get("status") in ("no slot", "skipped") and pd.Timestamp(s["date"]) >= recent and s["symbol"] not in active:
-            prev = passed.get(s["symbol"])
+            key = f'{s["scanner"]}|{s["symbol"]}'
+            prev = passed.get(key)
             if prev is None or _iso(s["date"]) >= prev["signal"]:
-                passed[s["symbol"]] = {"symbol": s["symbol"], "scanner": s["scanner"], "signal": _iso(s["date"]),
+                passed[key] = {"symbol": s["symbol"], "scanner": s["scanner"], "signal": _iso(s["date"]),
                                        "why": "no free slot" if s["status"] == "no slot" else s.get("why", "filtered out")}
     order = {"zone": 0, "dip": 1, "breakout": 2}
     buy_list.sort(key=lambda x: (order[x["stage"]], x["priority"], x["signal"]))

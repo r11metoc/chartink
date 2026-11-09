@@ -145,3 +145,13 @@ def test_screener_page_preferred_and_hidden_on_public_site(monkeypatch):
     pub = dipzone._public_fund(c)
     assert pub["screen"]["fails"] == ["P/E fails"] and pub["pe"] is None
     assert "35" not in str(pub["screen"])
+
+
+def test_banks_use_roe_and_skip_opm_de_debtors(monkeypatch):
+    monkeypatch.setattr(fundamentals, "_export", {})
+    bank = dict(SCREEN_OK, **{"Industry": "Private Sector Bank", "OPM": "-16", "Debt to equity": "6",
+                              "Debtor days": "867", "Return on capital employed": "7", "Return on equity": "12"})
+    monkeypatch.setattr(fundamentals, "_auto_row", lambda s: (bank, "Yahoo"))
+    c = fundamentals.check("ABANK", fundamentals.FILE)
+    assert c["bank"] and {"OPM", "Debt/equity", "Debtor days"} <= set(c["screen"]["unknown"])
+    assert c["screen"]["fails"] == ["ROE 12% (needs > 15%)"] and c["screen"]["fail_labels"] == ["ROE"]

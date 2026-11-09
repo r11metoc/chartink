@@ -24,6 +24,7 @@ from pathlib import Path
 import db
 import dipzone
 import fundamental_scan
+import health
 from notify import _col, _num, _price
 from slot_gate import IST, SLOTS
 
@@ -243,12 +244,13 @@ def main() -> int:
     states = dipzone.live_states(conn)
     triggers = dipzone.trigger_map(states)
     breakouts = breakouts_view(conn, latest_run, triggers)
+    scanners = scanners_view(conn, latest_run, triggers)
     data = {
         "generated_at": datetime.now(IST).isoformat(timespec="minutes"),
         "last_scan": _ist(last_scan).isoformat(timespec="minutes"),
         "slots": list(SLOTS),
         "window_days": WINDOW_DAYS,
-        "scanners": scanners_view(conn, latest_run, triggers),
+        "scanners": scanners,
         "breakouts": breakouts,
         "stats": stats_view(breakouts),
         "sectors": sectors_view(conn),
@@ -256,6 +258,7 @@ def main() -> int:
         "dip": dipzone.dashboard_view(states),
         "performance": _performance(),
         "fundscan": fundamental_scan.view(),
+        "health": health.checks(conn, states, last_scan, scanners),
     }
     conn.close()
     OUT.parent.mkdir(parents=True, exist_ok=True)

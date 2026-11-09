@@ -153,6 +153,12 @@ def cached(symbol: str) -> dict | None:
     return dict(e["data"], **{"NSE Code": symbol}) if e else None
 
 
+def fetched_at(symbol: str) -> str | None:
+    cached(symbol)
+    e = (_mem or {}).get(symbol)
+    return e["fetched_at"][:10] if e else None
+
+
 def fetch(symbol: str, get=None, sleep=time.sleep) -> dict | None:
     """Row for one stock: consolidated page, else standalone. None if not found."""
     if get is None:

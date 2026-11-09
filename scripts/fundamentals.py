@@ -101,13 +101,26 @@ def check(symbol: str, path: Path = FILE) -> dict | None:
     # The uploaded export's numbers where it has them, the automatic source for the rest.
     row = {**(auto or {}), **{k: v for k, v in (scr or {}).items() if str(v or "").strip()}}
     src = f"Screener export + {asrc}" if scr and auto else "Screener export" if scr else asrc
+    bank = "bank" in str(row.get("Industry", "")).lower()
+    if bank:
+        # Banks: operating margin and debt/equity don't apply (deposits are their raw
+        # material) and ROE is the return measure, not ROCE.
+        row = {**row, "OPM": "", "Debt to equity": "", "Debtor days": "", "Debtor Days Ch": "",
+               "Return on capital employed": row.get("Return on equity", "")}
     screen = main_screen.evaluate(row)
+    if bank:  # say ROE where ROE was checked
+        screen["fails"] = [("ROE" + f[4:]) if f.startswith("ROCE ") else f for f in screen["fails"]]
+        screen["fail_labels"] = ["ROE" if x == "ROCE" else x for x in screen["fail_labels"]]
     vrow = row
     if "bank" in str(row.get("Industry", "")).lower():
         # Banks: widely held (no promoter) and loans are not trade receivables.
         vrow = {**row, "Promoter holding": "", "Debtor days": "", "Debtor Days Ch": ""}
     v = vp.score_row(vrow)
-    return {"source": src, "private": "Screener page" in src, "screen": screen,
+    asof = None
+    if "Screener page" in src:
+        import screener_company
+        asof = screener_company.fetched_at(sym)
+    return {"source": src, "private": "Screener page" in src, "bank": bank, "asof": asof, "screen": screen,
             "score": v.get("score"), "verdict": v.get("verdict"), "flags": v.get("flags"),
             "pe": v.get("pe"), "roce": v.get("roce"), "promoter": v.get("promoter")}
 

@@ -304,7 +304,8 @@ const fundLine = (f) => {
   const sc = f.screen;
   const head = sc.ok ? `passes your screen (${sc.passed}/${sc.checked})`
     : sc.fails.length ? `fails your screen: ${sc.fails.map(esc).join("; ")}` : `screen: not enough data (${sc.checked}/${sc.total})`;
-  return ` · ${head}${f.score != null ? ` · Valuepick ${Math.round(f.score)}` : ""}`;
+  const src = f.asof ? ` (Screener, ${fmtDate(f.asof)})` : f.source === "Yahoo" ? " (Yahoo)" : "";
+  return ` · ${head}${f.score != null ? ` · Valuepick ${Math.round(f.score)}` : ""}${f.bank ? " · bank: ROE used, OPM and debt/equity not applicable" : ""}${src}`;
 };
 const lakh = (v) => "₹" + (v / 100000).toFixed(2) + "L";
 
@@ -326,7 +327,7 @@ function renderToday(d) {
     <div><span>Holding</span><b>${hold.length}<small class="meta">/${slots}</small></b></div>
     <div><span>Open P&amp;L</span><b class="${cls(openPnl)}">${rupees(openPnl)}</b></div>
     <div><span>Booked P&amp;L</span><b class="${cls(booked)}">${rupees(booked)}</b></div>
-  </div>`;
+  </div><div class="meta" style="margin:-4px 2px 4px">Paper trades of ₹1L each · returns after 0.25% costs (brokerage, taxes, slippage)</div>`;
 
   const actions = [
     ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
@@ -347,12 +348,12 @@ function renderToday(d) {
   // Every stock on the scanners in the latest scan, with what the rule did with it.
   const held = Object.fromEntries(hold.map((h) => [h.symbol, h]));
   const waiting = Object.fromEntries(z.buy_list.map((b) => [b.symbol, b]));
-  const why = Object.fromEntries(passed.map((p) => [p.symbol, p.why.split(":")[0]]));
+  const why = Object.fromEntries(passed.map((p) => [p.scanner + "|" + p.symbol, p.why.split(":")[0]]));
   const onScan = (d.scanners || []).flatMap((g) => g.rows.map((r) => ({ ...r, scanner: g.name })));
   const scanRows = onScan.map((r) => {
     const h = held[r.symbol], b = waiting[r.symbol];
     const chip = h ? `<span class="pill BUY">Holding ${pct(h.ret)}</span>` : b ? `<span class="pill HOLD">Buy-stop</span>`
-      : `<span class="pill WAIT">${esc(why[r.symbol] || "not taken")}</span>`;
+      : `<span class="pill WAIT">${esc(why[r.scanner + "|" + r.symbol] || "not taken")}</span>`;
     const vs = r.trigger != null ? ` · trigger ${money(r.trigger)} (${r.chg >= 0 ? "above" : "below"}, ${pct(r.chg)})` : "";
     return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${scanTag(r.scanner)}</div>
       <div class="meta">${money(r.now)}${vs}${r.industry ? " · " + esc(r.industry) : ""}</div></div><div class="num">${chip}</div></div>`;
@@ -376,7 +377,10 @@ function renderToday(d) {
       <div class="meta">${money(c.entry)} → ${money(c.exit)} · ${fmtDate(c.exit_date)} · ${SELL[c.reason] || esc(c.reason)}</div></div>
       <div class="num"><div class="chg ${cls(c.ret)}">${pct(c.ret)}</div><div class="tiny ${cls(c.pnl)}">${rupees(c.pnl)}</div></div></div>`).join("");
   const soldCard = sold.length ? `<details class="card"><summary>Sold <span class="meta">${sold.length} · ${rupees(booked)}</span></summary>${soldRows}</details>` : "";
-  return summary + todo + scanCard + holdings + soldCard;
+  const hc = d.health;
+  const healthCard = hc ? `<details class="card"><summary>Data check <span class="meta" style="color:${hc.ok ? "var(--up)" : "var(--down)"}">${hc.ok ? "✓ all good" : "⚠ " + hc.checks.filter((c) => !c.ok).length + " issue(s)"}</span></summary>
+    ${hc.checks.map((c) => `<div class="row hrow"><div class="meta" style="color:var(--text)">${c.ok ? "✓" : "⚠"} ${esc(c.text)}</div><div></div></div>`).join("")}</details>` : "";
+  return summary + todo + scanCard + holdings + soldCard + healthCard;
 }
 
 function renderRule(d) {
@@ -547,14 +551,14 @@ function renderFundScan(d) {
     `<button data-fv="${esc(k)}" class="${state.fv === k ? "on" : ""}">${esc(k)} ${all.filter(g).length}</button>`).join("")}</div>`;
   const vcls = (v) => v.startsWith("Shortlist") ? "up" : v.startsWith("Reject") || v.startsWith("Skip") ? "down" : "";
   const num = (v, u = "") => (v == null || v === "" ? "–" : `${Math.round(v * 10) / 10}${u}`);
-  const rows = all.filter(groups[state.fv]).map((x) => {
+  const rows = all.filter(groups[state.fv]).map((x, i) => {
     const sc = x.screen;
     const scr = sc.ok ? `<span class="tag up">screen ✓ ${sc.passed}/${sc.checked}</span>`
       : sc.fails.length ? `<span class="tag down">screen ✗ ${sc.fails.length}</span>` : `<span class="tag">screen ? ${sc.checked}/${sc.total}</span>`;
     const why = [x.flags && "⚠ " + x.flags, sc.fails.length && "Fails: " + sc.fails.join("; "),
                  sc.unknown.length && "Not in export: " + sc.unknown.join(", ")].filter(Boolean).map(esc).join("<br>");
     return `<details class="row hrow fs" style="display:block"><summary style="list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:8px">
-      <div><div class="sym">${x.rank}. ${esc(x.name || x.code)} <span class="tag ${vcls(x.verdict)}">${esc(x.verdict || "no score")}</span>${scr}</div>
+      <div><div class="sym">${i + 1}. ${esc(x.name || x.code)} <span class="tag ${vcls(x.verdict)}">${esc(x.verdict || "no score")}</span>${scr}</div>
         <div class="meta">${esc(x.code)}${x.industry ? " · " + esc(x.industry) : ""}</div>
         <div class="meta">P/E ${num(x.pe)} · ROCE ${num(x.roce, "%")} · promoter ${num(x.promoter, "%")} · ₹${num(x.mcap)} Cr · ${num(x.from_high, "%")} from high${x.entry ? " · " + esc(x.entry) : ""}</div></div>
       <div class="num"><div><b>${x.score == null ? "–" : Math.round(x.score)}</b></div><div class="tiny">Valuepick</div></div></summary>
