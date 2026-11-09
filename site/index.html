@@ -333,9 +333,10 @@ function renderToday(d, part) {
     ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
         <div class="meta">At the next open · closed below its 50-day average ${money(h.ma)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
-    ...stops.map((b) => `<div class="row"><div><div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}</div>
-        <div class="meta">Buy-stop${b.valid_until ? " until " + fmtDate(b.valid_until) : ""} · stop ${money(b.stop)} if bought${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""} · now ${money(b.now)}${fundLine(b.fund)}</div></div>
-        <div></div></div>`),
+    ...stops.map((b) => `<details class="row fs" style="display:block"><summary style="list-style:none;cursor:pointer">
+        <div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}</div>
+        <div class="meta">Until ${b.valid_until ? fmtDate(b.valid_until) : "–"} · stop ${money(b.stop)} if bought · now ${money(b.now)}${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""}</div></summary>
+        ${b.fund ? `<div class="meta" style="padding-top:6px">Fundamentals${fundLine(b.fund)}</div>` : ""}</details>`),
   ];
   const done = [
     ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
@@ -349,14 +350,25 @@ function renderToday(d, part) {
   const held = Object.fromEntries(hold.map((h) => [h.symbol, h]));
   const waiting = Object.fromEntries(z.buy_list.map((b) => [b.symbol, b]));
   const why = Object.fromEntries(passed.map((p) => [p.scanner + "|" + p.symbol, p.why.split(":")[0]]));
-  const onScan = (d.scanners || []).flatMap((g) => g.rows.map((r) => ({ ...r, scanner: g.name })));
+  const pending = Object.fromEntries((z.pending || []).map((p) => [p.scanner + "|" + p.symbol, p]));
+  const bySym = {};
+  for (const g of d.scanners || []) for (const r of g.rows) (bySym[r.symbol] ||= { ...r, scanners: [] }).scanners.push(g.name);
+  const onScan = Object.values(bySym);
   const scanRows = onScan.map((r) => {
     const h = held[r.symbol], b = waiting[r.symbol];
-    const chip = h ? `<span class="pill BUY">Holding ${pct(h.ret)}</span>` : b ? `<span class="pill HOLD">Buy-stop</span>`
-      : `<span class="pill WAIT">${esc(why[r.scanner + "|" + r.symbol] || "not taken")}</span>`;
-    const vs = r.trigger != null ? ` · trigger ${money(r.trigger)} (${r.chg >= 0 ? "above" : "below"}, ${pct(r.chg)})` : "";
-    return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${scanTag(r.scanner)}</div>
-      <div class="meta">${money(r.now)}${vs}${r.industry ? " · " + esc(r.industry) : ""}</div></div><div class="num">${chip}</div></div>`;
+    const newOn = r.scanners.filter((sc) => pending[sc + "|" + r.symbol]);
+    const reason = r.scanners.map((sc) => why[sc + "|" + r.symbol]).find(Boolean);
+    let chip, note;
+    if (h) { chip = `<span class="pill BUY">Holding ${pct(h.ret)}</span>`; note = `bought ${fmtDate(h.entry_date)} at ${money(h.entry)}`; }
+    else if (b) { chip = `<span class="pill HOLD">Buy-stop</span>`; note = `buy above ${money(b.level)} until ${b.valid_until ? fmtDate(b.valid_until) : "–"}`; }
+    else if (newOn.length) {
+      const wk = newOn.every((sc) => SHORT[sc] === "Weekly");
+      chip = `<span class="pill WAIT">${wk ? "New this week" : "New today"}</span>`;
+      note = `buy-stop at the ${wk ? "week's" : "day's"} high, set after the ${wk ? "week's" : ""} close${hold.length >= slots ? " if a slot is free" : ""}`.replace("the  close", "the close");
+    } else { chip = `<span class="pill WAIT">${esc(reason || "not taken")}</span>`;
+             note = r.trigger != null ? `trigger ${money(r.trigger)} (${r.chg >= 0 ? "above" : "below"}, ${pct(r.chg)})` : ""; }
+    return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${r.scanners.map(scanTag).join("")}</div>
+      <div class="meta">${money(r.now)}${note ? " · " + note : ""}${r.industry ? " · " + esc(r.industry) : ""}</div></div><div class="num">${chip}</div></div>`;
   }).join("");
   const scanCard = `<section class="card"><h2>On the scanners now <small>${onScan.length}</small></h2>
     ${scanRows || `<div class="empty">No stocks on the scanners in the latest scan.</div>`}</section>`;
@@ -603,6 +615,15 @@ document.addEventListener("click", (e) => {
   render();
 });
 
+function nextScan(slots) {
+  // Scans run at the slot times (IST), Monday to Friday.
+  const ist = new Date(Date.now() + (330 + new Date().getTimezoneOffset()) * 60e3);
+  const hm = ist.getHours() * 60 + ist.getMinutes(), wd = ist.getDay();
+  const mins = slots.map((t) => +t.slice(0, 2) * 60 + +t.slice(3));
+  if (wd >= 1 && wd <= 5) { const i = mins.findIndex((m) => m > hm); if (i >= 0) return `next scan ${slots[i]}`; }
+  const nextDay = wd === 5 || wd === 6 ? "Monday" : "tomorrow";
+  return `next scan ${nextDay} ${slots[0]}`;
+}
 let loadedAt = 0;
 async function load() {
   const btn = $("#refresh");
@@ -615,7 +636,7 @@ async function load() {
     $("#offline").innerHTML = cached ? `<div class="offline">Offline: showing the data saved on this phone.</div>` : "";
     state.data = d;
     loadedAt = Date.now();
-    $("#updated").textContent = `Updated ${fmtWhen(d.last_scan)}`;
+    $("#updated").textContent = `Updated ${fmtWhen(d.last_scan)} · ${nextScan(d.slots || ["09:23", "12:23", "15:23"])}`;
     render();
   } catch (e) {
     if (!state.data) $("#view").innerHTML = `<div class="err">Couldn't load the data (${esc(e.message)}). Pull down to refresh.</div>`;

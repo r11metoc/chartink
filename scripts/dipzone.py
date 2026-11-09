@@ -528,7 +528,10 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
             "skipped": skipped,
             "fund_asof": fundamentals.scores().get("_asof"),
             "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity,
-            "closed": closed, "passed": sorted(passed.values(), key=lambda x: x["signal"], reverse=True)}
+            "closed": closed, "passed": sorted(passed.values(), key=lambda x: x["signal"], reverse=True),
+            # signals whose candle isn't complete yet (today's, or this week's for weekly)
+            "pending": [{"symbol": s["symbol"], "scanner": s["scanner"], "signal": _iso(s["date"])}
+                        for s in states if s.get("status") == "no prices yet"]}
 
 
 # ------------------------------------------------------------ backtest report
