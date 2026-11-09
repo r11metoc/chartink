@@ -14,9 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "train or predict"
+        description: "train, predict, or window_test (backtest longer buy-stop windows)"
         type: choice
-        options: [predict, train]
+        options: [predict, train, window_test]
         default: predict
       symbols:
         description: "predict: comma-separated symbols (blank = latest dashboard scan)"
@@ -96,6 +96,19 @@ jobs:
             git pull --rebase origin "${{ github.ref_name }}"
             git push origin "HEAD:${{ github.ref_name }}"
           fi
+
+      - name: Entry window test (reports/entry_window_test.md)
+        if: inputs.mode == 'window_test'
+        working-directory: scripts
+        run: |
+          python entry_window_test.py
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/entry_window_test.md
+          git commit -m "Entry window test $(date -u +%Y-%m-%dT%H:%M:%SZ)" || exit 0
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
 
       - name: Score scanner results
         if: inputs.mode == 'predict'
