@@ -4,4 +4,5 @@ debug/
 .venv/
 reports/daily_prices_after_signal.xlsx
 site/data.json
-
+# Screener company-page figures: private (Actions cache), never committed
+data/screener_cache.json

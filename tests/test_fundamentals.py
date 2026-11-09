@@ -27,7 +27,7 @@ def test_check_reads_export(tmp_path):
     with open(f, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(ROW)); w.writeheader(); w.writerow(ROW)
     c = fundamentals.check("goodco", f)
-    assert c["verdict"] == "Shortlist" and c["source"] == "Screener"
+    assert c["verdict"] == "Shortlist" and c["source"].startswith("Screener export")
     assert "Valuepick" in fundamentals.label(c)
     assert fundamentals.check("MISSING", f) is None
 
@@ -85,7 +85,7 @@ def test_only_newest_upload_is_used_and_yahoo_fills_gaps(tmp_path, monkeypatch):
     fundamentals._yahoo.clear()
     monkeypatch.setattr(fundamentals, "_yahoo_row", lambda s: {**ROW, "Price to Earning": "12"} if s == "GOODCO" else None)
     c = fundamentals.check("GOODCO", fundamentals.FILE)
-    assert c["source"] == "Screener + Yahoo" and c["promoter"] == 65 and c["pe"] == 12
+    assert c["source"] == "Screener export + Yahoo" and c["promoter"] == 65 and c["pe"] == 12
 
 
 SCREEN_OK = {"Current Price": "95", "High price": "100", "Market Capitalization": "2000",
@@ -131,3 +131,17 @@ def test_fundamental_scan_ranks_export_stocks(tmp_path, monkeypatch):
     assert [x["code"] for x in v["stocks"]] == ["GOODCO", "WEAKCO"]  # listed once despite two codes
     g = v["stocks"][0]
     assert g["rank"] == 1 and g["pe"] == 10.0 and "P/E" not in " ".join(g["screen"]["unknown"])
+
+
+def test_screener_page_preferred_and_hidden_on_public_site(monkeypatch):
+    import dipzone
+    import screener_company
+    monkeypatch.setattr(fundamentals, "_export", {})
+    monkeypatch.setattr(screener_company, "cached", lambda s: dict(SCREEN_OK, **{"Price to Earning": "35"}) if s == "PAGECO" else None)
+    monkeypatch.setattr(fundamentals, "_yahoo_row", lambda s: None)
+    c = fundamentals.check("PAGECO", fundamentals.FILE)
+    assert c["source"] == "Screener page" and c["private"] and c["screen"]["fails"] == ["P/E 35 (needs < 20)"]
+    assert "P/E 35" in fundamentals.label(c)  # Telegram (private) keeps the figure
+    pub = dipzone._public_fund(c)
+    assert pub["screen"]["fails"] == ["P/E fails"] and pub["pe"] is None
+    assert "35" not in str(pub["screen"])

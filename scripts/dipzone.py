@@ -449,6 +449,16 @@ def _r(x) -> float | None:
     return None if x is None else round(float(x), 2)
 
 
+def _public_fund(f: dict | None) -> dict | None:
+    """For the public website: when the figures come from a Screener company
+    page, keep the verdicts and which conditions fail, drop the numbers
+    (Screener allows personal viewing only). Telegram, which is private, gets them."""
+    if not f or not f.get("private"):
+        return f
+    sc = dict(f["screen"], fails=[c + " fails" for c in f["screen"].get("fail_labels", [])])
+    return {**f, "screen": sc, "pe": None, "roce": None, "promoter": None}
+
+
 def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     """JSON for site/data.json: buy list, holdings, recent buys and sells."""
     import fundamentals
@@ -457,7 +467,7 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
     for s in states:
         base = {"scanner": s["scanner"], "symbol": s["symbol"], "signal": s["date"],
                 "confirmed_by": s.get("confirmed_by", []), "off_high": s.get("dist_52w_high"),
-                "fund": fundamentals.check(s["symbol"]),
+                "fund": _public_fund(fundamentals.check(s["symbol"])),
                 "trigger": _r(s.get("trigger")), "now": _r(s.get("last_close")), "now_date": _iso(s.get("last_date")),
                 "cap": s.get("cap"), "priority": s.get("priority", 3)}
         st = s.get("status")

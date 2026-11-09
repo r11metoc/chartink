@@ -111,8 +111,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt "yfinance>=0.2.40,<1" "pandas>=2.0,<3"
+          pip install -r requirements.txt "yfinance>=0.2.40,<1" "pandas>=2.0,<3" "beautifulsoup4>=4.12,<5"
           playwright install --with-deps chromium
+
+      # Screener company-page figures stay out of the public repo: GitHub's Actions cache.
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/screener_cache.json
+          key: screener-${{ github.run_id }}
+          restore-keys: screener-
 
       # Before the scan, so the digest's sector averages use today's prices.
       - name: Import backtest exports and refresh prices
@@ -124,6 +131,12 @@ jobs:
           python refresh_prices.py || echo "Price refresh failed, using scan prices."
           # Fundamentals of every scanner stock (Yahoo, cached 30 days) for the Valuepick check.
           python update_fundamentals.py || echo "Fundamentals refresh failed, alerts go out without them."
+
+      - uses: actions/cache/save@v4
+        if: always() && hashFiles('data/screener_cache.json') != ''
+        with:
+          path: data/screener_cache.json
+          key: screener-${{ github.run_id }}
 
       - name: Run scan
         env:

@@ -83,23 +83,31 @@ def _yahoo_row(symbol: str) -> dict | None:
     return _yahoo[symbol]
 
 
+def _auto_row(symbol: str) -> tuple[dict | None, str]:
+    """Automatic source: the stock's Screener company page (cached, private),
+    else Yahoo."""
+    import screener_company
+    row = screener_company.cached(symbol)
+    return (row, "Screener page") if row else (_yahoo_row(symbol), "Yahoo")
+
+
 def check(symbol: str, path: Path = FILE) -> dict | None:
     """Fundamental check for one stock, or None without data."""
     sym = str(symbol).strip().upper()
     scr = export_rows(path).get(sym)
-    yh = _yahoo_row(sym) if path == FILE else None
-    if not scr and not yh:
+    auto, asrc = _auto_row(sym) if path == FILE else (None, "")
+    if not scr and not auto:
         return None
-    # Screener's numbers where the export has them, Yahoo's for the columns it lacks.
-    row = {**(yh or {}), **{k: v for k, v in (scr or {}).items() if str(v or "").strip()}}
-    src = "Screener + Yahoo" if scr and yh else "Screener" if scr else "Yahoo"
+    # The uploaded export's numbers where it has them, the automatic source for the rest.
+    row = {**(auto or {}), **{k: v for k, v in (scr or {}).items() if str(v or "").strip()}}
+    src = f"Screener export + {asrc}" if scr and auto else "Screener export" if scr else asrc
     screen = main_screen.evaluate(row)
     vrow = row
     if "bank" in str(row.get("Industry", "")).lower():
         # Banks: widely held (no promoter) and loans are not trade receivables.
         vrow = {**row, "Promoter holding": "", "Debtor days": "", "Debtor Days Ch": ""}
     v = vp.score_row(vrow)
-    return {"source": src, "screen": screen,
+    return {"source": src, "private": "Screener page" in src, "screen": screen,
             "score": v.get("score"), "verdict": v.get("verdict"), "flags": v.get("flags"),
             "pe": v.get("pe"), "roce": v.get("roce"), "promoter": v.get("promoter")}
 

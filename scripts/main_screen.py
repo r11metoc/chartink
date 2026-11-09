@@ -47,7 +47,7 @@ RULES = [
 
 def evaluate(row: dict) -> dict:
     """{'passed', 'checked', 'total', 'fails': [text], 'unknown': [label], 'ok'}."""
-    fails, unknown, passed = [], [], 0
+    fails, labels, unknown, passed = [], [], [], 0
     for label, val, test, text in RULES:
         if label == "Profit growth":
             g, q = _n(row, "Profit growth"), _n(row, "YOY Quarterly profit growth")
@@ -58,6 +58,7 @@ def evaluate(row: dict) -> dict:
             else:
                 shown = ", ".join(f"{n} {_fmt(v)}%" for n, v in (("1y", g), ("qtr YoY", q)) if v is not None)
                 fails.append(f"Profit growth {shown} (needs {text.replace('profit growth ', '')})")
+                labels.append(label)
             continue
         v = val(row)
         if v is None:
@@ -67,8 +68,10 @@ def evaluate(row: dict) -> dict:
         else:
             unit = "%" if label in ("ROCE", "OPM", "Promoter", "Pledge", "Near 52w high") else " Cr" if label == "Market cap" else ""
             fails.append(f"{label} {_fmt(v)}{unit} (needs {text})")
+            labels.append(label)
     checked = passed + len(fails)
     return {"passed": passed, "checked": checked, "total": len(RULES), "fails": fails,
+            "fail_labels": labels,
             "unknown": unknown, "ok": not fails and checked >= MIN_CHECKED}
 
 
