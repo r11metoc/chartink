@@ -34,7 +34,8 @@
   header { padding: 18px 16px 8px; }
   h1 { font-size: 22px; margin: 0; }
   .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-  nav { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 8px 16px; display: flex; gap: 6px; }
+  nav { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 8px 16px; display: flex; gap: 6px; max-width: 760px; margin: 0 auto; }
+  header { max-width: 760px; margin: 0 auto; }
   nav button {
     flex: 1; border: 0; border-radius: 10px; padding: 9px 0; font: inherit; font-weight: 600;
     background: var(--chip); color: var(--muted); cursor: pointer;
@@ -219,20 +220,6 @@ function renderPerformance(f) {
       Open positions counted at cost; this year is year-to-date. Past results, not a promise.</div></section>`;
 }
 
-function renderNow(d) {
-  return d.scanners.map((s) => `
-    <section class="card">
-      <h2>${esc(s.name)} <small>${s.rows.length} stock${s.rows.length === 1 ? "" : "s"}</small></h2>
-      ${s.rows.length ? s.rows.map((r) => `
-        <div class="row">
-          <div><div class="sym">${esc(r.symbol)}</div>
-            <div class="meta">${money(r.now)} · trigger ${money(r.trigger)}${r.trigger_date ? " (" + fmtDate(r.trigger_date) + " high)" : ""}${r.seen != null && r.seen !== r.trigger ? " · seen at " + money(r.seen) : ""}${r.industry ? " · " + esc(r.industry) : ""}</div></div>
-          <div class="num chg ${cls(r.chg)}">${pct(r.chg)}</div>
-          <span class="pill ${r.status}">${r.status}</span>
-        </div>`).join("") : `<div class="empty">No stocks on this scanner right now.</div>`}
-    </section>`).join("");
-}
-
 function renderBreakouts(d) {
   const names = ["All", ...new Set(d.breakouts.map((b) => b.scanner))];
   const rows = d.breakouts.filter((b) =>
@@ -330,6 +317,8 @@ function renderToday(d) {
   const stops = z.buy_list.filter((b) => b.stage === "breakout");
   const cutoff = new Date(Date.now() - 4 * 864e5).toISOString().slice(0, 10);
   const bought = hold.filter((h) => h.entry_date >= cutoff && !h.sell_signal);
+  const soldNow = sold.filter((c) => c.exit_date >= cutoff);
+  const passed = z.passed || [];
   const invested = hold.length * stake, value = hold.reduce((a, h) => a + (h.value ?? stake), 0);
   const openPnl = value - invested, booked = sold.reduce((a, c) => a + c.pnl, 0);
 
@@ -339,19 +328,28 @@ function renderToday(d) {
     <div><span>Booked P&amp;L</span><b class="${cls(booked)}">${rupees(booked)}</b></div>
   </div>`;
 
-  const items = [
+  const actions = [
     ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
         <div class="meta">At the next open · closed below its 50-day average ${money(h.ma)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
     ...stops.map((b) => `<div class="row"><div><div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}</div>
         <div class="meta">Buy-stop${b.valid_until ? " until " + fmtDate(b.valid_until) : ""} · stop ${money(b.stop)} if bought${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""} · now ${money(b.now)}${fundLine(b.fund)}</div></div>
         <div></div></div>`),
+  ];
+  const done = [
     ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
         <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · stop ${money(h.stop)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
+    ...soldNow.map((c) => `<div class="row"><div><div class="sym">${c.ret >= 0 ? "✅" : "🛑"} Sold ${esc(c.symbol)}${scanTag(c.scanner)}</div>
+        <div class="meta">${fmtDate(c.exit_date)} at ${money(c.exit)} · ${SELL[c.reason] || esc(c.reason)}</div></div>
+        <div class="num chg ${cls(c.ret)}">${pct(c.ret)}</div></div>`),
   ];
-  const todo = `<section class="card todo"><h2>To do <small>${items.length ? items.length : ""}</small></h2>
-    ${items.join("") || `<div class="empty">Nothing to do today.</div>`}</section>`;
+  const skip = passed.length ? `<div class="note" style="padding-top:10px;border-top:1px solid var(--line)">Also on the scanners, not taken: ${passed.map((p) =>
+    `<b>${esc(p.symbol)}</b> (${esc(SHORT[p.scanner] || p.scanner)}, ${esc(p.why.split(":")[0])})`).join(" · ")}</div>` : "";
+  const todo = `<section class="card todo"><h2>To do <small>${actions.length || ""}</small></h2>
+    ${actions.join("") || `<div class="empty">Nothing to do today.</div>`}
+    ${done.length ? `<h2 style="border-top:1px solid var(--line)">Done this week <small>${done.length}</small></h2>${done.join("")}` : ""}
+    ${skip}</section>`;
 
   const rows = [...hold].sort((a, b) => b.ret - a.ret).map((h) => `
     <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
@@ -557,11 +555,11 @@ function renderFundScan(d) {
 }
 
 function renderMore(d) {
-  const tabs = { rule: "How it works", backtest: "Backtest", now: "On scanners", fund: "Fundamentals", breakouts: "Breakouts", sectors: "Sectors", upload: "Upload" };
+  const tabs = { rule: "How it works", backtest: "Backtest", fund: "Fundamentals", breakouts: "Breakouts", sectors: "Sectors", upload: "Upload" };
   if (!tabs[state.more]) state.more = "rule";
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
   const body = { rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
-                 now: renderNow, fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
+                 fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
   return chips + body;
 }
 

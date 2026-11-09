@@ -502,6 +502,17 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
             if st in CLOSED and pd.Timestamp(s["exit_date"]) >= cutoff:
                 activity.append({**trade, "side": "SELL", "when": _iso(s["exit_date"]), "price": _r(s["exit"]),
                                  "reason": st, "pnl": int(s["ret"] / 100 * STAKE)})
+    # Recent scanner signals the rule didn't take (no free slot, filter), latest per stock,
+    # so the Today page covers everything on the scanners without a separate list.
+    active = {x["symbol"] for x in buy_list + holding}
+    recent = pd.Timestamp(date.today()) - pd.Timedelta(days=7)
+    passed: dict[str, dict] = {}
+    for s in states:
+        if s.get("status") in ("no slot", "skipped") and pd.Timestamp(s["date"]) >= recent and s["symbol"] not in active:
+            prev = passed.get(s["symbol"])
+            if prev is None or _iso(s["date"]) >= prev["signal"]:
+                passed[s["symbol"]] = {"symbol": s["symbol"], "scanner": s["scanner"], "signal": _iso(s["date"]),
+                                       "why": "no free slot" if s["status"] == "no slot" else s.get("why", "filtered out")}
     order = {"zone": 0, "dip": 1, "breakout": 2}
     buy_list.sort(key=lambda x: (order[x["stage"]], x["priority"], x["signal"]))
     holding.sort(key=lambda x: x["entry_date"], reverse=True)
@@ -516,7 +527,7 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
             "skipped": skipped,
             "fund_asof": fundamentals.scores().get("_asof"),
             "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity,
-            "closed": closed}
+            "closed": closed, "passed": sorted(passed.values(), key=lambda x: x["signal"], reverse=True)}
 
 
 # ------------------------------------------------------------ backtest report
