@@ -139,8 +139,10 @@ def parse(page: str) -> dict:
     return {k: ("" if v is None else v) for k, v in out.items()}
 
 
+EVENTS_V = 2  # bump when parse_events changes, so cached dates are re-read
 _MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 _DATE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*(20\d\d)\b", re.I)
+_MDY = re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20\d\d)\b", re.I)
 _DMY = re.compile(r"\b(\d{1,2})[/-](\d{1,2})[/-](20\d\d)\b")
 
 
@@ -154,6 +156,7 @@ def parse_events(fragment: str) -> list[dict]:
         if not re.search(r"board\s+meet", text, re.I):
             continue
         dates = [f"{y}-{_MONTHS[m[:3].lower()]:02d}-{int(d):02d}" for d, m, y in _DATE.findall(text)]
+        dates += [f"{y}-{_MONTHS[m[:3].lower()]:02d}-{int(d):02d}" for m, d, y in _MDY.findall(text)]
         dates += [f"{y}-{int(mo):02d}-{int(d):02d}" for d, mo, y in _DMY.findall(text) if 1 <= int(mo) <= 12]
         if dates:
             out.append({"date": max(dates), "what": "results" if re.search(r"result", text, re.I) else "board meeting"})
@@ -179,7 +182,9 @@ def refresh_events(symbols: list[str], hours: int = 20, get=None, sleep=time.sle
     for sym in sorted(set(symbols)):
         e = data.get(sym)
         cid = e and e["data"].get("Company ID")
-        if not cid or (e.get("events_at") and now - datetime.fromisoformat(e["events_at"]) < timedelta(hours=hours)):
+        fresh = e and e.get("events_v") == EVENTS_V and e.get("events_at") and \
+            now - datetime.fromisoformat(e["events_at"]) < timedelta(hours=hours)
+        if not cid or fresh:
             continue
         try:
             r = get(f"https://www.screener.in/announcements/recent/{cid}/")
@@ -190,7 +195,7 @@ def refresh_events(symbols: list[str], hours: int = 20, get=None, sleep=time.sle
             if fails >= MAX_FAILS:
                 break
             continue
-        e["events"], e["events_at"] = parse_events(r.text), now.isoformat()
+        e["events"], e["events_at"], e["events_v"] = parse_events(r.text), now.isoformat(), EVENTS_V
         n += 1
         sleep(DELAY_S)
     CACHE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")

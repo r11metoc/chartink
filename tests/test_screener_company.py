@@ -56,13 +56,16 @@ FRAG = """<ul class="list-links">
 <li><a href="#"> Board Meeting Intimation for Board Meeting To Be Held On 12Th November, 2026.
   <div class="ink-600 smaller"><time datetime="2026-10-27">27 Oct</time> - Board meets on 12 Nov 2026 to approve Q2 results.</div></a></li>
 <li><a href="#"> Board Meeting Intimation for dividend <div><time>2 Oct</time> - meeting on 15/12/2026</div></a></li>
+<li><a href="#"> Board Meeting Intimation for Financial Results For The Quarter Ended September 30, 2026.
+  <div><time>5 Nov</time> - Board meets November 13, 2026 to approve Q2 results.</div></a></li>
 <li><a href="#"> Grant Of Options <div><time>26 Oct</time> - granted on 24 October 2026.</div></a></li>
 </ul>"""
 
 
 def test_parse_events_reads_board_meeting_dates():
     ev = sc.parse_events(FRAG)
-    assert ev == [{"date": "2026-11-12", "what": "results"}, {"date": "2026-12-15", "what": "board meeting"}]
+    assert ev == [{"date": "2026-11-12", "what": "results"}, {"date": "2026-12-15", "what": "board meeting"},
+                  {"date": "2026-11-13", "what": "results"}]
 
 
 def test_refresh_events_uses_company_id(tmp_path, monkeypatch):
