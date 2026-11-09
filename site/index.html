@@ -585,14 +585,16 @@ function renderFundScan(d) {
 }
 
 function renderMore(d) {
-  const tabs = { breakouts: "Breakouts", holdings: "Holdings", sectors: "Sectors", backtest: "Backtest",
-                 fund: "Fundamentals", upload: "Upload", rule: "How it works" };
+  const tabs = MORE_TABS;
   if (!tabs[state.more]) state.more = "breakouts";
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
   const body = { holdings: (x) => renderToday(x, "holdings"), rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
                  fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
   return chips + body;
 }
+
+const MORE_TABS = { breakouts: "Breakouts", holdings: "Holdings", sectors: "Sectors", backtest: "Backtest",
+                    fund: "Fundamentals", upload: "Upload", rule: "How it works" };
 
 function render() {
   const d = state.data;
@@ -601,7 +603,40 @@ function render() {
   if (!{ today: 1, more: 1 }[state.tab]) state.tab = "today";
   $("#view").innerHTML = { today: renderToday, more: renderMore }[state.tab](d);
   try { localStorage.setItem("view", JSON.stringify({ tab: state.tab, more: state.more, fv: state.fv })); } catch { /* fine */ }
+  const on = document.querySelector(".sub2 button.on[data-more]");
+  if (on) on.scrollIntoView({ block: "nearest", inline: "center" });
 }
+
+// Swipe left/right to move between pages: Today, then each More tab in order.
+const PAGES = ["today", ...Object.keys(MORE_TABS).map((k) => "more:" + k)];
+function goPage(step) {
+  const cur = state.tab === "today" ? "today" : "more:" + state.more;
+  const next = PAGES[PAGES.indexOf(cur) + step];
+  if (!next) return;
+  if (next === "today") state.tab = "today"; else { state.tab = "more"; state.more = next.slice(5); }
+  render();
+  window.scrollTo(0, 0);
+  const v = $("#view");
+  v.style.transition = "none"; v.style.transform = `translateX(${step * 40}px)`; v.style.opacity = "0.4";
+  requestAnimationFrame(() => { v.style.transition = "transform .18s ease-out, opacity .18s"; v.style.transform = ""; v.style.opacity = ""; });
+}
+let sw = null;
+const scrollsSideways = (el) => {
+  for (; el && el !== document.body; el = el.parentElement)
+    if (el.scrollWidth > el.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(el).overflowX)) return true;
+  return false;
+};
+document.addEventListener("touchstart", (e) => {
+  const t = e.touches[0];
+  sw = e.touches.length === 1 && !scrollsSideways(e.target) && !e.target.closest("input,select,textarea")
+    ? { x: t.clientX, y: t.clientY, at: Date.now() } : null;
+}, { passive: true });
+document.addEventListener("touchend", (e) => {
+  if (!sw) return;
+  const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+  if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy) && Date.now() - sw.at < 700) goPage(dx < 0 ? 1 : -1);
+  sw = null;
+}, { passive: true });
 
 document.addEventListener("click", (e) => {
   const t = e.target.closest("button");
