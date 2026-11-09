@@ -1,10 +1,11 @@
-"""Fundamentals for scanner stocks from Yahoo Finance, in Screener's column names.
+"""Fallback fundamentals for scanner stocks from Yahoo Finance, in Screener's
+column names (the primary source is each stock's Screener page,
+screener_company.py).
 
 Every stock the Chartink scanners pick gets its fundamentals fetched (yfinance:
 .info plus the annual income statement, balance sheet and cash flow) and
-cached in chartink.db for REFRESH_DAYS. fundamentals.py scores them with the
-Valuepick logic (valuepick_score.py), so the technical signal comes with a
-fundamental check without any manual export.
+cached in chartink.db for REFRESH_DAYS; fundamentals.py uses them when a
+Screener page couldn't be read.
 
 Yahoo has no promoter holding as such: "heldPercentInsiders" (insiders and
 promoters) stands in for it. Figures are in Rs crore like Screener's.

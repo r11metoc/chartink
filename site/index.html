@@ -422,17 +422,37 @@ function renderToday(d, part) {
 function renderRule(d) {
   const r = d.dip && d.dip.rule;
   if (!r) return "";
-  return `<section class="card"><div class="note" style="padding-top:12px;font-size:14px;color:var(--text)">
+  const sec = (t, body) => `<section class="card"><h2>${t}</h2><div class="note" style="font-size:14px;color:var(--text)">${body}</div></section>`;
+  return sec("The rule", `
     <b>Buy</b>: when a stock appears on a scanner, place a buy-stop at its <b>trigger</b> (the signal day's high; the week's high for Weekly)
-    for ${r.entry_days} days (${r.entry_days_weekly} for Weekly).<br><br>
+    for ${r.entry_days} sessions (${r.entry_days_weekly} for Weekly). Filled at the trigger, or at the open on a gap-up.<br><br>
     <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day average, or at the ${r.stop}% stop (${Object.values(r.stop_by || {})[0] || r.stop}% for Weekly), or after a year.<br><br>
-    <b>Slots</b>: 15 positions of about 6.7% each. If short of slots, take 1st choice (mid caps) first.<br><br>
-    <b>Fundamentals</b> (information only): every scanner stock is checked against <b>your main screen</b>
+    <b>Slots</b>: 15 positions of about 6.7% each, one per stock. If short of slots, mid caps first, then large, then small.<br><br>
+    <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.<br><br>
+    Paper trades of ₹1L each; returns are after 0.25% costs. Not advice.`)
+  + sec("Scans and alerts", `
+    Scans at 09:23, 12:23 and 15:23 IST, Monday to Friday; the header shows the next one.
+    Telegram sends only today's actions (set a buy-stop, bought, sell, closed). Ask the bot for more:
+    /today, /holdings, /scanners, /breakouts, /fundamentals, /help (replies within about 15 minutes).<br><br>
+    <b>Data check</b> on Today re-checks every scan: scan freshness, prices, every paper trade against the daily prices, and fundamentals.`)
+  + sec("Fundamentals (information only)", `
+    Every scanner stock is checked against <b>your main screen</b>
     (price within 20% of the 52w high, market cap ₹100–5,000 Cr, ROCE &gt; 15%, OPM &gt; 5%, debt/equity &lt; 1.1, no pledge,
-    promoter &gt; 55%, profit growth &gt; 40% or quarterly YoY &gt; 100%, debtor days &lt; 150, P/E &lt; 20).
-    <span class="tag up">✓</span> = passes every condition it could check; <span class="tag down">✗ 3</span> = fails 3 (tap to see which).
-    Data from Yahoo Finance, refreshed monthly; pledge isn't available there. It never changes a buy or sell.<br><br>
-    <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.</div></section>`;
+    promoter &gt; 55%, profit growth &gt; 40% or quarterly YoY &gt; 100%, debtor days &lt; 150, P/E &lt; 20) and scored with your Valuepick logic.
+    <span class="tag up">✓</span> = passes every condition it could check; <span class="tag down">✗ 3</span> = fails 3 (tap the card to see which).
+    Banks are checked on ROE; OPM, debt/equity and debtor days don't apply to them.<br><br>
+    Figures come from each stock's Screener page (monthly), Yahoo if that fails. Pledge isn't on Screener's public pages.
+    This page shows which conditions fail; Telegram shows the numbers. It never changes a buy or sell.<br><br>
+    <b>Fundamentals</b> (More) ranks every stock in your latest uploaded Screener export.`)
+  + sec("Market and results", `
+    <b>Market</b> (Today, tap to open): Nifty 50 and Nifty 500 against their 50- and 200-day averages, India VIX,
+    how many tracked stocks are above their 50-day average, and the sectors gaining or losing picks.
+    Context only: a market-trend filter didn't improve the backtest.<br><br>
+    <b>📅 Results</b>: holdings, buy-stops and scanner stocks with results or a board meeting in the next 7 days,
+    from the companies' exchange filings (read daily). Prices can jump either way on results day.`)
+  + sec("Using the app", `
+    Swipe left or right to move between Today and the More pages. Pull down or tap ↻ to refresh.
+    Upload (More) takes a new Chartink backtest export (replaces it and retrains) or a Screener export (replaces the Fundamentals list).`);
 }
 
 // ---------------------------------------------------------------- upload (straight to GitHub)

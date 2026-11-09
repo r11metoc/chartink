@@ -1,321 +1,144 @@
-# Chartink breakout tracker
+# Chartink scanner tracker
 
-**What runs:** `scan.yml` (3 scans a day, Mon–Fri, Telegram + dashboard) and
-`signal_model.yml` (Saturday retrain / re-learn for all three scanners:
-`Wkly_upswing`, `63_30_daily`, `Bullish_Scanner`).
+A bot that runs entirely on GitHub. It reads the three scanners on the
+Chartink dashboard [Atlas NG Scanners](https://chartink.com/dashboard/45863)
+(`63_30_daily`, `Bullish_Scanner`, `Wkly_upswing`), applies one fixed
+breakout rule to every signal, keeps a paper portfolio, and shows it all on a
+phone app and in Telegram.
 
-Scrapes the three scanner widgets on the public dashboard
-[chartink.com/dashboard/45863](https://chartink.com/dashboard/45863) on a
-schedule, stores every result in a SQLite database committed to this repo,
-and sends a Telegram alert whenever a symbol newly appears in one of the
-scanners (i.e. a fresh breakout).
+- App: <https://r11metoc.github.io/chartink/> (install: Chrome ⋮ → Add to Home
+  screen, or Safari Share → Add to Home Screen)
+- Paper trades and information only. Not advice.
 
-## How it works
+## The rule
 
-- `.github/workflows/scan.yml` scans at 09:23, 12:23 and 15:23 IST, Mon–Fri
-  (see "Changing the schedule" for how) and can also be triggered manually
-  from the Actions tab. Every scheduled scan automatically sends the breakout
-  alert (if any), the snapshot, sectors and digest, all together — no manual
-  inputs needed for that. Manual runs still only
-  send the extras you explicitly opt into via the `snap`/`digest` inputs,
-  so you can trigger a quick breakout-only check without the noise.
-- `scripts/scrape_dashboard.py` opens the dashboard in a headless Chromium
-  browser (via Playwright — the page is JS-rendered, so a plain HTTP request
-  won't show the tables), and extracts each widget's table generically: it
-  looks for a heading near each `<table>` to use as the scanner name, and
-  picks the column that looks like the stock symbol.
-- `scripts/db.py` stores every run in `data/chartink.db` (SQLite):
-  - `runs` — one row per scrape
-  - `results` — every symbol seen in every run, per scanner
-  - `breakouts` — symbols that were *not* present in a scanner's previous
-    run but *are* present now, tagged `kind`:
-    - `fresh` — never seen on this scanner before
-    - `retest` — seen before, dropped out for at least one run, and back
-      again (the scan's own condition re-triggering at the same level)
-- `scripts/notify.py` sends a Telegram message listing new breakouts,
-  grouped by scanner, with a 🚀 (fresh) or 🔁 (retest) marker per symbol.
-- The workflow commits `data/chartink.db` back to the repo after each run,
-  so you get full git history of every scan.
+- **Trigger** = high of the signal candle (the day's high; the week's high for
+  `Wkly_upswing`).
+- **Buy**: buy-stop at the trigger for 3 sessions after the signal (5 for
+  weekly). Filled at the trigger, or at the open on a gap-up.
+- **Sell**: at the next open after a close below the 50-day average; 12% stop
+  (15% weekly); at most 250 sessions.
+- **Slots**: 15 positions, one per stock. When short of slots: mid caps first,
+  then large, then small.
+- **Filters**: `Wkly_upswing` only when ATR(14) < 4% of price; `63_30_daily`
+  only within 10% of the 52-week high.
+- Returns are after 0.25% round-trip costs.
 
-The first run for each scanner just seeds the baseline (nothing to compare
-against yet), so no breakout alert fires until the second run onward.
+Backtest Feb 2019 to Nov 2026 (`reports/stock_outcomes.md`): +5.4% a trade,
+46% wins (average win +20.3%, average loss −7.2%); ₹10L in 15 slots became
+about ₹53L, 24% a year, worst fall −14%, against the Nifty 500's 13% a year and
+−38%. Tested and rejected: Nifty trend filter, skipping small caps, volume or
+sector ranking, buying pullbacks, +8% targets, trailing stops, a 20-day exit,
+longer buy-stop windows (`reports/entry_window_test.md`).
 
-Every scheduled run sends the current scan results too (not just new
-breakouts) — you don't need to do anything for this. To get the same thing
-on demand between scheduled runs, go to the Actions tab → "Chartink
-breakout scan" → Run workflow → set `snap` to `true`.
+## The app
 
-Each scheduled run sends these messages (the digest ones with `digest`):
+**Today**
+- Holding count, open and booked P&L; header shows the last scan and the next one.
+- **Market** (folded): Nifty 50 / Nifty 500 vs their 50- and 200-day averages,
+  India VIX, share of tracked stocks above their 50-day average, sectors
+  gaining or losing picks. Context only: it never changes a trade.
+- **To do**: sells at the next open, buy-stops to place (tap for the
+  fundamentals), and "Results coming" for holdings or buy-stops with results
+  or a board meeting in the next 7 days.
+- **Done this week**: buys and sells of the last few days.
+- **On the scanners now**: every stock on the scanners in the latest scan,
+  once per stock with all its scanner tags, and what the rule did with it
+  (holding, buy-stop, new today, no free slot, too volatile…).
+- **Data check**: each scan re-checks scan freshness, prices, every paper
+  trade against the daily prices, and fundamentals coverage.
 
-| Message | Answers | Contents |
-|---|---|---|
-| **📋 Snapshot** | What's on my scanners right now? | Every stock on each scanner, in a 🟢 BUY table and a ⏸ HOLD table |
-| **🏭 Sectors in focus** | Which sectors are the scanners picking? | Top 5 sectors per scanner by backtest picks, last 7 and 30 days |
-| **📊 Digest** | How are this month's new triggers doing? | Stocks that triggered in the last `days` (default 30), in BUY / HOLD tables per scanner (stocks that left their scanner are priced at the latest daily close), then the top 8 sectors by momentum across all scanners |
+**More** (swipe left/right between pages on a phone): Breakouts (90-day
+history of triggers), Holdings (positions and sold trades), Sectors, Backtest,
+Fundamentals, Upload, How it works.
 
-**BUY / HOLD rule** (snapshot and digest): BUY if the price now is above
-the trigger price, HOLD otherwise. The trigger price is the price when the
-stock last broke out on that scanner, or, if no breakout was recorded,
-the earliest price seen for it there — so a stock that appeared this run
-starts in HOLD at +0.0%. Each table shows Symbol, Trig, Now and Chg (% move
-since the trigger), best move first. In the digest, `*` marks a stock that
-has since dropped off the scanner (its "Now" is the last price seen). This
-is a mechanical comparison of two stored prices, not a recommendation.
+## Fundamentals (information only)
 
-**Sectors in focus** comes from `data/backtest/*.csv` (`backtest_hits`),
-so it's independent of the live scans.
+- **Your main screen** (`scripts/main_screen.py`): price > 80% of the 52-week
+  high, market cap ₹100–5,000 Cr, ROCE > 15, OPM > 5, debt/equity < 1.1,
+  pledge = 0, promoter > 55, profit growth > 40 or quarterly YoY > 100, debtor
+  days < 150, P/E < 20. Plus your Valuepick score (`scripts/valuepick_score.py`).
+  Banks: ROE in place of ROCE; OPM, debt/equity and debtor days don't apply.
+- **Scanner stocks**: figures from each stock's Screener.in company page
+  (`scripts/screener_company.py`, monthly, a few seconds apart), Yahoo as the
+  fallback. Screener allows personal viewing only, so the figures live in a
+  git-ignored cache carried in GitHub's private Actions cache; the public app
+  shows pass/fail and which conditions fail, Telegram shows the figures.
+  Pledge isn't on Screener's public pages.
+- **More → Fundamentals** (`scripts/fundamental_scan.py`): every stock in
+  your latest uploaded Screener export, ranked by Valuepick (Shortlist,
+  Check flags, Maybe, Your screen). A new upload replaces the old list.
+- **Results dates** (`scripts/market.py`): board-meeting dates from each
+  stock's Screener announcements, read daily for held, buy-stop and scanner
+  stocks (BSE's calendar is blocked from GitHub; Yahoo is used for large caps).
 
-For a custom lookback, trigger the workflow manually with `digest` set to
-`true` and `days` set to whatever window you want. Any message longer than
-Telegram's 4096-character limit is split at section boundaries, and a
-message Telegram rejects is resent as plain text rather than dropped.
+## Telegram
 
-## Web dashboard
+The bot pushes only **Today's actions** (set a buy-stop, bought, sell, closed).
+Everything else on request, answered within about 15 minutes
+(`scripts/telegram_commands.py`, only from your chat):
+`/today`, `/holdings`, `/scanners`, `/breakouts`, `/fundamentals`, `/help`.
 
-**Buy** (first tab): the live breakout rule. A 🛒 *Buy list* of signals
-waiting for the price to cross the trigger (buy-stop price, stop if bought,
-expiry), in priority order (mid caps first), plus the backtest of buying on
-the alerts and the exit-rule comparison. **Portfolio**: every stock the
-alerts bought, with open and booked P&L, sell level, stop and every sale.
-Built by `dipzone.dashboard_view()` into `site/data.json` on every scan.
+## Uploads (More → Upload)
 
-`site/index.html` is a phone-friendly dashboard, published to GitHub Pages
-after every scan (open it on your iPhone and use Share → Add to Home Screen):
+Uses your own fine-grained GitHub token (only this repo; Contents and Actions:
+read and write), saved in your browser only.
+- **Chartink backtest export** → replaces `data/backtest/<scanner>.csv`, then
+  starts the retrain and a scan.
+- **Screener export** (Excel or CSV) → `data/fundamentals/uploads/`, replacing
+  the previous one, then starts a scan.
 
-- **Now**: every stock on each scanner, its price vs its trigger price, BUY/HOLD
-- **Breakouts**: every trigger in the last 90 days with its move since the
-  trigger, best move so far and days held, filterable by scanner and BUY/HOLD,
-  plus per-scanner totals (how many are above their trigger, average move)
-- **Sectors**: **sector momentum** across all scanners combined: stocks
-  picked in the last 14 days (each counted once, from the backtest exports
-  plus the bot's own live triggers) vs the 14 days before, how many scanners
-  agree, the average move of those picks since they were picked, and an
-  8-week bar chart; then the per-scanner backtest tables
+## Schedule and workflows
 
+- **Timer** (`keeper.yml`): GitHub runs short-interval schedules only every few
+  hours, so this job stays up ~5.5 hours, starts `scan.yml` in auto mode every
+  15 minutes, then restarts itself (its own 3-hourly schedule only revives it).
+- **Scan** (`scan.yml`): the gate (`scripts/slot_gate.py`) scans once per slot,
+  09:23, 12:23 and 15:23 IST, Mon–Fri (each slot open until the next, the last
+  until 20:00). A scan reads the dashboard (`scrape_dashboard.py`, waits until
+  every widget's rows stop changing), repairs half-read scans
+  (`db.repair_partial_reads`), refreshes prices (Yahoo), the results calendar
+  and fundamentals, sends Telegram alerts, rebuilds `site/data.json`, commits
+  `data/chartink.db` and publishes the app. Manual runs: Actions → "Chartink
+  breakout scan" → Run workflow.
+- **Signal model** (`signal_model.yml`): Saturday 08:47 IST, or manually with
+  `mode=train`, rebuilds the dataset from the backtest exports plus the live
+  triggers and re-runs the backtests. `mode=window_test` runs the entry-window
+  test.
 
-### Weekly retraining
+## Setup (one time)
 
-Every Saturday `signal_model.yml` rebuilds the trade dataset from the Chartink
-backtest exports **plus every trigger the bot caught live**, so it keeps
-growing. It then re-runs the backtest of the live breakout rule, the ₹10L
-portfolio (15 slots, mid caps first) and the exit-rule comparison
-(`reports/stock_outcomes.md`, `data/model/performance.json`), and retrains
-the signal model (`reports/signal_model_report.md`).
+1. Telegram: create a bot with @BotFather, add repo secrets
+   `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+2. Settings → Pages → Source: **GitHub Actions**.
+3. Actions → "Timer" → Run workflow (once; it keeps itself running).
 
-Each scan runs `scripts/refresh_prices.py`, which fetches daily prices from
-Yahoo Finance (`daily_prices` table) for every stock that triggered in the
-last 120 days, so a stock keeps being tracked after it drops off its scanner.
-`scripts/export_dashboard.py` then writes `site/data.json`. If Yahoo is down
-the dashboard falls back to the last scan price.
+## Updating from a PC
 
-One-time setup: Settings → Pages → Build and deployment → Source: **GitHub
-Actions**. The dashboard is then at `https://r11metoc.github.io/chartink/`.
-Like the repository itself, it is public to anyone who has the link.
+Updates arrive as a git bundle. In the repo folder, paste one block like this
+(it stops at the first error and deletes the bundle only after a successful
+push):
 
-## Breakout alerts (live)
-
-`scripts/dipzone.py` watches every signal since 25 Sep 2026 and, on every scan,
-sends a Telegram alert when:
-
-- **SET A BUY-STOP**: a new signal's trigger (the signal candle's high; the
-  week's high for `Wkly_upswing`) is known. Place a buy-stop there, valid
-  for 3 sessions (5 after a weekly signal).
-- **BOUGHT**: the price traded above the trigger. Filled at the trigger, or
-  at the open on a gap-up; 12% stop (15% weekly), then ride the trend.
-- **SELL**: a holding closes below its 50-day average: sell at the next open.
-- **CLOSED**: a trade was sold below the 50-day average, hit its stop, or
-  was held a year.
-
-History of the rule: the exit used to be a +8% target with an 8-week limit;
-riding until a close below the 50-day average made +4.2% a trade against
-+1.9% (2021-26). The buy used to wait for a 3% pullback; buying at the
-breakout made +5.8% a trade against +4.2% on the same signals, won 46% vs
-41% and the ₹10L portfolio's worst fall was -10% vs -18% (growth about the
-same). `LIVE_MODE = "dip"` switches back to the pullback buy.
-
-Wkly_upswing signals are only taken when the daily ATR(14) is under 4% of the
-close, with a 15% stop instead of 12% (`ATR_MAX_PCT`, `STOP_BY_SCANNER`).
-63_30_daily signals are only taken when the signal-day close is within 10%
-of the 52-week high (`NEAR_HIGH_PCT`), and signals another scanner flagged in
-the 10 days before are tagged ⭐. Only completed daily candles are used, so a morning alert means "buy at
-today's open". Each alert is sent once (`dip_alerts` table). The digest adds
-a paper book for this rule, and the Saturday report
-(`reports/stock_outcomes.md`, "Breakout rule") backtests the same rule on
-the full history. Settings are at the top of `scripts/dipzone.py`.
-
-**Would it have made money?** The Saturday run also trades the alerts as a
-₹10L portfolio (each buy 1/15 of the portfolio's value, so profits are
-reinvested; at most 15 open, mid caps first when slots are short, first come first served, one position per stock) from the first date all three scanners have backtest
-data, and compares it with the Nifty 500: growth per year, worst fall and
-year by year. It is written to `data/model/performance.json`, shown at the
-bottom of the website's Dip tab and in the report ("If I had bought on the
-alerts"). It also sells the same dip buys by other exits (10% / 15% trailing stop,
-close below the 20- or 50-day average, half at +8% and the rest on the
-20-day average) so you can see which one makes more (`EXIT_RULES`).
-Settings: `PF_CAPITAL`, `PF_MAX_POS`, `EXIT_MAX_HOLD` in `scripts/dipzone.py`.
-
-## If I had bought every scanner stock
-
-`scripts/stock_outcomes.py` (part of the Saturday `signal_model.yml` run, and
-of any manual run with `mode=train`) buys every backtest and live hit with the
-bot's own entry rule (price crosses the signal candle's high within 3
-sessions, 5 for the weekly scanner) and then just holds, reporting the return
-after 2 weeks and 1 month (short), 3 and 6 months (medium), 1 and 2 years
-(long), each against the Nifty 500, by scanner, market cap, year and sector,
-plus the best and worst repeat stocks. Report: `reports/stock_outcomes.md`;
-data: `data/model/stock_outcomes.csv` (per buy) and
-`data/model/stock_summary.csv` (per stock).
-
-## Signal model: "buy when it crosses the trigger price"
-
-`.github/workflows/signal_model.yml` (Actions tab → "Scanner signal model")
-tests the actual trade and scores new scanner results:
-
-- **Trigger** = high of the signal candle (the completed week's candle for
-  `Wkly_upswing`). **Entry** = buy-stop at the trigger, valid 3 sessions
-  (5 for weekly); filled at the open on a gap-up. **Stop** = signal candle
-  low (2–8% below entry), **target** = 2× risk, else exit after 20 sessions.
-  After 0.25% round-trip costs. Logic in `scripts/breakout_sim.py`.
-- `mode=train`: `build_dataset.py` fetches Yahoo prices for every backtest
-  hit and stores features + the 70 sessions after each signal in
-  `data/model/`; `signal_model.py train` simulates every trade, compares it
-  with holding the Nifty 500, compares a fixed set of exit rules, and
-  walk-forward-validates a model that tries to pick the winning triggers.
-  Full results: `reports/signal_model_report.md`.
-  `export_daily_prices.py` writes `reports/daily_prices_after_signal.xlsx`:
-  every signal's trigger and entry, then daily Open/High/Low/Close for the
-  70 sessions after it (% vs trigger per day), plus a colour-coded grid of
-  closes. Train runs attach it to the run as the `daily-prices-after-signal`
-  artifact (Actions tab → the run → Artifacts); it isn't committed.
-- `mode=predict`: scores the symbols you type in (plus which scanner they
-  came from), or the latest dashboard scan if left blank, and sends each
-  setup to Telegram with its buy-above, stop and target levels, valid
-  window, and a status: `TRIGGERED` (already crossed), `EXPIRED` (window
-  passed), `MISSED` (already past the target).
-
-The model filter is only used if it beats "take every trigger"
-out of sample (walk-forward AUC ≥ 0.55 and a threshold that improves
-returns). Otherwise every setup is listed and the message says the filter is
-off. Training re-checks this every run.
-
-Locally (needs internet access to Yahoo Finance):
-
-```bash
-pip install -r requirements-train.txt
-cd scripts
-python build_dataset.py && python signal_model.py train
-python signal_model.py predict --input ~/Downloads/63_30_daily.csv --scanner 63_30_daily
-python signal_model.py predict --symbols KSB,ACI --scanner 63_30_daily
-python -m pytest ../tests    # offline tests, no network
+```
+git fetch origin claude/scanner-github-breakout-tracking-p7spin
+if ($LASTEXITCODE -eq 0) { git reset --hard FETCH_HEAD }
+if ($LASTEXITCODE -eq 0) { git fetch <bundle> HEAD }
+if ($LASTEXITCODE -eq 0) { git cherry-pick <base>..FETCH_HEAD }
+if ($LASTEXITCODE -eq 0) { git push }
+if ($LASTEXITCODE -eq 0) { Remove-Item <bundle>; "UPDATE DONE" }
 ```
 
-## Setup
+## Data
 
-1. **Create a Telegram bot** (skip if you chose "no notifications" — you can
-   still query the database directly):
-   - Message [@BotFather](https://t.me/BotFather) on Telegram, run `/newbot`,
-     and copy the token it gives you.
-   - Send your new bot any message, then visit
-     `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser to find
-     your `chat.id`.
-2. **Add repo secrets** (Settings → Secrets and variables → Actions):
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-3. Push this repo to GitHub (branch already set up if you're reading this
-   from the PR). No other secrets are needed — the dashboard is public.
-4. **Run it once manually** with debug on: Actions tab → "Chartink breakout
-   scan" → "Run workflow" → set `debug` to `true`. This uploads a
-   `chartink-debug-dump` artifact with the full page HTML and a screenshot,
-   so you can confirm the three scanners were detected and split correctly.
-
-## Scanner names
-
-The dashboard doesn't expose a heading/title next to each widget's table
-that can be detected generically, so the three scanners are matched by
-**position**: the 1st, 2nd and 3rd non-empty table found on the page are
-named, in order:
-
-1. `Wkly_upswing`
-2. `63_30_daily`
-3. `Bullish_Scanner`
-
-This order was verified against Chartink's own backtest CSV exports
-(`data/backtest/`) by cross-checking the live scrape's results for today
-against each scanner's most recent backtest entry — the original order
-(guessed from the order the scanners were listed in) turned out to be
-completely scrambled, so every symbol/price was always correct but was
-attributed to the wrong scanner name until this was caught and the
-existing database's `scanner_name` values were corrected retroactively.
-
-This is set in `DEFAULT_SCANNER_NAMES` in `scripts/scrape_dashboard.py`, or
-can be overridden per-run with a `CHARTINK_SCANNER_NAMES` env var
-(comma-separated, no spaces needed). If the dashboard's scanners are ever
-reordered, renamed, or a fourth one is added, update that list — a mismatch
-between the number of tables found and the number of configured names logs
-a warning and falls back to generic `Scanner N` labels rather than silently
-mislabeling data.
-
-Renaming a scanner effectively starts its breakout tracking over (the new
-name has no prior run to diff against), so expect one baseline-seeding run
-with no alert right after a name change.
-
-## If the scraper doesn't split your three scanners correctly
-
-The table/column detection in `scripts/scrape_dashboard.py` was written
-without being able to load the live page directly (this environment's
-network policy blocks chartink.com), so it uses generic heuristics rather
-than Chartink-specific CSS selectors. If a debug run shows it merging
-scanners, missing one, or picking the wrong column as the symbol, share the
-`chartink-debug-dump` artifact contents and the selectors can be tightened
-in `_EXTRACT_JS` and `_pick_symbol_index`.
-
-## Backtest-based descriptive context
-
-`data/backtest/*.csv` holds Chartink's own backtest exports (one per
-scanner: Date, Symbol, Marketcapname, Sector — no price or return data).
-`scripts/import_backtest.py` loads them into a `backtest_hits` table:
-
-```bash
-python scripts/import_backtest.py            # imports data/backtest/*.csv
-python scripts/import_backtest.py some/dir    # or a custom directory
-```
-
-It's safe to re-run — duplicate (scanner, date, symbol) rows are skipped.
-To refresh, export a new backtest CSV from Chartink, drop it into
-`data/backtest/<scanner_name>.csv` (filename must match the scanner name),
-and re-run the import.
-
-Breakout alerts and the scan snapshot show **📚 Nx before** when available:
-how many times this exact symbol has triggered this scanner in the backtest.
-
-This is **descriptive pattern-counting, not a return prediction** — the
-backtest data has no outcome (win/loss, % gain) attached to any historical
-hit, so there's nothing here that estimates whether a breakout will be
-profitable. It only tells you how often this scanner has liked this
-symbol/sector before.
-
-## Querying the data yourself
+`data/chartink.db` (SQLite): `runs`, `results` (every stock in every scan),
+`breakouts` (stocks new to a scanner vs its previous scan), `daily_prices`,
+`backtest_hits`, `slots`, `fundamentals` (Yahoo), `results_calendar`,
+`yahoo_events`, `dip_alerts`.
 
 ```bash
 sqlite3 data/chartink.db "select * from breakouts order by detected_at desc limit 20;"
-sqlite3 data/chartink.db "select scanner_name, count(*) from results where run_id = (select max(id) from runs) group by scanner_name;"
 ```
 
-## Changing the schedule
-
-GitHub starts scheduled runs late — often 5–8 hours late for this repo — so
-a plain cron at the scan times delivers everything after market close.
-Instead, the workflow's cron fires every 15 minutes and a small `gate` job
-(`scripts/slot_gate.py`) checks the actual time in IST:
-
-- inside a slot's window (09:23, 12:23 or 15:23 IST + 90 minutes, Mon–Fri)
-  and that slot hasn't been scanned yet → the `scan` job runs and records the
-  slot in the `slots` table
-- otherwise → the run stops after a few seconds and the `scan` job shows as
-  skipped
-
-So each slot is scanned once, by the first scheduled run to arrive in its
-window, however late GitHub is running. That also means the Actions tab
-shows many short gate-only runs; that's expected. To change the times, edit
-`SLOTS` (and `WINDOW`) in `scripts/slot_gate.py`. Scheduled runs only come
-from the repository's default branch.
+Backtest exports: `data/backtest/<scanner>.csv` (Chartink's Date, Symbol,
+Marketcapname, Sector). Scanner names come from each widget's title on the
+dashboard (`scrape_dashboard.py`); `CHARTINK_SCANNER_NAMES` overrides them.
