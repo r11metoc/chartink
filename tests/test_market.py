@@ -36,3 +36,14 @@ def test_pulse_trend(tmp_path, monkeypatch):
     db.save_daily_prices(c, "^NSEI", [(d, 100 + i, 100 + i, 100 + i, 100 + i) for i, d in enumerate(days)])
     p = market.pulse(c)
     assert p["trend"] == "Uptrend" and p["indexes"][0]["vs50"] > 0 and p["indexes"][0]["vs200"] > 0
+
+
+def test_yahoo_dates_fill_in(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "t.db")
+    c = db.connect()
+    c.execute("CREATE TABLE yahoo_events (symbol TEXT PRIMARY KEY, event_date TEXT, fetched_at TEXT)")
+    c.execute("INSERT INTO yahoo_events VALUES ('TIPS', '2026-11-11', '2026-11-09T00:00:00+00:00')")
+    c.execute("INSERT INTO yahoo_events VALUES ('FAR', '2026-12-30', '2026-11-09T00:00:00+00:00')")
+    import screener_company
+    monkeypatch.setattr(screener_company, "cached", lambda s: None)
+    assert market.upcoming_results(c, ["TIPS", "FAR"], today=date(2026, 11, 9)) == {"TIPS": "2026-11-11"}

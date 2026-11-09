@@ -25,7 +25,8 @@ VIX = "^INDIAVIX"
 CAL_URL = "https://api.bseindia.com/BseIndiaAPI/api/Corpforthresults/w?scripcode=&FromDate=&ToDate="
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                          "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-           "Referer": "https://www.bseindia.com/", "Accept": "application/json"}
+           "Referer": "https://www.bseindia.com/", "Origin": "https://www.bseindia.com",
+           "Accept": "application/json, text/plain, */*"}
 EVENT_DAYS = 7
 
 
@@ -43,7 +44,13 @@ def refresh_calendar(conn, get=None) -> int:
         return 0
     if get is None:
         import requests
-        get = lambda url: requests.get(url, headers=HEADERS, timeout=30)  # noqa: E731
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        try:  # pick up the site's cookies first, as a browser would
+            s.get("https://www.bseindia.com/", timeout=30)
+        except Exception:
+            pass
+        get = lambda url: s.get(url, timeout=30)  # noqa: E731
     r = get(CAL_URL)
     r.raise_for_status()
     rows = []
@@ -59,6 +66,32 @@ def refresh_calendar(conn, get=None) -> int:
         conn.executemany("INSERT INTO results_calendar VALUES (?, ?, ?, ?, ?)", rows)
         conn.commit()
     return len(rows)
+
+
+def refresh_yahoo(conn, symbols: list[str], hours: int = 20) -> int:
+    """Fallback when BSE's calendar can't be read: Yahoo's next earnings date
+    for the stocks that matter (held, buy-stop, on the scanners)."""
+    import yfinance as yf
+    from market_data import to_yahoo_ticker
+    conn.execute("CREATE TABLE IF NOT EXISTS yahoo_events (symbol TEXT PRIMARY KEY, event_date TEXT, fetched_at TEXT)")
+    now = datetime.now(timezone.utc)
+    n = 0
+    for sym in symbols:
+        r = conn.execute("SELECT fetched_at FROM yahoo_events WHERE symbol = ?", (sym,)).fetchone()
+        if r and now - datetime.fromisoformat(r[0]) < timedelta(hours=hours):
+            continue
+        d = None
+        try:
+            cal = yf.Ticker(to_yahoo_ticker(sym)).calendar or {}
+            ed = cal.get("Earnings Date") if isinstance(cal, dict) else None
+            ed = ed[0] if isinstance(ed, (list, tuple)) and ed else ed
+            d = ed.isoformat()[:10] if hasattr(ed, "isoformat") else None
+        except Exception:
+            pass
+        conn.execute("INSERT OR REPLACE INTO yahoo_events VALUES (?, ?, ?)", (sym, d, now.isoformat()))
+        n += d is not None
+    conn.commit()
+    return n
 
 
 def upcoming_results(conn, symbols: list[str], days: int = EVENT_DAYS, today: date | None = None) -> dict:
@@ -80,6 +113,13 @@ def upcoming_results(conn, symbols: list[str], days: int = EVENT_DAYS, today: da
         if not d and screener_company is not None:
             row = screener_company.cached(sym) or {}
             d = by_code.get(str(row.get("BSE Code", "")).strip())
+        if not d:
+            try:
+                r = conn.execute("SELECT event_date FROM yahoo_events WHERE symbol = ? AND event_date >= ? AND event_date <= ?",
+                                 (sym, today.isoformat(), until)).fetchone()
+                d = r[0] if r else None
+            except Exception:  # no Yahoo table yet
+                d = None
         if d:
             out[sym] = d
     return out
@@ -140,13 +180,30 @@ def pulse(conn, sector_momentum: dict | None = None) -> dict:
             "sectors_up": up, "sectors_down": down}
 
 
+def watch_symbols(conn) -> list[str]:
+    import dipzone
+    states = dipzone.live_states(conn)
+    syms = {s["symbol"] for s in states if s.get("status") in ("holding", "waiting for breakout", "no prices yet")}
+    run = conn.execute("SELECT MAX(id) FROM runs").fetchone()[0]
+    syms |= {s for (s,) in conn.execute("SELECT DISTINCT symbol FROM results WHERE run_id = ?", (run,))}
+    return sorted(syms)
+
+
 def main() -> int:
     conn = db.connect()
+    bse_ok = False
     try:
         n = refresh_calendar(conn)
-        print(f"Results calendar: {n} entries" if n else "Results calendar: fresh, not refetched")
+        bse_ok = True
+        print(f"Results calendar (BSE): {n} entries" if n else "Results calendar (BSE): fresh, not refetched")
     except Exception as e:  # never cost the scan
-        print(f"Results calendar fetch failed ({e.__class__.__name__}); Today shows no result dates")
+        print(f"BSE results calendar failed ({e.__class__.__name__}); trying Yahoo earnings dates")
+    if not bse_ok:
+        try:
+            syms = watch_symbols(conn)
+            print(f"Yahoo earnings dates: {refresh_yahoo(conn, syms)} found for {len(syms)} stocks")
+        except Exception as e:
+            print(f"Yahoo earnings dates failed ({e.__class__.__name__})")
     conn.close()
     return 0
 
