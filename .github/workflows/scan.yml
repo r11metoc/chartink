@@ -8,6 +8,10 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
+      auto:
+        description: "Timer tick (keeper.yml): scan only if a slot is due, answer Telegram commands"
+        type: boolean
+        default: false
       debug:
         description: "Dump page HTML/screenshot as an artifact"
         type: boolean
@@ -35,7 +39,7 @@ jobs:
     outputs:
       slot: ${{ steps.gate.outputs.slot }}
     steps:
-      - if: github.event_name == 'schedule'
+      - if: github.event_name == 'schedule' || inputs.auto
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
@@ -44,14 +48,14 @@ jobs:
             data
 
       - id: gate
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || inputs.auto
         working-directory: scripts
         run: python3 slot_gate.py
 
   # Telegram commands (/today, /holdings, /scanners, /breakouts, /fundamentals).
   # Checked on every 15-minute tick; Python only starts when a message is waiting.
   commands:
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || inputs.auto
     concurrency:
       group: telegram-commands
       cancel-in-progress: false
@@ -88,7 +92,7 @@ jobs:
 
   scan:
     needs: gate
-    if: github.event_name != 'schedule' || needs.gate.outputs.slot != ''
+    if: (github.event_name != 'schedule' && !inputs.auto) || needs.gate.outputs.slot != ''
     # On the job, not the workflow, so the frequent gate runs never queue
     # behind (or cancel) a real scan.
     concurrency:

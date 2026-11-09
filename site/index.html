@@ -152,7 +152,7 @@
 <footer>Paper trades from your Chartink scanners. Not advice.</footer>
 
 <script>
-const state = { tab: "today", more: "rule", fv: "Shortlist", scanner: "All", status: "All", data: null };
+const state = { tab: "today", more: "breakouts", fv: "Shortlist", scanner: "All", status: "All", data: null };
 try { Object.assign(state, JSON.parse(localStorage.getItem("view") || "{}")); } catch { /* defaults */ }
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -309,7 +309,7 @@ const fundLine = (f) => {
 };
 const lakh = (v) => "₹" + (v / 100000).toFixed(2) + "L";
 
-function renderToday(d) {
+function renderToday(d, part) {
   const z = d.dip;
   if (!z) return `<section class="card"><div class="empty">No data in this scan yet.</div></section>`;
   const stake = z.rule.stake, slots = (d.performance && d.performance.portfolio && d.performance.portfolio.max_pos) || 15;
@@ -380,7 +380,8 @@ function renderToday(d) {
   const hc = d.health;
   const healthCard = hc ? `<details class="card"><summary>Data check <span class="meta" style="color:${hc.ok ? "var(--up)" : "var(--down)"}">${hc.ok ? "✓ all good" : "⚠ " + hc.checks.filter((c) => !c.ok).length + " issue(s)"}</span></summary>
     ${hc.checks.map((c) => `<div class="row hrow"><div class="meta" style="color:var(--text)">${c.ok ? "✓" : "⚠"} ${esc(c.text)}</div><div></div></div>`).join("")}</details>` : "";
-  return summary + todo + scanCard + holdings + soldCard + healthCard;
+  if (part === "holdings") return summary + holdings + soldCard;
+  return summary + todo + scanCard + healthCard;
 }
 
 function renderRule(d) {
@@ -572,10 +573,11 @@ function renderFundScan(d) {
 }
 
 function renderMore(d) {
-  const tabs = { rule: "How it works", backtest: "Backtest", fund: "Fundamentals", breakouts: "Breakouts", sectors: "Sectors", upload: "Upload" };
-  if (!tabs[state.more]) state.more = "rule";
+  const tabs = { breakouts: "Breakouts", holdings: "Holdings", sectors: "Sectors", backtest: "Backtest",
+                 fund: "Fundamentals", upload: "Upload", rule: "How it works" };
+  if (!tabs[state.more]) state.more = "breakouts";
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
-  const body = { rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
+  const body = { holdings: (x) => renderToday(x, "holdings"), rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
                  fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
   return chips + body;
 }

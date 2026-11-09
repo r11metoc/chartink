@@ -1,0 +1,43 @@
+name: Timer
+
+# GitHub runs the 15-minute schedule in scan.yml only every few hours on a busy
+# day (9 Nov 2026: nothing between 06:43 and 10:50 IST, so the 09:23 scan was
+# missed). This job is the clock instead: it stays up for ~5.5 hours, starts
+# scan.yml in "auto" mode every 15 minutes (the slot gate decides whether a
+# scan is due; Telegram commands are answered), then starts a fresh copy of
+# itself. The schedule below only restarts it if the chain ever stops.
+# Free for a public repository.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "11 */3 * * *"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: timer
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: Start scan.yml every 15 minutes for ~5.5 hours
+        run: |
+          end=$(( $(date +%s) + 330*60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            gh workflow run scan.yml --ref "$BRANCH" -f auto=true || echo "dispatch failed, retrying next tick"
+            sleep 900
+          done
+
+      - name: Hand over to a fresh timer
+        if: always()
+        run: gh workflow run keeper.yml --ref "$BRANCH"
