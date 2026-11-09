@@ -38,7 +38,11 @@ DEFAULT_SCANNER_NAMES = ["63_30_daily", "Bullish_Scanner", "Wkly_upswing"]
 # Oct 2026: the dashboard's widgets were reordered and position-based naming
 # filed Bullish_Scanner stocks under 63_30_daily.
 LOAD_WAIT_S = 45  # widgets that still say "Loading" get this long to finish
+STABLE_READS = 5  # then the row counts must stay the same for this many reads, 1 s apart
+STABLE_MAX_S = 30
 ATTEMPTS = 3
+# Nov 2026: two scans read the Bullish widget while it was still filling in
+# (1 row instead of 5), and the next scan filed the other 4 as fresh triggers.
 
 
 def _scanner_names() -> list[str]:
@@ -183,6 +187,17 @@ def scrape_dashboard(url: str, debug: bool = False) -> list[ScanResult]:
                 if not loading and len(found) >= len(names):
                     break
                 page.wait_for_timeout(1_000)
+            # Widgets fill their rows in over a few seconds: wait until the
+            # row counts stop changing, so a half-drawn table isn't read.
+            counts, same = None, 0
+            for _ in range(STABLE_MAX_S):
+                now = tuple((t["named"], len(t["rows"])) for t in tables)
+                same = same + 1 if now == counts else 0
+                counts = now
+                if same >= STABLE_READS - 1:
+                    break
+                page.wait_for_timeout(1_000)
+                tables = page.evaluate(_EXTRACT_JS, names)
             if tables:
                 break
             print(f"Attempt {attempt}: no tables on the page yet")

@@ -131,6 +131,36 @@ def save_results(conn: sqlite3.Connection, run_id: int, scanner_name: str, rows:
         )
 
 
+def repair_partial_reads(conn: sqlite3.Connection, max_gap_h: float = 2.0) -> int:
+    """Undo half-read scans: when a scanner's list in run B is a strict subset
+    of run A before it, and run C soon after has the missing stocks again, B
+    was read while the widget was still filling in. Drop B's rows for that
+    scanner and the 're-trigger' breakouts C recorded for the missing stocks.
+    Returns how many runs were repaired. Safe to call every run."""
+    fixed = 0
+    runs = dict(conn.execute("SELECT id, run_at FROM runs"))
+    for (scanner,) in conn.execute("SELECT DISTINCT scanner_name FROM results").fetchall():
+        ids = [r for (r,) in conn.execute(
+            "SELECT DISTINCT run_id FROM results WHERE scanner_name = ? ORDER BY run_id", (scanner,))]
+        sets = {r: symbols_for_run(conn, scanner, r) for r in ids[-60:]}
+        tail = ids[-60:]
+        for a, b, c in zip(tail, tail[1:], tail[2:]):
+            sa, sb, sc = sets[a], sets[b], sets[c]
+            gone = sa - sb
+            if not (sb < sa and gone <= sc):
+                continue
+            gap = (datetime.fromisoformat(runs[c]) - datetime.fromisoformat(runs[b])).total_seconds() / 3600
+            if gap > max_gap_h:
+                continue
+            conn.execute("DELETE FROM results WHERE run_id = ? AND scanner_name = ?", (b, scanner))
+            conn.executemany("DELETE FROM breakouts WHERE run_id = ? AND scanner_name = ? AND symbol = ?",
+                             [(c, scanner, s) for s in gone])
+            print(f"Repaired a half-read scan: run {b} {scanner} had {len(sb)} of {len(sa)} stocks")
+            sets[b] = sa  # so a following triplet sees the full list
+            fixed += 1
+    return fixed
+
+
 def previous_run_id(conn: sqlite3.Connection, scanner_name: str, before_run_id: int) -> int | None:
     cur = conn.execute(
         "SELECT DISTINCT run_id FROM results WHERE scanner_name = ? AND run_id < ? "

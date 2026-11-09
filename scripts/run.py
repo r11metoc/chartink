@@ -83,7 +83,11 @@ def main() -> int:
     for scan in scans:
         print(f"Scanner '{scan.scanner_name}': {len(scan.rows)} rows")
         db.save_results(conn, run_id, scan.scanner_name, scan.rows)
+    # A previous scan that read a widget half-filled must not turn its missing
+    # stocks into fresh triggers now.
+    db.repair_partial_reads(conn)
 
+    for scan in scans:
         prev_id = db.previous_run_id(conn, scan.scanner_name, run_id)
         if prev_id is None:
             print(f"  first run for this scanner, seeding baseline ({len(scan.rows)} symbols)")
