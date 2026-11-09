@@ -19,8 +19,8 @@ TRACK_DAYS = 120
 # Backtest picks feed the sector view's "average move since pick".
 BACKTEST_DAYS = 120
 # Nifty 50 for the market regime (50-day average), Nifty 500 for "vs index".
-BENCHMARKS = ["^NSEI", "^CRSLDX"]
-BENCHMARK_DAYS = 120
+BENCHMARKS = ["^NSEI", "^CRSLDX", "^INDIAVIX"]  # + India VIX for the market pulse
+BENCHMARK_DAYS = 420  # 200-day averages
 
 
 def tracked_symbols(conn) -> tuple[list[str], str]:

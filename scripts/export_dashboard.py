@@ -25,6 +25,7 @@ import db
 import dipzone
 import fundamental_scan
 import health
+import market
 from notify import _col, _num, _price
 from slot_gate import IST, SLOTS
 
@@ -245,6 +246,9 @@ def main() -> int:
     triggers = dipzone.trigger_map(states)
     breakouts = breakouts_view(conn, latest_run, triggers)
     scanners = scanners_view(conn, latest_run, triggers)
+    momentum = sector_momentum_view(conn, datetime.now(IST).date())
+    watch = sorted({s["symbol"] for s in states if s.get("status") in ("holding", "waiting for breakout", "no prices yet")}
+                   | {r["symbol"] for g in scanners for r in g["rows"]})
     data = {
         "generated_at": datetime.now(IST).isoformat(timespec="minutes"),
         "last_scan": _ist(last_scan).isoformat(timespec="minutes"),
@@ -254,7 +258,9 @@ def main() -> int:
         "breakouts": breakouts,
         "stats": stats_view(breakouts),
         "sectors": sectors_view(conn),
-        "sector_momentum": sector_momentum_view(conn, datetime.now(IST).date()),
+        "sector_momentum": momentum,
+        "market": market.pulse(conn, momentum),
+        "events": market.upcoming_results(conn, watch),
         "dip": dipzone.dashboard_view(states),
         "performance": _performance(),
         "fundscan": fundamental_scan.view(),

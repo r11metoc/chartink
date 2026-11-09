@@ -106,9 +106,11 @@ def parse(page: str) -> dict:
         return None
 
     ind = soup.select('#peers a[title="Industry"]')
+    bse = re.search(r"bseindia\.com/stock-share-price/[^/\"]+/[^/\"]+/(\d{6})/", page)
     out = {
         "Name": (soup.find("h1").get_text(strip=True) if soup.find("h1") else ""),
         "Industry": ind[-1].get_text(strip=True) if ind else "",
+        "BSE Code": bse.group(1) if bse else None,
         "Current Price": first("Current Price"),
         "High price": first("High / Low"),
         "Market Capitalization": first("Market Cap"),
@@ -187,7 +189,7 @@ def refresh(symbols: list[str], days: int = REFRESH_DAYS, get=None, sleep=time.s
     done = fails = 0
     for sym in sorted(set(symbols)):
         e = data.get(sym)
-        if e and (now - datetime.fromisoformat(e["fetched_at"])).days < days:
+        if e and (now - datetime.fromisoformat(e["fetched_at"])).days < days and "BSE Code" in e["data"]:
             continue
         try:
             row = fetch(sym, get, sleep)

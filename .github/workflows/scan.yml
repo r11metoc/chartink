@@ -133,6 +133,8 @@ jobs:
           python import_backtest.py
           # Yahoo hiccups shouldn't cost the scan; the dashboard falls back to scan prices.
           python refresh_prices.py || echo "Price refresh failed, using scan prices."
+          # BSE results calendar for the Today page's result-date warnings.
+          python market.py || echo "Results calendar failed."
           # Fundamentals of every scanner stock (Yahoo, cached 30 days) for the Valuepick check.
           python update_fundamentals.py || echo "Fundamentals refresh failed, alerts go out without them."
 

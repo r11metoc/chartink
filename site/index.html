@@ -307,6 +307,25 @@ const fundLine = (f) => {
   const src = f.asof ? ` (Screener, ${fmtDate(f.asof)})` : f.source === "Yahoo" ? " (Yahoo)" : "";
   return ` · ${head}${f.score != null ? ` · Valuepick ${Math.round(f.score)}` : ""}${f.bank ? " · bank: ROE used, OPM and debt/equity not applicable" : ""}${src}`;
 };
+const evTag = (sym) => { const d = (state.data && state.data.events || {})[sym];
+  return d ? ` <span class="tag" style="background:var(--hold-bg);color:var(--hold)">📅 results ${fmtDate(d)}</span>` : ""; };
+
+function renderMarket(d) {
+  const m = d.market;
+  if (!m || !m.indexes || !m.indexes.length) return "";
+  const sign = (v) => (v == null ? "–" : (v > 0 ? "+" : "") + v + "%");
+  const ix = m.indexes.map((x) => `<div class="meta" style="color:var(--text)"><b>${esc(x.name)}</b> ${x.close.toLocaleString("en-IN")}
+      <span class="${cls(x.day)}">${sign(x.day)}</span> today · ${sign(x.month)} in a month ·
+      ${x.vs50 == null ? "" : (x.vs50 >= 0 ? "above" : "below") + " 50-day"}${x.vs200 == null ? "" : ", " + (x.vs200 >= 0 ? "above" : "below") + " 200-day"}</div>`).join("");
+  const tcls = m.trend === "Uptrend" ? "up" : m.trend === "Downtrend" ? "down" : "";
+  const b = m.breadth && m.breadth.total ? `<div class="meta">${m.breadth.pct}% of the ${m.breadth.total} tracked stocks are above their 50-day average</div>` : "";
+  const sec = (m.sectors_up.length || m.sectors_down.length) ? `<div class="meta">Sectors gaining picks: ${esc(m.sectors_up.join(", ") || "–")} · losing: ${esc(m.sectors_down.join(", ") || "–")}</div>` : "";
+  const n = m.indexes[0];
+  return `<details class="card"><summary>Market <span class="meta"><b class="${tcls}">${esc(m.trend || "")}</b> · Nifty <span class="${cls(n.day)}">${sign(n.day)}</span>${m.vix ? ` · VIX ${m.vix.level}` : ""}</span></summary>
+    <div style="padding:0 14px 12px;display:grid;gap:4px">${ix}${b}${sec}
+    <div class="meta" style="font-size:11.5px">Context only: a market-trend filter didn't improve your backtest, so it never changes a buy or sell.</div></div></details>`;
+}
+
 const lakh = (v) => "₹" + (v / 100000).toFixed(2) + "L";
 
 function renderToday(d, part) {
@@ -329,15 +348,21 @@ function renderToday(d, part) {
     <div><span>Booked P&amp;L</span><b class="${cls(booked)}">${rupees(booked)}</b></div>
   </div><div class="meta" style="margin:-4px 2px 4px">Paper trades of ₹1L each · returns after 0.25% costs (brokerage, taxes, slippage)</div>`;
 
+  const held = Object.fromEntries(hold.map((h) => [h.symbol, h]));
+  const waiting = Object.fromEntries(z.buy_list.map((b) => [b.symbol, b]));
   const actions = [
     ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
         <div class="meta">At the next open · closed below its 50-day average ${money(h.ma)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
     ...stops.map((b) => `<details class="row fs" style="display:block"><summary style="list-style:none;cursor:pointer">
-        <div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}</div>
+        <div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}${evTag(b.symbol)}</div>
         <div class="meta">Until ${b.valid_until ? fmtDate(b.valid_until) : "–"} · stop ${money(b.stop)} if bought · now ${money(b.now)}${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""}</div></summary>
         ${b.fund ? `<div class="meta" style="padding-top:6px">Fundamentals${fundLine(b.fund)}</div>` : ""}</details>`),
   ];
+  const ev = d.events || {};
+  const evRows = Object.entries(ev).filter(([sym]) => held[sym] || waiting[sym]).sort((a, b) => a[1].localeCompare(b[1]));
+  if (evRows.length) actions.push(`<div class="row"><div><div class="sym">📅 Results coming</div>
+      <div class="meta">${evRows.map(([sym, dt]) => `<b>${esc(sym)}</b> ${fmtDate(dt)} (${held[sym] ? "holding" : "buy-stop"})`).join(" · ")} · prices can jump either way on results day</div></div><div></div></div>`);
   const done = [
     ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
         <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · stop ${money(h.stop)}</div></div>
@@ -347,8 +372,6 @@ function renderToday(d, part) {
         <div class="num chg ${cls(c.ret)}">${pct(c.ret)}</div></div>`),
   ];
   // Every stock on the scanners in the latest scan, with what the rule did with it.
-  const held = Object.fromEntries(hold.map((h) => [h.symbol, h]));
-  const waiting = Object.fromEntries(z.buy_list.map((b) => [b.symbol, b]));
   const why = Object.fromEntries(passed.map((p) => [p.scanner + "|" + p.symbol, p.why.split(":")[0]]));
   const pending = Object.fromEntries((z.pending || []).map((p) => [p.scanner + "|" + p.symbol, p]));
   const bySym = {};
@@ -367,7 +390,7 @@ function renderToday(d, part) {
       note = `buy-stop at the ${wk ? "week's" : "day's"} high, set after the ${wk ? "week's" : ""} close${hold.length >= slots ? " if a slot is free" : ""}`.replace("the  close", "the close");
     } else { chip = `<span class="pill WAIT">${esc(reason || "not taken")}</span>`;
              note = r.trigger != null ? `trigger ${money(r.trigger)} (${r.chg >= 0 ? "above" : "below"}, ${pct(r.chg)})` : ""; }
-    return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${r.scanners.map(scanTag).join("")}</div>
+    return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${r.scanners.map(scanTag).join("")}${evTag(r.symbol)}</div>
       <div class="meta">${money(r.now)}${note ? " · " + note : ""}${r.industry ? " · " + esc(r.industry) : ""}</div></div><div class="num">${chip}</div></div>`;
   }).join("");
   const scanCard = `<section class="card"><h2>On the scanners now <small>${onScan.length}</small></h2>
@@ -378,7 +401,7 @@ function renderToday(d, part) {
     </section>`;
 
   const rows = [...hold].sort((a, b) => b.ret - a.ret).map((h) => `
-    <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
+    <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}${evTag(h.symbol)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
       <div class="meta">${money(h.entry)} → ${money(h.now)} · sell below ${money(h.ma)}</div></div>
       <div class="num"><div class="chg ${cls(h.ret)}">${pct(h.ret)}</div><div class="tiny ${cls(h.pnl)}">${rupees(h.pnl)}</div></div></div>`).join("");
   const holdings = `<section class="card"><h2>Holdings <small>${lakh(value)}</small></h2>
@@ -393,7 +416,7 @@ function renderToday(d, part) {
   const healthCard = hc ? `<details class="card"><summary>Data check <span class="meta" style="color:${hc.ok ? "var(--up)" : "var(--down)"}">${hc.ok ? "✓ all good" : "⚠ " + hc.checks.filter((c) => !c.ok).length + " issue(s)"}</span></summary>
     ${hc.checks.map((c) => `<div class="row hrow"><div class="meta" style="color:var(--text)">${c.ok ? "✓" : "⚠"} ${esc(c.text)}</div><div></div></div>`).join("")}</details>` : "";
   if (part === "holdings") return summary + holdings + soldCard;
-  return summary + todo + scanCard + healthCard;
+  return summary + renderMarket(d) + todo + scanCard + healthCard;
 }
 
 function renderRule(d) {
