@@ -344,12 +344,25 @@ function renderToday(d) {
         <div class="meta">${fmtDate(c.exit_date)} at ${money(c.exit)} · ${SELL[c.reason] || esc(c.reason)}</div></div>
         <div class="num chg ${cls(c.ret)}">${pct(c.ret)}</div></div>`),
   ];
-  const skip = passed.length ? `<div class="note" style="padding-top:10px;border-top:1px solid var(--line)">Also on the scanners, not taken: ${passed.map((p) =>
-    `<b>${esc(p.symbol)}</b> (${esc(SHORT[p.scanner] || p.scanner)}, ${esc(p.why.split(":")[0])})`).join(" · ")}</div>` : "";
+  // Every stock on the scanners in the latest scan, with what the rule did with it.
+  const held = Object.fromEntries(hold.map((h) => [h.symbol, h]));
+  const waiting = Object.fromEntries(z.buy_list.map((b) => [b.symbol, b]));
+  const why = Object.fromEntries(passed.map((p) => [p.symbol, p.why.split(":")[0]]));
+  const onScan = (d.scanners || []).flatMap((g) => g.rows.map((r) => ({ ...r, scanner: g.name })));
+  const scanRows = onScan.map((r) => {
+    const h = held[r.symbol], b = waiting[r.symbol];
+    const chip = h ? `<span class="pill BUY">Holding ${pct(h.ret)}</span>` : b ? `<span class="pill HOLD">Buy-stop</span>`
+      : `<span class="pill WAIT">${esc(why[r.symbol] || "not taken")}</span>`;
+    const vs = r.trigger != null ? ` · trigger ${money(r.trigger)} (${r.chg >= 0 ? "above" : "below"}, ${pct(r.chg)})` : "";
+    return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${scanTag(r.scanner)}</div>
+      <div class="meta">${money(r.now)}${vs}${r.industry ? " · " + esc(r.industry) : ""}</div></div><div class="num">${chip}</div></div>`;
+  }).join("");
+  const scanCard = `<section class="card"><h2>On the scanners now <small>${onScan.length}</small></h2>
+    ${scanRows || `<div class="empty">No stocks on the scanners in the latest scan.</div>`}</section>`;
   const todo = `<section class="card todo"><h2>To do <small>${actions.length || ""}</small></h2>
     ${actions.join("") || `<div class="empty">Nothing to do today.</div>`}
     ${done.length ? `<h2 style="border-top:1px solid var(--line)">Done this week <small>${done.length}</small></h2>${done.join("")}` : ""}
-    ${skip}</section>`;
+    </section>`;
 
   const rows = [...hold].sort((a, b) => b.ret - a.ret).map((h) => `
     <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
@@ -363,7 +376,7 @@ function renderToday(d) {
       <div class="meta">${money(c.entry)} → ${money(c.exit)} · ${fmtDate(c.exit_date)} · ${SELL[c.reason] || esc(c.reason)}</div></div>
       <div class="num"><div class="chg ${cls(c.ret)}">${pct(c.ret)}</div><div class="tiny ${cls(c.pnl)}">${rupees(c.pnl)}</div></div></div>`).join("");
   const soldCard = sold.length ? `<details class="card"><summary>Sold <span class="meta">${sold.length} · ${rupees(booked)}</span></summary>${soldRows}</details>` : "";
-  return summary + todo + holdings + soldCard;
+  return summary + todo + scanCard + holdings + soldCard;
 }
 
 function renderRule(d) {
