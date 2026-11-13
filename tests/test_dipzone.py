@@ -86,10 +86,11 @@ def test_summary_ignores_duplicates():
     assert row["signals"] == 1 and row["holding"] == 1
 
 
-def test_same_stop_for_all_and_no_volatility_filter():
+def test_same_stop_for_all_and_weekly_volatility_filter():
     assert dz.stop_for("Wkly_upswing") == dz.stop_for("63_30_daily") == 15.0
-    assert dz.passes_filter("Wkly_upswing", -2.0, 9.5)        # volatile stocks are no longer skipped
-    assert not dz.passes_filter("63_30_daily", -12.0, 1.0)    # 63/30 still within 10% of the 52-week high
+    assert not dz.passes_filter("Wkly_upswing", -2.0, 5.5) and dz.passes_filter("Wkly_upswing", -2.0, 3.0)
+    assert dz.passes_filter("Bullish_Scanner", None, 9.0)
+    assert not dz.passes_filter("63_30_daily", -12.0, 1.0)
     rows = BREAKOUT + [(104, 104, 99, 99.5), (99.5, 100, 99, 99.6), (99.6, 99.6, 86, 87)]   # bought 99.5; 12% would stop, 15% (84.6) not
     assert dz.simulate(frame(rows), 100.0, "Wkly_upswing")["status"] == "holding"
 
@@ -130,7 +131,7 @@ def test_breakout_gap_up_fills_at_open_and_waits_otherwise():
     s = dz.simulate_breakout(frame([(103, 104, 102, 103.5)]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
     assert s["entry"] == 103 and s["gap"] and s["status"] == "holding"
     w = dz.simulate_breakout(frame([(98, 99, 97, 98)]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
-    assert w["status"] == "waiting for breakout" and w["sessions_left"] == 9   # 10-session buy-stop
+    assert w["status"] == "waiting for breakout" and w["sessions_left"] == 2   # 3-session buy-stop
 
 
 def test_apply_slots_limits_and_prefers_midcaps():

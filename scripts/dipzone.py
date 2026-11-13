@@ -34,13 +34,15 @@ DEFAULT_DIP = 3.0
 FLOOR_PCT = 5.0       # the dip close must stay within 5% below the trigger
 ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
 TARGET_PCT = 8.0
-# 13 Nov 2026, the user's rule: 15% stop for every scanner (was 12%, 15% weekly),
-# no volatility filter (was: Wkly_upswing only under 4% daily ATR), exit on a
-# close below the 30-day EMA (was the 50-day simple average), buy-stop valid
-# 10 sessions (20 weekly; was 3 / 5, breakout_sim.py).
+# 13 Nov 2026: exit on a close below the 30-day EMA (was the 50-day simple
+# average) and a 15% stop for every scanner (was 12%, 15% weekly). Backtest
+# 2019-26 (reports/rule_compare.md): 26.9% a year, worst fall -9.2%, vs 24.3%
+# and -14.1% before; better in both 2019-22 and 2023-26. The 3/5-session
+# buy-stop and the weekly volatility filter stay: longer windows (25.9%) and
+# no filter (25.2%) both did worse.
 STOP_PCT = 15.0
 STOP_BY_SCANNER: dict[str, float] = {}
-ATR_MAX_PCT: dict[str, float] = {}
+ATR_MAX_PCT = {"Wkly_upswing": 4.0}       # daily ATR(14) under 4% of the close
 MAX_HOLD = 40         # sessions (8 weeks) - the old +8% target rule (kept for comparison)
 EXIT_MA = 30          # live exit: sell at the next open after a close below this daily EMA
 EXIT_LABEL = f"{EXIT_MA}-day EMA"

@@ -428,7 +428,7 @@ function renderRule(d) {
     for ${r.entry_days} sessions after the signal (${r.entry_days_weekly} for Weekly); if the price hasn't crossed by then, cancel it. Filled at the trigger, or at the open on a gap-up.<br><br>
     <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day EMA, or at the ${r.stop}% stop-loss, or after a year.<br><br>
     <b>Slots</b>: 15 positions of about 6.7% each, one per stock. If short of slots, mid caps first, then large, then small.<br><br>
-    <b>Filter</b>: 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high. No volatility filter: the entry and exit rules handle it.<br><br>
+    <b>Filters</b>: Weekly only takes calmer stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.<br><br>
     Paper trades of ₹1L each; returns are after 0.25% costs. Not advice.`)
   + sec("Scans and alerts", `
     Scans at 10:00, 13:00 and 15:00 IST (within about 15 minutes), Monday to Friday; the header shows the next one.
