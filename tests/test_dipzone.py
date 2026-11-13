@@ -164,3 +164,17 @@ def test_exit_line_is_30_day_ema():
     line = dz.exit_line(c)
     assert np.isnan(line[28]) and not np.isnan(line[29])
     assert abs(line[-1] - c.ewm(span=30, adjust=False).mean().iloc[-1]) < 1e-9
+
+
+def test_no_slot_stock_can_be_bought_on_a_later_signal():
+    def st(sym, day, entry, status="holding", exit_=None):
+        s = {"scanner": "Bullish_Scanner", "symbol": sym, "date": day, "status": status, "priority": 1,
+             "entry_date": pd.Timestamp(entry), "entry": 100.0, "ret": 1.0}
+        if exit_:
+            s["exit_date"] = pd.Timestamp(exit_)
+        return s
+    a = st("A", "2026-11-01", "2026-11-02", "stop", "2026-11-05")   # holds the only slot until 5 Nov
+    b1 = st("B", "2026-11-02", "2026-11-03")                        # no slot
+    b2 = st("B", "2026-11-05", "2026-11-06")                        # later signal: slot free again
+    out = dz.apply_slots([a, b1, b2], slots=1)
+    assert [x["status"] for x in out] == ["stop", "no slot", "holding"]

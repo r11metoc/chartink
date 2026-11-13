@@ -242,12 +242,15 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
     for d0, sc0, sym0, _ in paper._signals(conn, confirm_from):
         seen.setdefault(sym0, []).append((pd.Timestamp(d0), sc0))
     out = []
-    active: set[tuple[str, str]] = set()  # one open idea per scanner + stock
+    # One open buy-stop per scanner + stock. Holdings don't block a new signal
+    # here: apply_slots() decides (one position per stock, 15 slots), as in the
+    # backtest, so a stock that got no slot can be bought on a later signal.
+    active: set[tuple[str, str]] = set()
     for day, scanner, symbol, source in paper._signals(conn, START):
         t = pd.Timestamp(day)
         if (scanner, symbol) in active:
             out.append({"scanner": scanner, "symbol": symbol, "date": day, "source": source,
-                        "status": "duplicate", "why": "already watching or holding this stock for this scanner"})
+                        "status": "duplicate", "why": "a buy-stop from an earlier signal is still open"})
             continue
         others = sorted({sc for d0, sc in seen.get(symbol, [])
                          if sc != scanner and t - pd.Timedelta(days=CONFIRM_DAYS) <= d0 <= t})
@@ -272,7 +275,7 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
         st = live_sim(df, sig, scanner)
         if st["status"] == "waiting for breakout":
             st["valid_until"] = df.index[sig["end_pos"]] + pd.offsets.BDay(bs.entry_window_for(scanner))
-        if st["status"] in ACTIVE:
+        if st["status"] == "waiting for breakout":
             active.add((scanner, symbol))
         out.append({**base, **st, "last_close": float(df["Close"].iloc[-1]), "last_date": df.index[-1]})
     return apply_slots(out)
@@ -291,7 +294,7 @@ def apply_slots(states: list[dict], slots: int | None = None) -> list[dict]:
         d = pd.Timestamp(s["entry_date"])
         open_ = [o for o in open_ if o.get("status") not in CLOSED or pd.Timestamp(o["exit_date"]) > d]
         if any(o["symbol"] == s["symbol"] for o in open_):
-            why = "already holding this stock from another scanner"
+            why = "already holding this stock"
         elif len(open_) >= slots:
             why = f"all {slots} slots were full"
         else:
@@ -335,9 +338,10 @@ def events(states: list[dict], now: datetime) -> list[tuple[str, dict, str]]:
     """(key, state, kind) for setup / buy / sell / exit events in the last ALERT_DAYS."""
     since = pd.Timestamp(now.date()) - pd.Timedelta(days=ALERT_DAYS)
     ev = []
+    held = {s["symbol"] for s in states if s.get("status") == "holding"}
     for s in states:
         if s.get("mode") == "breakout":
-            if s.get("status") == "waiting for breakout":
+            if s.get("status") == "waiting for breakout" and s["symbol"] not in held:
                 ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|setup", s, "setup"))
             if "entry_date" in s and s["entry_date"] >= since:
                 ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|bought", s, "bought"))
@@ -509,6 +513,15 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
             if prev is None or _iso(s["date"]) >= prev["signal"]:
                 passed[key] = {"symbol": s["symbol"], "scanner": s["scanner"], "signal": _iso(s["date"]),
                                        "why": "no free slot" if s["status"] == "no slot" else s.get("why", "filtered out")}
+    held = {x["symbol"] for x in holding}
+    seen_bl: set[str] = set()
+    keep = []
+    for x in sorted(buy_list, key=lambda x: x["signal"], reverse=True):  # newest buy-stop per stock
+        if x["symbol"] in held or x["symbol"] in seen_bl:
+            continue
+        seen_bl.add(x["symbol"])
+        keep.append(x)
+    buy_list = keep
     order = {"zone": 0, "dip": 1, "breakout": 2}
     buy_list.sort(key=lambda x: (order[x["stage"]], x["priority"], x["signal"]))
     holding.sort(key=lambda x: x["entry_date"], reverse=True)

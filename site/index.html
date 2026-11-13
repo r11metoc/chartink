@@ -235,7 +235,9 @@ function renderBreakouts(d) {
   return `
     <div class="stats">${stats}</div>
     <div class="filters">${names.map((n) => chip("scanner", n)).join("")}</div>
-    <div class="filters">${["All", "BUY", "HOLD"].map((v) => chip("status", v)).join("")}</div>
+    <div class="filters">${[["All", "All"], ["BUY", "Above trigger"], ["HOLD", "Below trigger"]].map(([v, t]) =>
+      `<button data-status="${v}" class="${state.status === v ? "on" : ""}">${t}</button>`).join("")}</div>
+    <div class="note" style="padding:6px 2px 0">Every scanner signal of the last ${d.window_days} days and its price vs its trigger. Not a buy list: what to buy is in Today → To do.</div>
     <section class="card">
       <h2>Triggers, last ${d.window_days} days <small>${rows.length}</small></h2>
       ${rows.length ? rows.map((b) => `
@@ -243,7 +245,7 @@ function renderBreakouts(d) {
           <div><div class="sym">${esc(b.symbol)}${b.on_scan ? '<span class="dot" title="still on the scanner"></span>' : ""}</div>
             <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · trigger ${money(b.trigger)} → ${money(b.now)}${b.seen != null && b.seen !== b.trigger ? " · seen at " + money(b.seen) : ""}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div></div>
           <div class="num chg ${cls(b.chg)}">${pct(b.chg)}</div>
-          <span class="pill ${b.status}">${b.status}</span>
+          <span class="pill ${b.status}">${b.status === "BUY" ? "above" : "below"}</span>
         </div>`).join("") : `<div class="empty">No triggers match.</div>`}
     </section>
     <footer>● still on the scanner · best = highest price since the trigger</footer>`;
@@ -395,7 +397,9 @@ function renderToday(d, part) {
   }).join("");
   const scanCard = `<section class="card"><h2>On the scanners now <small>${onScan.length}</small></h2>
     ${scanRows || `<div class="empty">No stocks on the scanners in the latest scan.</div>`}</section>`;
-  const todo = `<section class="card todo"><h2>To do <small>${actions.length || ""}</small></h2>
+  const full = hold.length >= slots && stops.length
+    ? `<div class="note" style="padding-top:2px">All ${slots} slots are full: a buy-stop becomes a buy only if a holding is sold first.</div>` : "";
+  const todo = `<section class="card todo"><h2>To do <small>${actions.length || ""}</small></h2>${full}
     ${actions.join("") || `<div class="empty">Nothing to do today.</div>`}
     ${done.length ? `<h2 style="border-top:1px solid var(--line)">Done this week <small>${done.length}</small></h2>${done.join("")}` : ""}
     </section>`;
