@@ -63,7 +63,7 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Weekly retrain $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            git pull --rebase origin "${{ github.ref_name }}"
+            git pull --rebase --autostash origin "${{ github.ref_name }}"
             git push origin "HEAD:${{ github.ref_name }}"
           fi
 
