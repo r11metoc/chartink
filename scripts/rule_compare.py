@@ -31,6 +31,9 @@ VARIANTS = {
     "Old + 10/20-session buy-stop": {**OLD, "win": (10, 20)},
     "Old + no volatility filter": {**OLD, "atr": False},
     "New rule (all four changes)": NEW,
+    "EMA exit + 15% stop": {**OLD, "exit": "ema30", "stop": (15.0, 15.0)},
+    "EMA exit + 15% stop + 10/20 buy-stop": {**OLD, "exit": "ema30", "stop": (15.0, 15.0), "win": (10, 20)},
+    "EMA exit + 15% stop, no vol. filter": {**OLD, "exit": "ema30", "stop": (15.0, 15.0), "atr": False},
 }
 
 
@@ -102,7 +105,7 @@ def main() -> int:
     res = {k: trades(hits, prices, v) for k, v in VARIANTS.items()}
     begin = res["Old rule (until 13 Nov)"].groupby("scanner")["entry_date"].min().max()
     L = ["# Rule change backtest (13 Nov 2026)", "",
-         "Each line changes one thing from the old rule; the last has all four. ₹10L, 15 slots, mid caps first, "
+         "Lines 2-5 change one thing from the old rule, line 6 has all four, the last three are combinations. ₹10L, 15 slots, mid caps first, "
          f"after 0.25% costs, from {begin.date()}. Trades still open are left out.", ""]
     for name, a, b in [("All years", begin, None), ("2019-22", begin, pd.Timestamp("2023-01-01")),
                        ("2023-26", pd.Timestamp("2023-01-01"), None)]:
