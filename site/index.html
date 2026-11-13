@@ -237,7 +237,7 @@ function renderBreakouts(d) {
     <div class="filters">${names.map((n) => chip("scanner", n)).join("")}</div>
     <div class="filters">${[["All", "All"], ["BUY", "Above trigger"], ["HOLD", "Below trigger"]].map(([v, t]) =>
       `<button data-status="${v}" class="${state.status === v ? "on" : ""}">${t}</button>`).join("")}</div>
-    <div class="note" style="padding:6px 2px 0">Every scanner signal of the last ${d.window_days} days and its price vs its trigger. Not a buy list: what to buy is in Today → To do.</div>
+    <div class="note" style="padding:6px 2px 0">Every scanner signal of the last ${d.window_days} days and its price vs its trigger. Not a buy list: "Rule" says what the paper book did with each signal; what to buy is in Today → To do.</div>
     <section class="card">
       <h2>Triggers, last ${d.window_days} days <small>${rows.length}</small></h2>
       ${rows.length ? rows.map((b) => `
@@ -246,6 +246,7 @@ function renderBreakouts(d) {
             <div class="meta">${esc(b.scanner)} · ${fmtDate(b.date)} · trigger ${money(b.trigger)} → ${money(b.now)}${b.seen != null && b.seen !== b.trigger ? " · seen at " + money(b.seen) : ""}${b.best_chg != null ? " · best " + pct(b.best_chg) : ""}${b.days != null ? " · " + b.days + "d" : ""}</div></div>
           <div class="num chg ${cls(b.chg)}">${pct(b.chg)}</div>
           <span class="pill ${b.status}">${b.status === "BUY" ? "above" : "below"}</span>
+          ${b.rule ? `<div class="meta" style="grid-column:1/-1;margin-top:-4px">Rule: <b>${esc(b.rule)}</b></div>` : ""}
         </div>`).join("") : `<div class="empty">No triggers match.</div>`}
     </section>
     <footer>● still on the scanner · best = highest price since the trigger</footer>`;
@@ -312,7 +313,7 @@ const fundLine = (f) => {
 const evTag = (sym) => { const e = (state.data && state.data.events || {})[sym];
   return e ? ` <span class="tag" style="background:var(--hold-bg);color:var(--hold)">📅 ${esc(e.what)} ${fmtDate(e.date)}</span>` : ""; };
 
-function renderMarket(d) {
+function renderMarket(d, open) {
   const m = d.market;
   if (!m || !m.indexes || !m.indexes.length) return "";
   const sign = (v) => (v == null ? "–" : (v > 0 ? "+" : "") + v + "%");
@@ -323,7 +324,7 @@ function renderMarket(d) {
   const b = m.breadth && m.breadth.total ? `<div class="meta">${m.breadth.pct}% of the ${m.breadth.total} tracked stocks are above their 50-day average</div>` : "";
   const sec = (m.sectors_up.length || m.sectors_down.length) ? `<div class="meta">Sectors gaining picks: ${esc(m.sectors_up.join(", ") || "–")} · losing: ${esc(m.sectors_down.join(", ") || "–")}</div>` : "";
   const n = m.indexes[0];
-  return `<details class="card"><summary>Market <span class="meta"><b class="${tcls}">${esc(m.trend || "")}</b> · Nifty <span class="${cls(n.day)}">${sign(n.day)}</span>${m.vix ? ` · VIX ${m.vix.level}` : ""}</span></summary>
+  return `<details class="card"${open ? " open" : ""}><summary>Market <span class="meta"><b class="${tcls}">${esc(m.trend || "")}</b> · Nifty <span class="${cls(n.day)}">${sign(n.day)}</span>${m.vix ? ` · VIX ${m.vix.level}` : ""}</span></summary>
     <div style="padding:0 14px 12px;display:grid;gap:4px">${ix}${b}${sec}
     <div class="meta" style="font-size:11.5px">Context only: a market-trend filter didn't improve your backtest, so it never changes a buy or sell.</div></div></details>`;
 }
@@ -363,8 +364,8 @@ function renderToday(d, part) {
   ];
   const ev = d.events || {};
   const evRows = Object.entries(ev).filter(([sym]) => held[sym] || waiting[sym]).sort((a, b) => a[1].date.localeCompare(b[1].date));
-  if (evRows.length) actions.push(`<div class="row"><div><div class="sym">📅 Results coming</div>
-      <div class="meta">${evRows.map(([sym, e]) => `<b>${esc(sym)}</b> ${fmtDate(e.date)}${e.what !== "results" ? " (" + esc(e.what) + ")" : ""} · ${held[sym] ? "holding" : "buy-stop"}`).join(" · ")}</div></div><div></div></div>`);
+  const resultsCard = !evRows.length ? "" : (`<section class="card"><h2>📅 Results coming <small>${evRows.length}</small></h2><div class="row"><div>
+      <div class="meta">${evRows.map(([sym, e]) => `<b>${esc(sym)}</b> ${fmtDate(e.date)}${e.what !== "results" ? " (" + esc(e.what) + ")" : ""} · ${held[sym] ? "holding" : "buy-stop"}`).join(" · ")}</div></div><div></div></div></section>`);
   const done = [
     ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
         <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · SL ${money(h.stop)}</div></div>
@@ -401,8 +402,8 @@ function renderToday(d, part) {
     ? `<div class="note" style="padding-top:2px">All ${slots} slots are full: a buy-stop becomes a buy only if a holding is sold first.</div>` : "";
   const todo = `<section class="card todo"><h2>To do <small>${actions.length || ""}</small></h2>${full}
     ${actions.join("") || `<div class="empty">Nothing to do today.</div>`}
-    ${done.length ? `<h2 style="border-top:1px solid var(--line)">Done this week <small>${done.length}</small></h2>${done.join("")}` : ""}
     </section>`;
+  const doneCard = done.length ? `<section class="card"><h2>Done this week <small>${done.length}</small></h2>${done.join("")}</section>` : "";
 
   const rows = [...hold].sort((a, b) => b.ret - a.ret).map((h) => `
     <div class="row hrow"><div><div class="sym">${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}${evTag(h.symbol)}${h.sell_signal ? ' <span class="pill SELL">SELL</span>' : ""}</div>
@@ -419,8 +420,9 @@ function renderToday(d, part) {
   const hc = d.health;
   const healthCard = hc ? `<details class="card"><summary>Data check <span class="meta" style="color:${hc.ok ? "var(--up)" : "var(--down)"}">${hc.ok ? "✓ all good" : "⚠ " + hc.checks.filter((c) => !c.ok).length + " issue(s)"}</span></summary>
     ${hc.checks.map((c) => `<div class="row hrow"><div class="meta" style="color:var(--text)">${c.ok ? "✓" : "⚠"} ${esc(c.text)}</div><div></div></div>`).join("")}</details>` : "";
-  if (part === "holdings") return summary + holdings + soldCard;
-  return summary + renderMarket(d) + todo + scanCard + healthCard;
+  if (part === "holdings") return summary + doneCard + holdings + soldCard;
+  if (part === "market") return renderMarket(d, true) + resultsCard + healthCard;
+  return summary + todo + scanCard;
 }
 
 function renderRule(d) {
@@ -438,7 +440,7 @@ function renderRule(d) {
     Scans at 10:00, 13:00 and 15:00 IST (within about 15 minutes), Monday to Friday; the header shows the next one.
     Telegram sends only today's actions (set a buy-stop, bought, sell, closed). Ask the bot for more:
     /today, /holdings, /scanners, /breakouts, /fundamentals, /help (replies within about 15 minutes).<br><br>
-    <b>Data check</b> on Today re-checks every scan: scan freshness, prices, every paper trade against the daily prices, and fundamentals.`)
+    <b>Data check</b> (More → Market) re-checks every scan: scan freshness, prices, every paper trade against the daily prices, and fundamentals.`)
   + sec("Fundamentals (information only)", `
     Every scanner stock is checked against <b>your main screen</b>
     (price within 20% of the 52w high, market cap ₹100–5,000 Cr, ROCE &gt; 15%, OPM &gt; 5%, debt/equity &lt; 1.1, no pledge,
@@ -449,7 +451,7 @@ function renderRule(d) {
     This page shows which conditions fail; Telegram shows the numbers. It never changes a buy or sell.<br><br>
     <b>Fundamentals</b> (More) ranks every stock in your latest uploaded Screener export.`)
   + sec("Market and results", `
-    <b>Market</b> (Today, tap to open): Nifty 50 and Nifty 500 against their 50- and 200-day averages, India VIX,
+    <b>Market</b> (More → Market): Nifty 50 and Nifty 500 against their 50- and 200-day averages, India VIX,
     how many tracked stocks are above their 50-day average, and the sectors gaining or losing picks.
     Context only: a market-trend filter didn't improve the backtest.<br><br>
     <b>📅 Results</b>: holdings, buy-stops and scanner stocks with results or a board meeting in the next 7 days,
@@ -635,12 +637,12 @@ function renderMore(d) {
   const tabs = MORE_TABS;
   if (!tabs[state.more]) state.more = "breakouts";
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
-  const body = { holdings: (x) => renderToday(x, "holdings"), rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
+  const body = { holdings: (x) => renderToday(x, "holdings"), market: (x) => renderToday(x, "market"), rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
                  fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
   return chips + body;
 }
 
-const MORE_TABS = { breakouts: "Breakouts", holdings: "Holdings", sectors: "Sectors", backtest: "Backtest",
+const MORE_TABS = { breakouts: "Breakouts", holdings: "Holdings", market: "Market", sectors: "Sectors", backtest: "Backtest",
                     fund: "Fundamentals", upload: "Upload", rule: "How it works" };
 
 function render() {

@@ -26,6 +26,7 @@ import dipzone
 import fundamental_scan
 import health
 import market
+from live_signals import live_hit_date
 from notify import _col, _num, _price
 from slot_gate import IST, SLOTS
 
@@ -117,6 +118,7 @@ def breakouts_view(conn, latest_run: int, triggers: dict | None = None) -> list[
             "symbol": symbol,
             "kind": e["kind"],
             "date": when.date().isoformat(),
+            "detected_at": e["detected_at"],
             "time": when.strftime("%H:%M"),
             "trigger": trig,
             "seen": seen,
@@ -239,12 +241,54 @@ def _performance() -> dict | None:
         return None
 
 
+def rule_outcome(states: list[dict]) -> dict[tuple[str, str], str]:
+    """(scanner, symbol) -> what the paper book did with its latest signal."""
+    held = {s["symbol"]: s for s in states if s.get("status") == "holding"}
+    out = {}
+    for s in states:
+        st = s.get("status")
+        if st == "duplicate":
+            continue
+        if s["symbol"] in held:
+            h = held[s["symbol"]]
+            txt = f"holding {h['ret']:+.1f}%" if h["scanner"] == s["scanner"] else f"holding (from {h['scanner']})"
+        elif st in dipzone.CLOSED:
+            txt = f"bought, sold {s['ret']:+.1f}% ({'stop-loss' if st == 'stop' else 'below ' + dipzone.EXIT_LABEL if st == 'average' else st})"
+        elif st == "no slot":
+            txt = "crossed, but " + ("already holding" if "holding" in s.get("why", "") else "no free slot")
+        elif st == "skipped":
+            txt = "skipped: " + s.get("why", "").split(":")[0]
+        elif st == "waiting for breakout":
+            txt = "buy-stop open"
+        elif st == "no breakout":
+            txt = "didn't cross in time"
+        elif st == "no prices yet":
+            txt = "new: buy-stop after the close"
+        else:
+            continue
+        out[(s["scanner"], s["symbol"])] = txt  # latest signal wins for the plain key
+        out[(s["scanner"], s["symbol"], str(s["date"])[:10])] = txt
+    return out
+
+
 def main() -> int:
     conn = db.connect()
     latest_run, last_scan = conn.execute("SELECT id, run_at FROM runs ORDER BY id DESC LIMIT 1").fetchone()
     states = dipzone.live_states(conn)
     triggers = dipzone.trigger_map(states)
     breakouts = breakouts_view(conn, latest_run, triggers)
+    outcome = rule_outcome(states)
+    trig_on = {(s["scanner"], s["symbol"], str(s["date"])[:10]): float(s["trigger"])
+               for s in states if s.get("trigger") is not None}
+    for b in breakouts:
+        # each row's own signal candle high (not the stock's latest signal)
+        t = trig_on.get((b["scanner"], b["symbol"], live_hit_date(b["detected_at"])))
+        if t is not None:
+            b["trigger"] = round(t, 2)
+            b["chg"] = _pct(b["trigger"], b["now"])
+            b["status"] = "BUY" if b["chg"] is not None and b["chg"] > 0 else "HOLD"
+        b["rule"] = outcome.get((b["scanner"], b["symbol"], live_hit_date(b["detected_at"])) if b.get("detected_at") else None) \
+            or outcome.get((b["scanner"], b["symbol"]))
     scanners = scanners_view(conn, latest_run, triggers)
     momentum = sector_momentum_view(conn, datetime.now(IST).date())
     watch = sorted({s["symbol"] for s in states if s.get("status") in ("holding", "waiting for breakout", "no prices yet")}

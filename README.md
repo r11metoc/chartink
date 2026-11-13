@@ -38,24 +38,19 @@ longer buy-stop windows (`reports/entry_window_test.md`).
 
 ## The app
 
-**Today**
-- Holding count, open and booked P&L; header shows the last scan and the next one.
-- **Market** (folded): Nifty 50 / Nifty 500 vs their 50- and 200-day averages,
-  India VIX, share of tracked stocks above their 50-day average, sectors
-  gaining or losing picks. Context only: it never changes a trade.
-- **To do**: sells at the next open, buy-stops to place (tap for the
-  fundamentals), and "Results coming" for holdings or buy-stops with results
-  or a board meeting in the next 7 days.
-- **Done this week**: buys and sells of the last few days.
-- **On the scanners now**: every stock on the scanners in the latest scan,
-  once per stock with all its scanner tags, and what the rule did with it
-  (holding, buy-stop, new today, no free slot, too volatile…).
-- **Data check**: each scan re-checks scan freshness, prices, every paper
-  trade against the daily prices, and fundamentals coverage.
+**Today**: the holding count and P&L, **To do** (sells at the next open and the
+buy-stops to place; tap a buy-stop for its fundamentals) and **On the scanners
+now** (every stock in the latest scan and what the rule did with it).
 
-**More** (swipe left/right between pages on a phone): Breakouts (90-day
-history of triggers), Holdings (positions and sold trades), Sectors, Backtest,
-Fundamentals, Upload, How it works.
+**More** (swipe left/right between pages on a phone):
+- **Breakouts**: every signal of the last 90 days, its price vs its own trigger,
+  and what the paper book did with it (holding, sold, no free slot, skipped…).
+- **Holdings**: done this week, open positions, sold trades.
+- **Market**: Nifty 50 / Nifty 500 vs their 50- and 200-day averages, India
+  VIX, breadth, sectors gaining or losing picks (context only), results coming
+  for holdings and buy-stops, and the **Data check** (scan freshness, prices,
+  every paper trade against the daily prices, fundamentals coverage).
+- Sectors, Backtest, Fundamentals, Upload, How it works.
 
 ## Fundamentals (information only)
 
