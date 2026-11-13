@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 
+import pandas as pd
+
 import db
 from dipzone import HISTORY_DAYS
 from market_data import fetch_daily
@@ -48,7 +50,8 @@ def main() -> int:
     fetched = fetch_daily(symbols, start, end)
     fetched.update(fetch_daily(BENCHMARKS, (date.today() - timedelta(days=BENCHMARK_DAYS)).isoformat(), end))
     for symbol, df in fetched.items():
-        bars = [(d.date().isoformat(), float(r.Open), float(r.High), float(r.Low), float(r.Close))
+        bars = [(d.date().isoformat(), float(r.Open), float(r.High), float(r.Low), float(r.Close),
+                 None if pd.isna(r.Volume) else float(r.Volume))
                 for d, r in df.iterrows()]
         db.save_daily_prices(conn, symbol, bars)
     conn.commit()

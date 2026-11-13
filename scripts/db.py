@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS daily_prices (
     high REAL NOT NULL,
     low REAL NOT NULL,
     close REAL NOT NULL,
+    volume REAL,                    -- shares traded (for the ML ranker)
     PRIMARY KEY (symbol, date)
 );
 
@@ -78,6 +79,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         # was seen before, dropped out for at least one run, and is back -
         # i.e. the scan condition re-triggered at the same technical level.
         conn.execute("ALTER TABLE breakouts ADD COLUMN kind TEXT NOT NULL DEFAULT 'fresh'")
+    if "volume" not in {row[1] for row in conn.execute("PRAGMA table_info(daily_prices)")}:
+        conn.execute("ALTER TABLE daily_prices ADD COLUMN volume REAL")
     conn.execute("DROP TABLE IF EXISTS backtest_outcomes")  # old model's table, unused
     conn.execute("DROP TABLE IF EXISTS screen_stocks")  # removed Hitting highs list
 
@@ -90,18 +93,26 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
-def save_daily_prices(conn: sqlite3.Connection, symbol: str, bars: list[tuple[str, float, float, float, float]]) -> None:
-    """bars: (date, open, high, low, close). Re-saving a date overwrites it, so
-    today's still-forming bar is replaced by the later, more complete one."""
+def save_daily_prices(conn: sqlite3.Connection, symbol: str, bars: list[tuple]) -> None:
+    """bars: (date, open, high, low, close[, volume]). Re-saving a date
+    overwrites it, so today's still-forming bar is replaced by the later one."""
     conn.executemany(
-        "INSERT OR REPLACE INTO daily_prices (symbol, date, open, high, low, close) VALUES (?, ?, ?, ?, ?, ?)",
-        [(symbol, *bar) for bar in bars],
+        "INSERT OR REPLACE INTO daily_prices (symbol, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [(symbol, *bar[:5], bar[5] if len(bar) > 5 else None) for bar in bars],
     )
 
 
 def daily_prices_since(conn: sqlite3.Connection, symbol: str, since_date: str) -> list[tuple[str, float, float, float, float]]:
     return conn.execute(
         "SELECT date, open, high, low, close FROM daily_prices WHERE symbol = ? AND date >= ? ORDER BY date",
+        (symbol, since_date),
+    ).fetchall()
+
+
+def daily_bars_since(conn: sqlite3.Connection, symbol: str, since_date: str) -> list[tuple]:
+    """(date, open, high, low, close, volume)."""
+    return conn.execute(
+        "SELECT date, open, high, low, close, volume FROM daily_prices WHERE symbol = ? AND date >= ? ORDER BY date",
         (symbol, since_date),
     ).fetchall()
 

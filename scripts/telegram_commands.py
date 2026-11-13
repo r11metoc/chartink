@@ -92,7 +92,8 @@ def today_msg() -> str:
     for h in sells:
         lines.append(f"🔻 Sell <b>{h['symbol']}</b> at next open · {h['ret']:+.1f}%")
     for b in stops:
-        lines.append(f"🟡 <b>{b['symbol']}</b> above {_m(b['level'])} · SL {_m(b['stop'])} · signal {_dt(b['signal'])}")
+        ml = f" · ML {b['ml']}" if b.get("ml") is not None else ""
+        lines.append(f"🟡 <b>{b['symbol']}</b> above {_m(b['level'])} · SL {_m(b['stop'])} · signal {_dt(b['signal'])}{ml}")
     for h in bought:
         lines.append(f"🟢 Bought <b>{h['symbol']}</b> {_m(h['entry'])} on {_dt(h['entry_date'])} · SL {_m(h['stop'])}")
     if len(lines) == 1:

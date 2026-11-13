@@ -40,36 +40,15 @@ def _df(closes):
     return pd.DataFrame({"Open": c, "High": c * 1.001, "Low": c * 0.999, "Close": c})
 
 
-def test_trailing_stop_rides_then_exits():
-    up = [100 + i for i in range(30)] + [129 * 0.85] * 5   # +29%, then a 15% drop
-    x = dz.ride(_df(up), 0, "Bullish_Scanner", "trail10")
-    assert x["why"] == "stop" and x["ret"] == 9.4  # gapped below the trail: sold at the open
-
-
-def test_ma_exit_sells_next_open():
-    c = [100.0] * 25 + [110.0] * 5 + [90.0] * 3
-    x = dz.ride(_df(c), 21, "Bullish_Scanner", "ma20")
-    assert x["why"] == "average" and x["exit_date"] == _df(c).index[31]
-
-
-def test_open_trade_returns_none():
-    assert dz.ride(_df([100 + i for i in range(30)]), 0, "Bullish_Scanner", "trail15") is None
-
-
-def test_lock_rule_ignores_average_until_plus_8():
-    c = [100.0] * 25 + [99.0, 98.0, 99.0] + [109.0] * 3 + [90.0] * 3
-    x = dz.ride(_df(c), 21, "Bullish_Scanner", "lock8_ma20")
-    assert x["why"] == "stop" and x["ret"] < 0.5   # armed at +8%, then gapped below cost: sold at the open
-
-
-def test_ride_uses_given_entry_price():
-    c = [100.0] * 60 + [101.0 + i for i in range(10)] + [95.0] * 3
-    x = dz.ride(_df(c), 60, "Bullish_Scanner", "ma50", ep=100.5)
-    assert x["why"] == "average" and abs(x["ret"] - ((95 / 100.5 - 1) * 100 - 0.25)) < 0.02
-
-
 def test_portfolio_takes_midcaps_first_on_a_full_day():
     a = _t("S1", "2024-01-01", "2024-01-10", 8.0); a["cap"] = "Smallcap"
     b = _t("M1", "2024-01-01", "2024-01-10", 8.0); b["cap"] = "Midcap"
     pf = dz.portfolio(pd.DataFrame([a, b]), capital=100_000, max_pos=1)
     assert list(pf["taken"]["symbol"]) == ["M1"]
+
+
+def test_portfolio_uses_ml_score_when_given():
+    a = _t("S1", "2024-01-01", "2024-01-10", 8.0); a["cap"] = "Smallcap"; a["ml"] = 0.7
+    b = _t("M1", "2024-01-01", "2024-01-10", 8.0); b["cap"] = "Midcap"; b["ml"] = 0.4
+    pf = dz.portfolio(pd.DataFrame([a, b]), capital=100_000, max_pos=1)
+    assert list(pf["taken"]["symbol"]) == ["S1"]          # higher ML score beats the cap order

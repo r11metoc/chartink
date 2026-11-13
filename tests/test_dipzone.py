@@ -1,8 +1,9 @@
-"""Offline tests for the buy-the-dip rule (scripts/dipzone.py)."""
+"""Offline tests for the live rule (scripts/dipzone.py)."""
 
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -15,43 +16,16 @@ def frame(rows):
     return pd.DataFrame(rows, columns=["Open", "High", "Low", "Close"], index=idx)
 
 
-BREAKOUT = [(99, 104, 98, 103), (103, 106, 102, 105)]  # trigger 100, high close 105
+BUY = (99, 101, 98, 100.5)  # first bar after the signal crosses the 100 trigger: bought at 100
 
 
-def test_dip_then_target():
-    rows = BREAKOUT + [(104, 104, 101, 101.5),   # 3.3% below 105, above 95 -> buy next open
-                       (101, 103, 100.5, 102),   # bought at 101
-                       (102, 112, 101.5, 111)]   # target reached
-    s = dz.simulate(frame(rows), 100.0, "63_30_daily")
-    assert s["status"] == "target" and s["entry"] == 101.0
-    assert abs(s["exit"] - 101 * (1 + dz.TARGET_PCT / 100)) < 1e-9
-    assert s["ret"] == round(dz.TARGET_PCT - 0.25, 2)
+def _bo(rows, scanner="63_30_daily", ma=50.0):
+    return dz.simulate_breakout(frame(rows), 100.0, scanner, np.full(len(rows), float(ma)))
 
 
 def test_fifteen_percent_stop():
-    rows = BREAKOUT + [(104, 104, 101, 101.5), (101, 101.5, 99, 100), (99, 99.5, 85, 86)]  # stop 85.85
-    s = dz.simulate(frame(rows), 100.0, "Bullish_Scanner")
-    assert s["status"] == "stop" and abs(s["exit"] - 101 * 0.85) < 1e-9
-
-
-def test_weekly_scanner_needs_five_percent():
-    rows = BREAKOUT + [(104, 104, 101, 101.5)] + [(101.5, 102, 101, 101.5)] * 3
-    assert dz.simulate(frame(rows), 100.0, "Wkly_upswing")["status"] == "watching for dip"
-    rows = BREAKOUT + [(104, 104, 99, 99.5), (99.5, 100, 99, 99.6)]  # 5.2% below 105
-    assert dz.simulate(frame(rows), 100.0, "Wkly_upswing")["status"] == "holding"
-
-
-def test_dip_too_deep_below_trigger_is_not_a_buy():
-    rows = BREAKOUT + [(100, 100, 93, 94)] + [(94, 95, 93, 94)] * 25   # close 94 < floor 95
-    assert dz.simulate(frame(rows), 100.0, "63_30_daily")["status"] == "no dip"
-
-
-def test_buy_zone_waits_for_next_open_and_time_exit():
-    rows = BREAKOUT + [(104, 104, 101, 101.5)]
-    assert dz.simulate(frame(rows), 100.0, "63_30_daily")["status"] == "buy zone"
-    rows = rows + [(101, 102, 100, 101)] * (dz.MAX_HOLD + 1)
-    s = dz.simulate(frame(rows), 100.0, "63_30_daily")
-    assert s["status"] == "time" and s["ret"] == round(0 - 0.25, 2)
+    s = _bo([BUY, (100, 101, 99, 100), (99, 99.5, 84, 85)], "Bullish_Scanner")   # stop 85
+    assert s["status"] == "stop" and abs(s["exit"] - 85) < 1e-9
 
 
 def test_alerts_only_once():
@@ -59,10 +33,11 @@ def test_alerts_only_once():
     from datetime import datetime
     conn = sqlite3.connect(":memory:")
     now = datetime(2026, 1, 9, 10, 0)
-    rows = BREAKOUT + [(104, 104, 101, 101.5)]
-    s = {"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-02", **dz.simulate(frame(rows), 100.0, "63_30_daily")}
+    s = {"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-08", "status": "waiting for breakout",
+         "trigger": 100.0, "ml": 80}
     first = dz.new_events(conn, [s], now)
-    assert [k for _, _, k in first] == ["buy"] and "Buy at next open" in dz.format_alerts(first)
+    assert [k for _, _, k in first] == ["setup"] and "Place buy-stop" in dz.format_alerts(first)
+    assert "ML 80" in dz.format_alerts(first)
     assert dz.new_events(conn, [s], now) == []
 
 
@@ -91,8 +66,8 @@ def test_same_stop_for_all_and_weekly_volatility_filter():
     assert not dz.passes_filter("Wkly_upswing", -2.0, 5.5) and dz.passes_filter("Wkly_upswing", -2.0, 3.0)
     assert dz.passes_filter("Bullish_Scanner", None, 9.0)
     assert not dz.passes_filter("63_30_daily", -12.0, 1.0)
-    rows = BREAKOUT + [(104, 104, 99, 99.5), (99.5, 100, 99, 99.6), (99.6, 99.6, 86, 87)]   # bought 99.5; 12% would stop, 15% (84.6) not
-    assert dz.simulate(frame(rows), 100.0, "Wkly_upswing")["status"] == "holding"
+    rows = [BUY, (100, 100, 86, 87)]   # bought 100; 12% would stop, 15% (85) not
+    assert _bo(rows, "Wkly_upswing")["status"] == "holding"
 
 
 def _ma(rows, level):
@@ -101,20 +76,19 @@ def _ma(rows, level):
 
 
 def test_live_rule_rides_until_close_below_average():
-    rows = BREAKOUT + [(104, 104, 101, 101.5), (101, 103, 100.5, 102),   # bought at 101
-                       (102, 112, 101.5, 111), (111, 120, 110, 119),     # no target: keeps riding
-                       (119, 119, 108, 109), (108, 109, 107, 108)]       # closes below 110 -> sell next open (108)
-    s = dz.simulate(frame(rows), 100.0, "63_30_daily", _ma(rows, 110))
+    rows = [BUY, (101, 112, 100.5, 111), (111, 120, 110, 119),   # no target: keeps riding
+            (119, 119, 108, 109), (108, 109, 107, 108)]          # closes below 110 -> sell next open (108)
+    s = _bo(rows, ma=110)
     assert s["status"] == "average" and s["exit"] == 108 and s["target"] is None
 
 
 def test_live_rule_sell_signal_on_last_close():
-    rows = BREAKOUT + [(104, 104, 101, 101.5), (101, 103, 100.5, 102), (102, 112, 101.5, 111),
-                       (111, 111, 108, 109)]                              # today's close is below 110
-    s = dz.simulate(frame(rows), 100.0, "63_30_daily", _ma(rows, 110))
+    rows = [BUY, (101, 112, 100.5, 111), (111, 111, 108, 109)]   # today's close is below 110
+    s = _bo(rows, ma=110)
     assert s["status"] == "holding" and s["sell_signal"] == frame(rows).index[-1]
-    assert dz.events([{"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-05", **s}],
-                     frame(rows).index[-1].to_pydatetime())[0][2] == "sell"
+    kinds = [k for _, _, k in dz.events([{"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-02", **s}],
+                                        frame(rows).index[-1].to_pydatetime())]
+    assert "sell" in kinds
 
 
 def test_breakout_buy_fills_at_trigger_then_rides():

@@ -6,3 +6,7 @@ reports/daily_prices_after_signal.xlsx
 site/data.json
 # Screener company-page figures: private (Actions cache), never committed
 data/screener_cache.json
+# Weekly retrain by-products (rebuilt every Saturday; only performance.json
+# and ranker.json are kept in the repo)
+data/model/*.csv
+data/model/*.csv.gz

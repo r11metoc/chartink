@@ -8,6 +8,7 @@ Three views:
   sectors    backtest picks per sector, last 7 and 30 days
   dip        the live breakout rule: buy list, holdings, sales (dipzone.py)
   performance  backtest of buying on the alerts (data/model/performance.json)
+  ml           the ML ranker's status and walk-forward test (data/model/ranker.json)
   sector_momentum
              all scanners combined: distinct stocks picked per sector in the
              last 2 weeks vs the 2 before, scanners agreeing, average move
@@ -241,6 +242,15 @@ def _performance() -> dict | None:
         return None
 
 
+def _ml() -> dict | None:
+    """The ML ranker's status and test results for the ML page (no model numbers)."""
+    import ranker
+    m = ranker.load()
+    if not m:
+        return None
+    return {k: m[k] for k in ("on", "trained_at", "trained_on", "from", "to", "weights", "test")}
+
+
 def rule_outcome(states: list[dict]) -> dict[tuple[str, str], str]:
     """(scanner, symbol) -> what the paper book did with its latest signal."""
     held = {s["symbol"]: s for s in states if s.get("status") == "holding"}
@@ -307,6 +317,7 @@ def main() -> int:
         "events": market.upcoming_results(conn, watch),
         "dip": dipzone.dashboard_view(states),
         "performance": _performance(),
+        "ml": _ml(),
         "fundscan": fundamental_scan.view(),
         "health": health.checks(conn, states, last_scan, scanners),
     }

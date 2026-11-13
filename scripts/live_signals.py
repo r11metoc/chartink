@@ -15,9 +15,10 @@ MARKET_OPEN = (9, 15)
 
 
 def _frame(conn, symbol: str, since: str) -> pd.DataFrame:
-    rows = db.daily_prices_since(conn, symbol, since)
-    df = pd.DataFrame(rows, columns=["date", "Open", "High", "Low", "Close"])
+    rows = db.daily_bars_since(conn, symbol, since)
+    df = pd.DataFrame(rows, columns=["date", "Open", "High", "Low", "Close", "Volume"])
     df.index = pd.to_datetime(df.pop("date"))
+    df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce")
     return df
 
 

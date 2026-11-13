@@ -19,14 +19,17 @@ phone app and in Telegram.
   trigger, or at the open on a gap-up.
 - **Sell**: at the next open after a close below the 30-day EMA; 15% stop-loss
   for every scanner; at most 250 sessions.
-- **Slots**: 15 positions, one per stock. When short of slots: mid caps first,
-  then large, then small.
+- **Slots**: 15 positions, one per stock. When short of slots on a day: the
+  **ML ranker**'s order while it passes its walk-forward test (below), else mid
+  caps first, then large, then small.
 - **Filters**: `Wkly_upswing` only when ATR(14) < 4% of price; `63_30_daily`
   only within 10% of the 52-week high.
 - Changed on 13 Nov 2026 from a 50-day simple average exit and a 12% stop (15%
   weekly): better in both 2019-22 and 2023-26 with a smaller worst fall
-  (`reports/rule_compare.md`). Longer buy-stop windows and
-  dropping the volatility filter were tested and did worse.
+  (2019-26, ₹10L, 15 slots: 26.9% a year and −9.2% worst fall vs 24.3% and
+  −14.1%). Tested and worse: 10/20-session buy-stops (25.9%), no weekly
+  volatility filter (25.2%); for the weekly scanner, buying at the next open
+  instead of the buy-stop (25.8%).
 - Returns are after 0.25% round-trip costs.
 
 Backtest Feb 2019 to Nov 2026 (`reports/stock_outcomes.md`, the app's Backtest
@@ -34,7 +37,30 @@ page; refreshed every Saturday): 6,487 trades, +4.2% a trade, 43% wins, held
 about 31 days; ₹10L in 15 slots became about ₹62L, 26.6% a year, worst fall
 −9.2%, against the Nifty 500's 13.2% a year and −38%. Tested and rejected: Nifty trend filter, skipping small caps, volume or
 sector ranking, buying pullbacks, +8% targets, trailing stops, a 20-day exit,
-longer buy-stop windows (`reports/entry_window_test.md`).
+longer buy-stop windows.
+
+## ML slot ranker (`scripts/ranker.py`, `reports/ml_ranker.md`)
+
+The rule gives far more signals than 15 slots hold (the backtest took about 1
+in 8), so on a full day the order decides the result. A logistic regression on
+25 facts known at the signal close (recent returns, distance from the
+20/50/200-day averages and the 52-week high, RSI, ATR, volume, turnover, the
+signal candle, the Nifty's trend, scanner, market cap) estimates which signals
+are likelier to work. It never adds or skips a trade; it only orders them.
+
+- **Walk-forward test**: each year from 2020 is scored by a model trained only
+  on trades closed before that year.
+- **Gate**: switched on only if, on those unseen years, the ML-ordered
+  portfolio beats the fixed order in both halves, its worst fall is no more
+  than 1 point worse, and its top half beat its bottom half in two thirds of
+  the years. Re-checked every Saturday; it switches itself off if it fails.
+- **First test (13 Nov 2026)**: passed. 2020-26: 35.8% a year vs 30.3%, worst
+  fall −7.1% vs −9.2%; 2020-22 41.8% vs 40.7%, 2023-26 31.4% vs 22.8%. Weak
+  per trade (AUC 0.51), but the top fifth of scores averaged +6.3% a trade vs
+  about +3.8% for the rest. With 60 random orders the same trades made 21-30%
+  a year, so part of the gap can be luck. Gradient-boosted trees did worse.
+- Live: every signal gets an **ML rank** (0-100) shown on buy-stops, in
+  Telegram and in the Journal; the app's **ML** page shows the test.
 
 ## The app
 
@@ -46,11 +72,14 @@ now** (every stock in the latest scan and what the rule did with it).
 - **Breakouts**: every signal of the last 90 days, its price vs its own trigger,
   and what the paper book did with it (holding, sold, no free slot, skipped…).
 - **Holdings**: done this week, open positions, sold trades.
+- **Journal**: every paper trade with why it was bought and sold, the ML rank,
+  and a small chart of the price, the 30-day EMA and the trigger.
 - **Market**: Nifty 50 / Nifty 500 vs their 50- and 200-day averages, India
   VIX, breadth, sectors gaining or losing picks (context only), results coming
   for holdings and buy-stops, and the **Data check** (scan freshness, prices,
   every paper trade against the daily prices, fundamentals coverage).
-- Sectors, Backtest, Fundamentals, Upload, How it works.
+- Sectors, Backtest, **ML** (the slot ranker's status and test), Fundamentals,
+  Upload, How it works.
 
 ## Fundamentals (information only)
 
@@ -101,10 +130,11 @@ read and write), saved in your browser only.
   and fundamentals, sends Telegram alerts, rebuilds `site/data.json`, commits
   `data/chartink.db` and publishes the app. Manual runs: Actions → "Chartink
   breakout scan" → Run workflow.
-- **Signal model** (`signal_model.yml`): Saturday 08:47 IST, or manually with
-  `mode=train`, rebuilds the dataset from the backtest exports plus the live
-  triggers and re-runs the backtests. `mode=window_test` runs the entry-window
-  test.
+- **Weekly retrain** (`signal_model.yml`): Saturday 08:47 IST, or Run
+  workflow (the app starts it after a backtest upload). Fetches prices for
+  every scanner hit, re-runs the live rule (`scripts/stock_outcomes.py`),
+  retrains the ML ranker with its walk-forward test and commits
+  `data/model/performance.json`, `data/model/ranker.json` and the reports.
 
 ## Setup (one time)
 

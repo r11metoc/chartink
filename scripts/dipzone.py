@@ -14,8 +14,9 @@ Filters: Wkly_upswing only when daily ATR(14) < 4% of the close;
 63_30_daily only within 10% of the 52-week high. Signals another scanner
 also flagged in the 10 days before are tagged "confirmed".
 
-The pullback ("dip") rule is kept in `simulate` for the exit comparison in
-the weekly report. Decisions use completed daily candles only.
+When more buys than free slots: the ML ranker's order once it has passed its
+walk-forward test (ranker.py), else mid caps, then large, then small.
+Decisions use completed daily candles only.
 """
 
 from __future__ import annotations
@@ -29,11 +30,6 @@ import breakout_sim as bs
 import db
 from slot_gate import IST
 
-DIP_PCT = {"63_30_daily": 3.0, "Bullish_Scanner": 3.0, "Wkly_upswing": 5.0}
-DEFAULT_DIP = 3.0
-FLOOR_PCT = 5.0       # the dip close must stay within 5% below the trigger
-ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
-TARGET_PCT = 8.0
 # 13 Nov 2026: exit on a close below the 30-day EMA (was the 50-day simple
 # average) and a 15% stop for every scanner (was 12%, 15% weekly). Backtest
 # 2019-26 (performance.json): 26.6% a year, worst fall -9.2%, vs 24.0% and
@@ -43,7 +39,6 @@ TARGET_PCT = 8.0
 STOP_PCT = 15.0
 STOP_BY_SCANNER: dict[str, float] = {}
 ATR_MAX_PCT = {"Wkly_upswing": 4.0}       # daily ATR(14) under 4% of the close
-MAX_HOLD = 40         # sessions (8 weeks) - the old +8% target rule (kept for comparison)
 EXIT_MA = 30          # live exit: sell at the next open after a close below this daily EMA
 EXIT_LABEL = f"{EXIT_MA}-day EMA"
 RIDE_MAX_HOLD = 250   # sessions (~1 year) before a riding position is sold anyway
@@ -55,8 +50,7 @@ START = "2026-09-25"  # live signals from this date are tracked
 ALERT_DAYS = 4        # only alert on events this recent (no flood on the first run)
 STAKE = 100_000
 MARKET_CLOSE = (15, 30)
-ACTIVE = {"waiting for breakout", "watching for dip", "buy zone", "holding"}
-LIVE_MODE = "breakout"  # "breakout" (buy-stop at the trigger) or "dip" (wait for the pullback)
+ACTIVE = {"waiting for breakout", "holding"}
 # When more signals than free slots: mid caps first, then large, then small.
 # Backtest 2021-26 (10 slots, 12 shuffles): 17.4% a year vs 14.3% first come,
 # better in both 2021-23 (22.1% vs 17.3%) and 2024-26 (10.8% vs 7.1%), worst
@@ -69,8 +63,26 @@ def priority(cap: str | None) -> int:
     return CAP_PRIORITY.get(cap or "", 3)
 
 
-def dip_for(scanner: str) -> float:
-    return DIP_PCT.get(scanner, DEFAULT_DIP)
+_RANKER: dict | None = None
+
+
+def _ranker() -> dict | None:
+    """The ML ranker (data/model/ranker.json), loaded once."""
+    global _RANKER
+    if _RANKER is None:
+        import ranker
+        _RANKER = ranker.load() or {}
+    return _RANKER or None
+
+
+def slot_order(s: dict) -> tuple:
+    """Sort key when more buys than free slots: highest ML rank first when the
+    ranker is switched on (passed its walk-forward test), else mid, large, small."""
+    m = _ranker()
+    ml = s.get("ml")
+    if m and m.get("on") and ml is not None:
+        return (0, -ml)
+    return (1, s.get("priority", 3))
 
 
 def dist_52w_high(df: pd.DataFrame, end_pos: int) -> float | None:
@@ -110,58 +122,6 @@ def skip_reason(scanner: str, dist: float | None, atr: float | None) -> str:
     if lim is not None and dist is not None and dist < -lim:
         return f"{-dist:.0f}% below its 52-week high (limit {lim:g}%)"
     return f"too volatile: daily ATR {atr:.1f}% of price (limit {ATR_MAX_PCT[scanner]:g}%)"
-
-
-def simulate(fwd: pd.DataFrame, trigger: float, scanner: str, ma: np.ndarray | None = None) -> dict:
-    """Run the rule over the daily bars after the signal bar. With `ma` (the
-    EXIT_MA-day average aligned to `fwd`) the position rides until a close
-    below it (the live rule); without it, the old +8% target rule."""
-    o, h, l, c = (fwd[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
-    dates = fwd.index
-    n = len(c)
-    window = bs.entry_window_for(scanner)
-    out = {"trigger": trigger, "dip_pct": dip_for(scanner)}
-    b = next((i for i in range(min(window, n)) if h[i] > trigger), None)
-    if b is None:
-        out["status"] = "waiting for breakout" if n < window else "no breakout"
-        return out
-    out["breakout_date"] = dates[b]
-    floor = trigger * (1 - FLOOR_PCT / 100)
-    hi = c[b]
-    dip_i = None
-    for i in range(b + 1, min(n, b + 1 + ZONE_DAYS)):
-        hi = max(hi, c[i - 1])
-        if c[i] <= hi * (1 - out["dip_pct"] / 100) and c[i] >= floor:
-            dip_i = i
-            break
-    if dip_i is None:
-        out["status"] = "watching for dip" if n < b + 1 + ZONE_DAYS else "no dip"
-        out["high_close"] = float(max(c[b:]))
-        out["buy_below"] = round(out["high_close"] * (1 - out["dip_pct"] / 100), 2)
-        return out
-    out.update(dip_date=dates[dip_i], dip_close=float(c[dip_i]), high_close=float(hi))
-    e = dip_i + 1
-    if e >= n:
-        out["status"] = "buy zone"  # buy at the next open
-        return out
-    ep = float(o[e])
-    tgt, stp = ep * (1 + TARGET_PCT / 100), ep * (1 - stop_for(scanner) / 100)
-    out.update(entry_date=dates[e], entry=ep, target=tgt, stop=stp)
-    if ma is not None:
-        return _ride_ma(out, o, l, c, dates, e, ep, stp, ma)
-    last = min(n - 1, e + MAX_HOLD)
-    for i in range(e, last + 1):
-        if i > e and o[i] <= stp:
-            return {**out, "status": "stop", "exit_date": dates[i], "exit": float(o[i])} | _ret(ep, o[i])
-        if l[i] <= stp:
-            return {**out, "status": "stop", "exit_date": dates[i], "exit": stp} | _ret(ep, stp)
-        if i > e and o[i] >= tgt:
-            return {**out, "status": "target", "exit_date": dates[i], "exit": float(o[i])} | _ret(ep, o[i])
-        if h[i] >= tgt:
-            return {**out, "status": "target", "exit_date": dates[i], "exit": tgt} | _ret(ep, tgt)
-    if e + MAX_HOLD <= n - 1:
-        return {**out, "status": "time", "exit_date": dates[last], "exit": float(c[last])} | _ret(ep, c[last])
-    return {**out, "status": "holding", "now": float(c[-1]), "sessions_left": e + MAX_HOLD - (n - 1)} | _ret(ep, c[-1])
 
 
 def simulate_breakout(fwd: pd.DataFrame, trigger: float, scanner: str, ma: np.ndarray) -> dict:
@@ -241,6 +201,8 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
     seen: dict[str, list[tuple[pd.Timestamp, str]]] = {}
     for d0, sc0, sym0, _ in paper._signals(conn, confirm_from):
         seen.setdefault(sym0, []).append((pd.Timestamp(d0), sc0))
+    nifty = paper._frame(conn, "^NSEI", lookback)
+    model = _ranker()
     out = []
     # One open buy-stop per scanner + stock. Holdings don't block a new signal
     # here: apply_slots() decides (one position per stock, 15 slots), as in the
@@ -266,6 +228,9 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
         if sig is None:
             out.append({**base, "status": "no prices yet"})
             continue
+        if model:
+            import ranker
+            base["ml"] = ranker.rank(model, scanner, cap, ranker.signal_features(df, sig, nifty if not nifty.empty else None))
         base["dist_52w_high"] = dist_52w_high(df, sig["end_pos"])
         base["atr_pct"] = atr_pct(df, sig["end_pos"])
         if not passes_filter(scanner, base["dist_52w_high"], base["atr_pct"]):
@@ -277,18 +242,31 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
             st["valid_until"] = df.index[sig["end_pos"]] + pd.offsets.BDay(bs.entry_window_for(scanner))
         if st["status"] == "waiting for breakout":
             active.add((scanner, symbol))
+        if "entry_date" in st:
+            st["path"] = trade_path(df, sig["end_pos"], st.get("exit_date"))
         out.append({**base, **st, "last_close": float(df["Close"].iloc[-1]), "last_date": df.index[-1]})
     return apply_slots(out)
+
+
+def trade_path(df: pd.DataFrame, signal_pos: int, exit_date=None, before: int = 10, after: int = 3) -> dict:
+    """Closes and the exit line around a trade, for the journal's mini chart."""
+    end = len(df) if exit_date is None else min(len(df), int(df.index.searchsorted(pd.Timestamp(exit_date))) + 1 + after)
+    a = max(0, signal_pos - before)
+    ema = exit_line(df["Close"])[a:end]
+    return {"d": [x.date().isoformat() for x in df.index[a:end]],
+            "c": [round(float(x), 2) for x in df["Close"].iloc[a:end]],
+            "e": [None if np.isnan(x) else round(float(x), 2) for x in ema]}
 
 
 def apply_slots(states: list[dict], slots: int | None = None) -> list[dict]:
     """Trade the paper portfolio like the backtest: at most PF_MAX_POS open
     positions, one per stock, and on a day with more buys than free slots,
     mid caps first, then large, then small. Buys that don't fit become
-    'no slot' (the buy-stop alert still went out; the paper book skips it)."""
+    'no slot' (the buy-stop alert still went out; the paper book skips it).
+    Same-day order: slot_order (ML rank when switched on, else market cap)."""
     slots = slots or PF_MAX_POS
     bought = sorted((s for s in states if "entry_date" in s),
-                    key=lambda s: (pd.Timestamp(s["entry_date"]), s.get("priority", 3), s["date"]))
+                    key=lambda s: (pd.Timestamp(s["entry_date"]), slot_order(s), s["date"]))
     open_: list[dict] = []
     for s in bought:
         d = pd.Timestamp(s["entry_date"])
@@ -301,7 +279,7 @@ def apply_slots(states: list[dict], slots: int | None = None) -> list[dict]:
             open_.append(s)
             continue
         for k in ("entry_date", "entry", "stop", "target", "exit_date", "exit", "ret", "now", "ma",
-                  "sell_signal", "sessions_left", "signal_date", "gap"):
+                  "sell_signal", "sessions_left", "signal_date", "gap", "path"):
             s.pop(k, None)
         s["status"], s["why"] = "no slot", why
     return states
@@ -310,9 +288,7 @@ def apply_slots(states: list[dict], slots: int | None = None) -> list[dict]:
 def live_sim(df: pd.DataFrame, sig: dict, scanner: str) -> dict:
     """The live rule for one signal, on the full price frame."""
     fwd, ma = df.iloc[sig["end_pos"] + 1:], exit_ma(df, sig["end_pos"] + 1)
-    if LIVE_MODE == "breakout":
-        return simulate_breakout(fwd, sig["trigger"], scanner, ma)
-    return simulate(fwd, sig["trigger"], scanner, ma)
+    return simulate_breakout(fwd, sig["trigger"], scanner, ma)
 
 
 def trigger_map(states: list[dict]) -> dict[tuple[str, str], float]:
@@ -340,13 +316,10 @@ def events(states: list[dict], now: datetime) -> list[tuple[str, dict, str]]:
     ev = []
     held = {s["symbol"] for s in states if s.get("status") == "holding"}
     for s in states:
-        if s.get("mode") == "breakout":
-            if s.get("status") == "waiting for breakout" and s["symbol"] not in held:
-                ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|setup", s, "setup"))
-            if "entry_date" in s and s["entry_date"] >= since:
-                ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|bought", s, "bought"))
-        elif "dip_date" in s and s["dip_date"] >= since:
-            ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|buy", s, "buy"))
+        if s.get("status") == "waiting for breakout" and s["symbol"] not in held:
+            ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|setup", s, "setup"))
+        if "entry_date" in s and s["entry_date"] >= since:
+            ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|bought", s, "bought"))
         if s.get("sell_signal") is not None and s["sell_signal"] >= since:
             ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|sell", s, "sell"))
         if s.get("status") in CLOSED and s["exit_date"] >= since:
@@ -375,23 +348,18 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
         return None
     sc = lambda s: SHORT.get(s["scanner"], s["scanner"])  # noqa: E731
     lines = ["📋 <b>Today's actions</b>"]
-    setups = sorted((s for _, s, k in fresh if k == "setup"), key=lambda s: s.get("priority", 3))
+    setups = sorted((s for _, s, k in fresh if k == "setup"), key=slot_order)
     if setups:
         lines += ["", "<b>Place buy-stop</b>"]
         for s in setups:
             stp = s["trigger"] * (1 - stop_for(s["scanner"]) / 100)
-            lines.append(f"🟡 <b>{s['symbol']}</b> above {s['trigger']:.2f} · SL {stp:.2f} · signal {_d(s['date'])} · {sc(s)}")
+            ml = f" · ML {s['ml']}" if s.get("ml") is not None else ""
+            lines.append(f"🟡 <b>{s['symbol']}</b> above {s['trigger']:.2f} · SL {stp:.2f} · signal {_d(s['date'])} · {sc(s)}{ml}")
     bought = [s for _, s, k in fresh if k == "bought"]
     if bought:
         lines += ["", "<b>Bought</b>"]
         for s in bought:
             lines.append(f"🟢 <b>{s['symbol']}</b> {s['entry']:.2f} on {_d(s['entry_date'])} · SL {s['stop']:.2f} · {sc(s)}")
-    buys = [s for _, s, k in fresh if k == "buy"]
-    if buys:
-        lines += ["", "<b>Buy at next open</b>"]
-        for s in buys:
-            ref = s.get("entry", s["dip_close"])
-            lines.append(f"🟢 <b>{s['symbol']}</b> ~{ref:.2f} · SL {ref * (1 - stop_for(s['scanner']) / 100):.2f} · {sc(s)}")
     sells = [s for _, s, k in fresh if k == "sell"]
     if sells:
         lines += ["", "<b>Sell at next open</b>"]
@@ -419,7 +387,7 @@ def summary(states: list[dict]) -> dict:
         rets = [x["ret"] for x in closed]
         xs = [x for x in xs if x.get("status") != "duplicate"]
         out.append({"group": g, "signals": len(xs),
-                    "watching": sum(x.get("status") in ("waiting for breakout", "watching for dip", "buy zone") for x in xs),
+                    "watching": sum(x.get("status") == "waiting for breakout" for x in xs),
                     "holding": len(hold), "closed": len(closed),
                     "win": round(100 * np.mean([r > 0 for r in rets])) if rets else None,
                     "pnl": int(sum(r / 100 * STAKE for r in rets)),
@@ -428,7 +396,7 @@ def summary(states: list[dict]) -> dict:
 
 
 def format_summary(book: dict) -> str:
-    lines = [f"🎯 <b>Buy-the-dip paper book</b> (since {book['start']}, ₹1L a trade)", "<pre>",
+    lines = [f"🎯 <b>Paper book</b> (since {book['start']}, ₹1L a trade)", "<pre>",
              f"{'':16}{'Watch':>6}{'Hold':>5}{'Done':>5}{'Win':>5}{'P&L':>9}{'Open':>8}"]
     for r in book["rows"]:
         win = f"{r['win']}%" if r["win"] is not None else "–"
@@ -458,34 +426,26 @@ def _public_fund(f: dict | None) -> dict | None:
     return {**f, "screen": sc, "pe": None, "roce": None, "promoter": None}
 
 
-def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
-    """JSON for site/data.json: buy list, holdings, recent buys and sells."""
+def dashboard_view(states: list[dict]) -> dict:
+    """JSON for site/data.json: buy list, holdings, sold trades (with price paths)."""
     import fundamentals
-    buy_list, holding, activity, closed = [], [], [], []
-    cutoff = pd.Timestamp(date.today()) - pd.Timedelta(days=activity_days)
+    buy_list, holding, closed = [], [], []
     for s in states:
         base = {"scanner": s["scanner"], "symbol": s["symbol"], "signal": s["date"],
                 "confirmed_by": s.get("confirmed_by", []), "off_high": s.get("dist_52w_high"),
                 "fund": _public_fund(fundamentals.check(s["symbol"])),
                 "trigger": _r(s.get("trigger")), "now": _r(s.get("last_close")), "now_date": _iso(s.get("last_date")),
-                "cap": s.get("cap"), "priority": s.get("priority", 3)}
+                "cap": s.get("cap"), "priority": s.get("priority", 3), "ml": s.get("ml")}
         st = s.get("status")
         if st == "waiting for breakout":
             buy_list.append({**base, "stage": "breakout", "level": _r(s["trigger"]),
                              "stop": _r(s["trigger"] * (1 - stop_for(s["scanner"]) / 100)),
                              "valid_until": _iso(s.get("valid_until"))})
-        elif st == "watching for dip":
-            buy_list.append({**base, "stage": "dip", "level": s["buy_below"], "high_close": _r(s["high_close"]),
-                             "floor": _r(s["trigger"] * (1 - FLOOR_PCT / 100)), "dip_pct": s["dip_pct"],
-                             "breakout": _iso(s["breakout_date"])})
-        elif st == "buy zone":
-            ref = s["dip_close"]
-            buy_list.append({**base, "stage": "zone", "level": _r(ref), "dip_pct": s["dip_pct"],
-                             "stop": _r(ref * (1 - stop_for(s["scanner"]) / 100))})
         if "entry_date" in s:
             trade = {**base, "entry_date": _iso(s["entry_date"]), "entry": _r(s["entry"]),
                      "target": _r(s.get("target")), "stop": _r(s["stop"]), "ma": _r(s.get("ma")),
-                     "sell_signal": _iso(s.get("sell_signal")), "exit_by": _iso(
+                     "sell_signal": _iso(s.get("sell_signal")), "gap": s.get("gap"), "path": s.get("path"),
+                     "status": st, "exit_date": _iso(s.get("exit_date")), "exit": _r(s.get("exit")), "exit_by": _iso(
                          pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(RIDE_MAX_HOLD)), "ret": s.get("ret")}
             if st == "holding":
                 held = int(np.busday_count(pd.Timestamp(s["entry_date"]).date(), pd.Timestamp(s["last_date"]).date())) + 1
@@ -496,11 +456,6 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
                                "pnl": int(s["ret"] / 100 * STAKE),
                                "days": int(np.busday_count(pd.Timestamp(s["entry_date"]).date(),
                                                            pd.Timestamp(s["exit_date"]).date())) + 1})
-            if pd.Timestamp(s["entry_date"]) >= cutoff:
-                activity.append({**trade, "side": "BUY", "when": trade["entry_date"], "price": trade["entry"]})
-            if st in CLOSED and pd.Timestamp(s["exit_date"]) >= cutoff:
-                activity.append({**trade, "side": "SELL", "when": _iso(s["exit_date"]), "price": _r(s["exit"]),
-                                 "reason": st, "pnl": int(s["ret"] / 100 * STAKE)})
     # Recent scanner signals the rule didn't take (no free slot, filter), latest per stock,
     # so the Today page covers everything on the scanners without a separate list.
     active = {x["symbol"] for x in buy_list + holding}
@@ -522,20 +477,18 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
         seen_bl.add(x["symbol"])
         keep.append(x)
     buy_list = keep
-    order = {"zone": 0, "dip": 1, "breakout": 2}
-    buy_list.sort(key=lambda x: (order[x["stage"]], x["priority"], x["signal"]))
+    buy_list.sort(key=lambda x: (slot_order(x), x["signal"]))
     holding.sort(key=lambda x: x["entry_date"], reverse=True)
-    activity.sort(key=lambda x: (x["when"], x["side"] == "SELL"), reverse=True)
     closed.sort(key=lambda x: x["exit_date"], reverse=True)
     skipped = sum(s.get("status") == "skipped" for s in states)
-    return {"rule": {"mode": LIVE_MODE, "entry_days": bs.entry_window_for("63_30_daily"),
-                     "entry_days_weekly": bs.entry_window_for("Wkly_upswing"),
-                     "dip": DIP_PCT, "floor": FLOOR_PCT, "zone_days": ZONE_DAYS, "target": None, "exit_ma": EXIT_MA,
+    return {"rule": {"mode": "breakout", "entry_days": bs.entry_window_for("63_30_daily"),
+                     "entry_days_weekly": bs.entry_window_for("Wkly_upswing"), "target": None, "exit_ma": EXIT_MA,
+                     "ml_on": bool(_ranker() and _ranker().get("on")),
                      "stop": STOP_PCT, "stop_by": STOP_BY_SCANNER, "atr_max": ATR_MAX_PCT, "max_hold": RIDE_MAX_HOLD, "stake": STAKE,
                      "near_high": NEAR_HIGH_PCT},
             "skipped": skipped,
             "fund_asof": fundamentals.scores().get("_asof"),
-            "summary": summary(states), "buy_list": buy_list, "holding": holding, "activity": activity,
+            "summary": summary(states), "buy_list": buy_list, "holding": holding,
             "closed": closed, "passed": sorted(passed.values(), key=lambda x: x["signal"], reverse=True),
             # signals whose candle isn't complete yet (today's, or this week's for weekly)
             "pending": [{"symbol": s["symbol"], "scanner": s["scanner"], "signal": _iso(s["date"])}
@@ -544,8 +497,12 @@ def dashboard_view(states: list[dict], activity_days: int = 60) -> dict:
 
 # ------------------------------------------------------------ backtest report
 
-def backtest_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """Every closed backtest trade under the live rule (filters applied)."""
+def backtest_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], nifty: pd.DataFrame | None = None,
+                    features: bool = False) -> pd.DataFrame:
+    """Every closed backtest trade under the live rule (filters applied); with
+    `features`, also the ML ranker's facts at the signal close."""
+    import ranker
+    ind: dict[str, pd.DataFrame] = {}
     rows = []
     for _, h in hits.iterrows():
         df = prices.get(h["symbol"])
@@ -556,7 +513,13 @@ def backtest_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.D
             continue
         s = live_sim(df, sig, h["scanner_name"])
         if s["status"] in CLOSED:
+            f = {}
+            if features:
+                if h["symbol"] not in ind:
+                    ind[h["symbol"]] = bs.indicator_frame(df)
+                f = ranker.signal_features(df, sig, nifty, ind[h["symbol"]])
             rows.append({"scanner": h["scanner_name"], "symbol": h["symbol"], "cap": h["marketcap"],
+                         "hit_date": pd.Timestamp(h["hit_date"]), **f,
                          "status": s["status"], "ret": s["ret"],
                          "entry_date": pd.Timestamp(s["entry_date"]), "exit_date": pd.Timestamp(s["exit_date"]),
                          "days": int(np.busday_count(pd.Timestamp(s["entry_date"]).date(),
@@ -601,14 +564,20 @@ PF_MAX_POS = 15          # each trade gets 1/15 of the portfolio's value at the 
 
 def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, max_pos: int = PF_MAX_POS) -> dict | None:
     """Trade the alerts with limited money: first come, first served (on the
-    same day mid caps first, then large, then small: CAP_PRIORITY), at most
+    same day by the `ml` column when given, else mid caps first, then large,
+    then small: CAP_PRIORITY), at most
     max_pos open, one position per stock. Each buy is 1/max_pos of the
     portfolio's value that day (cash + open positions at cost), so profits are
     reinvested. Returns the daily equity curve and the trades taken."""
     if trades.empty:
         return None
-    t = trades.assign(_p=trades["cap"].map(CAP_PRIORITY).fillna(3) if "cap" in trades else 3)
-    t = t.sort_values(["entry_date", "_p", "scanner", "symbol"]).reset_index(drop=True)
+    capp = trades["cap"].map(CAP_PRIORITY).fillna(3) if "cap" in trades else pd.Series(3, index=trades.index)
+    if "ml" in trades:  # ML score (higher first) where there is one, else market cap
+        has = trades["ml"].notna()
+        t = trades.assign(_g=np.where(has, 0, 1), _p=np.where(has, -trades["ml"].fillna(0), capp))
+    else:
+        t = trades.assign(_g=1, _p=capp)
+    t = t.sort_values(["entry_date", "_g", "_p", "scanner", "symbol"]).reset_index(drop=True)
     by_day = {d: g.to_dict("records") for d, g in t.groupby("entry_date")}
     cash, open_, taken, skipped, curve = float(capital), [], [], 0, {}
     for d in pd.bdate_range(t["entry_date"].min(), t["exit_date"].max()):
@@ -633,153 +602,6 @@ def portfolio(trades: pd.DataFrame, capital: float = PF_CAPITAL, max_pos: int = 
             "capital": capital, "max_pos": max_pos}
 
 
-# ------------------------------------------------- exit rules compared
-
-EXIT_MAX_HOLD = 250  # sessions (~1 year) for the riding exits
-EXIT_RULES = {
-    "target8": "wait for pullback, +8% target, 8 weeks (older)",
-    "trail10": "10% trailing stop",
-    "trail15": "15% trailing stop",
-    "ma20": "close below 20-day average",
-    "ma50": "wait for pullback, close below 50-day average (old)",
-    "half8_ma20": "half at +8%, rest on close below 20-day average",
-    "lock8_ma20": "after +8%: stop at cost, sell on close below 20-day average",
-    "lock8_ma50": "after +8%: stop at cost, sell on close below 50-day average",
-    "bo_ma50": "buy at the breakout, close below the 30-day EMA (now)",
-}
-BO_ALL = "bo_ma50_all"  # breakout buys of every signal, not only those that later dipped
-
-
-def ride(df: pd.DataFrame, e: int, scanner: str, rule: str, ep: float | None = None) -> dict | None:
-    """Exit for a position bought at the open of bar e. Every riding rule keeps
-    the fixed starting stop (STOP_PCT) and exits after
-    EXIT_MAX_HOLD sessions. None while the trade would still be open. `ep`
-    overrides the buy price (a breakout buy fills at the trigger on bar e)."""
-    o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
-    n, ep = len(c), float(o[e]) if ep is None else float(ep)
-    stop = ep * (1 - stop_for(scanner) / 100)
-    ma = None
-    if rule == "live":  # the live exit line (30-day EMA)
-        ma = exit_line(pd.Series(c))
-    elif rule.startswith(("ma", "half", "lock")):
-        w = 50 if rule.endswith("ma50") else 20
-        ma = pd.Series(c).rolling(w, min_periods=w).mean().to_numpy()
-    trail = {"trail10": 0.10, "trail15": 0.15}.get(rule)
-    half = rule.startswith("half")
-    lock = rule.startswith("lock")  # ride only once the trade has worked
-    armed = False
-    tgt = ep * (1 + TARGET_PCT / 100)
-    banked, hi = 0.0, ep  # banked = % already realised on the first half
-    last = min(n - 1, e + EXIT_MAX_HOLD)
-    for i in range(e, last + 1):
-        if i > e and o[i] <= stop:
-            return _close(ep, o[i], banked, half and banked != 0.0, "stop", df.index[i], i - e + 1)
-        if l[i] <= stop:
-            return _close(ep, stop, banked, half and banked != 0.0, "stop", df.index[i], i - e + 1)
-        if half and banked == 0.0 and h[i] >= tgt:
-            banked = max(float(o[i]), tgt) / ep - 1 if i > e else tgt / ep - 1
-        if lock and not armed and h[i] >= tgt:
-            armed, stop = True, max(stop, ep)
-        if lock and not armed and i - e >= MAX_HOLD:  # never worked: the usual 8-week exit
-            return _close(ep, c[i], 0.0, False, "time", df.index[i], i - e + 1)
-        hi = max(hi, c[i])
-        if trail:
-            stop = max(stop, hi * (1 - trail))
-        if ma is not None and (armed or not lock) and not np.isnan(ma[i]) and c[i] < ma[i] and i > e:
-            if i + 1 > n - 1:
-                return None
-            return _close(ep, o[i + 1], banked, half and banked != 0.0, "average", df.index[i + 1], i - e + 2)
-    if e + EXIT_MAX_HOLD <= n - 1:
-        return _close(ep, c[last], banked, half and banked != 0.0, "time", df.index[last], last - e + 1)
-    return None
-
-
-def _close(ep, px, banked, split, why, when, days) -> dict:
-    r = float(px) / ep - 1
-    if split:
-        r = (banked + r) / 2
-    return {"ret": round(r * 100 - bs.COST_PCT, 2), "why": why, "exit_date": pd.Timestamp(when), "days": int(days)}
-
-
-def exit_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """Same dip buys as the live rule, sold by each rule in EXIT_RULES, plus
-    buying at the breakout itself (no pullback) with the 50-day-average exit."""
-    rows = []
-    for _, h in hits.iterrows():
-        df = prices.get(h["symbol"])
-        sig = bs.signal_bar(df, h["hit_date"], bs.is_weekly(h["scanner_name"])) if df is not None else None
-        if sig is None:
-            continue
-        if not passes_filter(h["scanner_name"], dist_52w_high(df, sig["end_pos"]), atr_pct(df, sig["end_pos"])):
-            continue
-        sp, trig = sig["end_pos"], sig["trigger"]
-        info = {"scanner": h["scanner_name"], "symbol": h["symbol"], "cap": h["marketcap"],
-                "hit_date": pd.Timestamp(h["hit_date"])}
-        # Breakout buy: first session within the entry window trading above the
-        # trigger, filled at the trigger (or the open on a gap-up).
-        hi, op = df["High"].to_numpy(dtype=float), df["Open"].to_numpy(dtype=float)
-        win = range(sp + 1, min(len(df), sp + 1 + bs.entry_window_for(h["scanner_name"])))
-        b = next((i for i in win if hi[i] > trig), None)
-        bo = None
-        if b is not None:
-            px = max(op[b], trig)
-            x = ride(df, b, h["scanner_name"], "live", ep=px)
-            if x:
-                bo = {**info, "entry_date": df.index[b], "entry": px, **x}
-                rows.append({**bo, "rule": BO_ALL})
-        base = simulate(df.iloc[sp + 1:], trig, h["scanner_name"])
-        if "entry_date" not in base:
-            continue
-        e = int(df.index.get_loc(base["entry_date"]))
-        common = {**info, "entry_date": pd.Timestamp(base["entry_date"])}
-        if base["status"] in ("target", "stop", "time"):
-            rows.append({**common, "rule": "target8", "ret": base["ret"], "why": base["status"],
-                         "exit_date": pd.Timestamp(base["exit_date"]),
-                         "days": int(df.index.get_loc(base["exit_date"])) - e + 1})
-        for rule in EXIT_RULES:
-            if rule in ("target8", "bo_ma50"):
-                continue
-            x = ride(df, e, h["scanner_name"], rule)
-            if x:
-                rows.append({**common, "rule": rule, **x})
-        if bo:  # the same signal, bought at the breakout instead of the dip
-            rows.append({**bo, "rule": "bo_ma50"})
-    return pd.DataFrame(rows)
-
-
-def exits_compare(et: pd.DataFrame, start: pd.Timestamp) -> list[dict]:
-    """Per exit rule: trade stats and the ₹10L portfolio, from `start`, using
-    only buys every rule has closed (so all rules see the same buys)."""
-    if et.empty:
-        return []
-    et = et[et["entry_date"] >= start]
-    if "hit_date" not in et:
-        et = et.assign(hit_date=et["entry_date"])
-    every = et[et["rule"] == BO_ALL]
-    et = et[et["rule"] != BO_ALL]
-    key = ["scanner", "symbol", "hit_date"]
-    done = et.groupby(key)["rule"].nunique()
-    common = done[done == et["rule"].nunique()].index
-    et = et.set_index(key).loc[common].reset_index()
-    out = []
-    labels = {**EXIT_RULES, BO_ALL: "no pullback, every breakout (incl. stocks that never dipped)"}
-    for rule, label in labels.items():
-        g = every if rule == BO_ALL else et[et["rule"] == rule]
-        if g.empty:
-            continue
-        pf = portfolio(g)
-        eq = pf["equity"]
-        r = g["ret"]
-        out.append({"rule": rule, "label": label, "trades": len(g), "win": round((r > 0).mean() * 100),
-                    "avg": round(r.mean(), 2), "avg_win": _rn(r[r > 0].mean()), "avg_loss": _rn(r[r <= 0].mean()),
-                    "days": round(g["days"].mean()),
-                    "final": round(eq.iloc[-1]), "cagr": round(_cagr(pf["capital"], eq.iloc[-1], eq.index[0], eq.index[-1]), 1),
-                    "max_dd": round((eq / eq.cummax() - 1).min() * 100, 1),
-                    "by_scanner": {k: {"trades": len(x), "win": round((x["ret"] > 0).mean() * 100), "avg": round(x["ret"].mean(), 2)}
-                                   for k, x in g.groupby("scanner")}})
-    return out
-
-
 def _rn(x) -> float | None:
     return None if x is None or pd.isna(x) else round(float(x), 1)
 
@@ -789,7 +611,7 @@ def _cagr(first: float, last: float, start, end) -> float:
     return ((last / first) ** (1 / yrs) - 1) * 100 if yrs > 0 and first > 0 else float("nan")
 
 
-def performance(trades: pd.DataFrame, bench: pd.Series | None, exits: pd.DataFrame | None = None) -> dict | None:
+def performance(trades: pd.DataFrame, bench: pd.Series | None) -> dict | None:
     """Would buying on the alerts have made money? Per-trade stats per
     scanner, plus a ₹10L portfolio from the date all three scanners have
     backtest data, compared with the Nifty 500 over the same days."""
@@ -816,8 +638,6 @@ def performance(trades: pd.DataFrame, bench: pd.Series | None, exits: pd.DataFra
                          "win": round((pf["taken"]["ret"] > 0).mean() * 100)},
            "years": [{"year": int(d.year), "ret": round((v / p - 1) * 100, 1)} for d, v, p in zip(yearly.index, yearly, prev)],
            "monthly": [{"m": d.strftime("%Y-%m"), "v": round(v)} for d, v in eq.resample("ME").last().items()]}
-    if exits is not None and not exits.empty:
-        out["exits"] = exits_compare(exits, start)
     if bench is not None:
         b = bench[(bench.index >= eq.index[0]) & (bench.index <= eq.index[-1])].dropna()
         if len(b) > 1:
@@ -861,17 +681,4 @@ def performance_section(perf: dict | None) -> list[str]:
     for y in perf["years"]:
         L.append(f"| {y['year']} | {y['ret']:+.1f}% | " + (f"{y['bench']:+.1f}%" if y.get("bench") is not None else "–") + " |")
     L += ["", "Open positions are counted at cost until sold. The current year is year-to-date."]
-    if perf.get("exits"):
-        L += ["", "### Exit rules compared (same dip buys)", "",
-              f"Every rule keeps the starting {STOP_PCT:g}% stop; the riding rules sell after a year at the latest. "
-              "Only buys that every rule has closed are counted.", "",
-              "| Exit | Trades | Win rate | Avg | Avg win / loss | Avg days | ₹10L became | Per year | Worst fall |",
-              "|---|---|---|---|---|---|---|---|---|"]
-        for x in perf["exits"]:
-            L.append(f"| {x['label']} | {x['trades']} | {x['win']}% | {x['avg']:+.2f}% | {_pctx(x['avg_win'])} / {_pctx(x['avg_loss'])} | "
-                     f"{x['days']} | ₹{x['final'] / 1e5:.1f}L | {x['cagr']:.1f}% | {x['max_dd']:.1f}% |")
-        L += ["", "| Exit | " + " | ".join(sorted(perf["exits"][0]["by_scanner"])) + " |",
-              "|---|" + "---|" * len(perf["exits"][0]["by_scanner"])]
-        for x in perf["exits"]:
-            L.append(f"| {x['label']} | " + " | ".join(f"{v['win']}% · {v['avg']:+.2f}%" for _, v in sorted(x["by_scanner"].items())) + " |")
     return L

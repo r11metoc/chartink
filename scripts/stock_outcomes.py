@@ -16,10 +16,15 @@ Horizons (trading sessions):
 
 Each return is compared with the Nifty 500 over the same days.
 
+Also re-runs the live rule over every hit (the official backtest) and
+retrains the ML slot ranker with its walk-forward test (ranker.py).
+
 Writes:
   reports/stock_outcomes.md          the report
-  data/model/stock_outcomes.csv      one row per trade
-  data/model/stock_summary.csv       one row per scanner x stock
+  data/model/performance.json        the backtest the app shows (committed)
+  data/model/ranker.json, reports/ml_ranker.md   the ML ranker (committed)
+  data/model/stock_outcomes.csv      one row per trade (not committed)
+  data/model/stock_summary.csv       one row per scanner x stock (not committed)
 
 Usage: python stock_outcomes.py
 """
@@ -35,7 +40,8 @@ import pandas as pd
 
 import breakout_sim as bs
 import dipzone
-from build_dataset import load_hits
+import ranker
+from hits import load_hits
 from market_data import fetch_daily
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,7 +49,7 @@ REPORT = ROOT / "reports" / "stock_outcomes.md"
 TRADES_CSV = ROOT / "data" / "model" / "stock_outcomes.csv"
 SUMMARY_CSV = ROOT / "data" / "model" / "stock_summary.csv"
 PERF_JSON = ROOT / "data" / "model" / "performance.json"
-EXITS_CSV = ROOT / "data" / "model" / "exit_trades.csv"
+ML_REPORT = ROOT / "reports" / "ml_ranker.md"
 
 HORIZONS = [("2w", 10, "Short"), ("1m", 21, "Short"), ("3m", 63, "Medium"),
             ("6m", 126, "Medium"), ("1y", 252, "Long"), ("2y", 504, "Long")]
@@ -251,10 +257,14 @@ def main() -> int:
     TRADES_CSV.parent.mkdir(parents=True, exist_ok=True)
     t.to_csv(TRADES_CSV, index=False)
     s.to_csv(SUMMARY_CSV, index=False)
-    dt = dipzone.backtest_trades(hits, prices)
-    et = dipzone.exit_trades(hits, prices)
-    et.to_csv(EXITS_CSV, index=False)  # every dip buy, sold by each exit rule
-    perf = dipzone.performance(dt, bench, et)
+    dt = dipzone.backtest_trades(hits, prices, idx.get("^NSEI"), features=True)
+    # ML ranker: walk-forward test, weekly retrain; it orders same-day buys
+    # in the official backtest (out-of-sample scores) only when it passed.
+    model, oos = ranker.train(dt)
+    ML_REPORT.write_text(ranker.report(model), encoding="utf-8")
+    print(f"ML ranker {'ON' if model['on'] else 'OFF'}: {model['test']['checks']}")
+    perf = dipzone.performance(dt.assign(ml=oos) if model["on"] else dt, bench)
+    perf["order"] = "ML ranker (from 2020, walk-forward)" if model["on"] else "mid, large, small caps"
     PERF_JSON.write_text(json.dumps(perf, allow_nan=False), encoding="utf-8")
     dz = dipzone.performance_section(perf) + dipzone.backtest_section(hits, prices, dt)
     REPORT.write_text(build_report(t, s, dz), encoding="utf-8")

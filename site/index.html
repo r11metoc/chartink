@@ -167,11 +167,7 @@ const rupees = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + "₹" + Math.abs(v).t
 
 const lv = (items) => `<div class="lv">${items.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("")}</div>`;
 
-const STAGE = {
-  zone: ["BUY", "BUY ZONE"],
-  dip: ["HOLD", "WAIT DIP"],
-  breakout: ["BUY", "BUY-STOP"],
-};
+const STAGE = { breakout: ["BUY", "BUY-STOP"] };
 const CHOICE = { 0: "1st choice", 1: "2nd choice", 2: "3rd choice" };
 const SELL = { target: "target", stop: "stop", time: "time limit", average: "below 30-day EMA" };
 const tags = (x) => (x.confirmed_by && x.confirmed_by.length ? ` · <b class="up">⭐ also on ${x.confirmed_by.map(esc).join(", ")}</b>` : "")
@@ -201,7 +197,7 @@ function renderPerformance(f) {
     <td class="n ${cls(y.bench)}">${y.bench == null ? "–" : (y.bench > 0 ? "+" : "") + y.bench + "%"}</td></tr>`).join("");
   return `<section class="card"><h2>📈 If you had bought on the alerts <small>backtest since ${fmtYear(f.start)}</small></h2>
     <div class="note">Starting with ₹${p.capital / 100000}L, each buy is 1/${p.max_pos} of the portfolio's value at the time (profits reinvested),
-      at most ${p.max_pos} open, first come first served, after costs.</div>
+      at most ${p.max_pos} open, first come first served (same day: ${esc(f.order || "mid, large, small caps")}), after costs.</div>
     <div class="lv"><div><span>₹${p.capital / 100000}L became</span><b>${L(p.final)}</b></div>
       <div><span>Per year</span><b class="${cls(p.cagr)}">${p.cagr}%</b></div>
       <div><span>Worst fall</span><b class="down">${p.max_dd}%</b></div></div>
@@ -211,11 +207,6 @@ function renderPerformance(f) {
     ${equityChart(f.monthly)}
     <table class="tight"><tr><th>Every alert</th><th class="n">Trades</th><th class="n">Won</th><th class="n">Avg</th><th class="n">Held</th></tr>${sc}</table>
     <table class="tight"><tr><th>Year</th><th class="n">Alerts</th><th class="n">Nifty 500</th></tr>${yrs}</table>
-    ${(f.exits || []).length ? `<h2 style="padding-top:14px">Exit rules compared <small>same dip buys</small></h2>
-      <table class="tight"><tr><th>Sell when</th><th class="n">Won</th><th class="n">Avg</th><th class="n">Held</th><th class="n">Per year</th><th class="n">Worst</th></tr>
-      ${f.exits.map((x) => `<tr><td>${esc(x.label)}</td><td class="n">${x.win}%</td><td class="n ${cls(x.avg)}">${pct(x.avg)}</td>
-        <td class="n">${x.days}d</td><td class="n ${cls(x.cagr)}">${x.cagr}%</td><td class="n down">${x.max_dd}%</td></tr>`).join("")}</table>
-      <div class="note" style="padding-top:6px">All keep the starting 15% stop; riding exits sell after a year at the latest.</div>` : ""}
     <div class="note" style="padding-top:8px">${p.taken} trades taken, ${p.skipped} skipped for want of a free slot (${p.win}% of those taken won).
       Open positions counted at cost; this year is year-to-date. Past results, not a promise.</div></section>`;
 }
@@ -359,7 +350,7 @@ function renderToday(d, part) {
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
     ...stops.map((b) => `<details class="row fs" style="display:block"><summary style="list-style:none;cursor:pointer">
         <div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}${evTag(b.symbol)}</div>
-        <div class="meta">Signal ${fmtDate(b.signal)} · SL ${money(b.stop)} · now ${money(b.now)}</div></summary>
+        <div class="meta">Signal ${fmtDate(b.signal)} · SL ${money(b.stop)} · now ${money(b.now)}${mlTag(d, b)}</div></summary>
         ${b.fund ? `<div class="meta" style="padding-top:6px">Fundamentals${fundLine(b.fund)}</div>` : ""}</details>`),
   ];
   const ev = d.events || {};
@@ -425,6 +416,89 @@ function renderToday(d, part) {
   return summary + todo + scanCard;
 }
 
+const mlTag = (d, x) => (x.ml != null && d.ml ? ` · ML ${x.ml}${d.ml.on ? "" : " (off)"}` : "");
+
+// ---------------------------------------------------------------- journal
+function miniChart(t) {
+  const p = t.path;
+  if (!p || p.c.length < 2) return "";
+  const vals = [...p.c, ...p.e.filter((v) => v != null), t.trigger, t.entry].filter((v) => v != null);
+  const lo = Math.min(...vals), hi = Math.max(...vals), W = 320, H = 90, pad = 6, n = p.c.length;
+  const X = (i) => pad + (i * (W - 2 * pad)) / (n - 1);
+  const Y = (v) => H - pad - ((v - lo) / (hi - lo || 1)) * (H - 2 * pad);
+  const pts = (arr) => arr.map((v, i) => (v == null ? null : `${X(i).toFixed(1)},${Y(v).toFixed(1)}`)).filter(Boolean).join(" ");
+  const at = (iso) => { const i = p.d.indexOf(iso); return i < 0 ? null : i; };
+  const dot = (i, v, col, label) => (i == null || v == null ? "" : `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${col}"><title>${label}</title></circle>`);
+  const sig = p.d.findIndex((x) => x >= t.signal);
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin:4px 0 2px" role="img" aria-label="Price around the trade">
+    ${t.trigger != null ? `<line x1="${pad}" x2="${W - pad}" y1="${Y(t.trigger).toFixed(1)}" y2="${Y(t.trigger).toFixed(1)}" stroke="var(--line)" stroke-width="1.5"/>` : ""}
+    <polyline points="${pts(p.e)}" fill="none" stroke="var(--hold)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <polyline points="${pts(p.c)}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    ${dot(sig < 0 ? null : sig, p.c[sig], "var(--muted)", "Signal")}
+    ${dot(at(t.entry_date), t.entry, "var(--up)", "Bought")}
+    ${t.exit_date ? dot(at(t.exit_date), t.exit, "var(--down)", "Sold") : ""}</svg>`;
+}
+
+function renderJournal(d) {
+  const z = d.dip;
+  if (!z) return `<div class="empty">No trades yet.</div>`;
+  const trades = [...z.holding.map((h) => ({ ...h, open: true })), ...(z.closed || [])]
+    .sort((a, b) => b.entry_date.localeCompare(a.entry_date));
+  const closed = z.closed || [];
+  const wins = closed.filter((c) => c.ret > 0).length;
+  const avg = closed.length ? closed.reduce((a, c) => a + c.ret, 0) / closed.length : null;
+  const why = (t) => t.reason === "average" ? `closed below the ${z.rule.exit_ma}-day EMA${t.ma ? " (" + money(t.ma) + ")" : ""}, sold at the next open`
+    : t.reason === "stop" ? `hit the ${z.rule.stop}% stop-loss` : t.reason === "time" ? "held a year (time limit)" : esc(t.reason || "");
+  const cards = trades.map((t) => `<section class="card"><h2><span>${esc(t.symbol)}${scanTag(t.scanner)}</span>
+      <small class="chg ${cls(t.ret)}">${pct(t.ret)} · ${rupees(t.pnl)}</small></h2>
+    <div class="note" style="color:var(--text)">
+      <b>Bought</b> ${fmtDate(t.entry_date)} at ${money(t.entry)}: signal ${fmtDate(t.signal)} on ${esc(SHORT[t.scanner] || t.scanner)},
+      ${t.gap ? "gapped above the trigger " + money(t.trigger) + ", filled at the open" : "crossed the trigger " + money(t.trigger)}${t.ml != null ? ` · ML rank ${t.ml}` : ""}${t.cap ? " · " + esc(t.cap.toLowerCase()) : ""}.<br>
+      ${t.open
+        ? `<b>Open</b> ${t.days} days · now ${money(t.now)} · sells after a close below the EMA (${money(t.ma)}) or at ${money(t.stop)}${t.sell_signal ? ` · <b class="down">sell signal: next open</b>` : ""}`
+        : `<b>Sold</b> ${fmtDate(t.exit_date)} at ${money(t.exit)} after ${t.days} days: ${why(t)}.`}
+      ${miniChart(t)}
+      <span class="meta"><span style="color:var(--accent)">━</span> close &nbsp;<span style="color:var(--hold)">┅</span> ${z.rule.exit_ma}-day EMA &nbsp;── trigger &nbsp;● signal / <span class="up">buy</span> / <span class="down">sell</span></span>
+    </div></section>`).join("");
+  return `<div class="summary">
+      <div><span>Trades</span><b>${trades.length}<small class="meta"> · ${z.holding.length} open</small></b></div>
+      <div><span>Closed won</span><b>${closed.length ? Math.round((100 * wins) / closed.length) + "%" : "–"}<small class="meta"> of ${closed.length}</small></b></div>
+      <div><span>Avg closed</span><b class="${cls(avg)}">${avg == null ? "–" : pct(avg)}</b></div></div>
+    <div class="meta" style="margin:-4px 2px 4px">Paper trades since ${fmtDate(z.summary.start)}, newest first. Every buy and sell follows the rule (How it works).</div>
+    ${cards || `<div class="empty">No trades yet.</div>`}`;
+}
+
+// ---------------------------------------------------------------- ML ranker
+function renderML(d) {
+  const m = d.ml;
+  if (!m) return `<section class="card"><div class="empty">The ML ranker hasn't been trained yet (Saturday's retrain).</div></section>`;
+  const t = m.test, f = t.portfolio.fixed, ml = t.portfolio.ml;
+  const bar = (v, max) => `<span style="display:inline-block;height:9px;border-radius:3px;vertical-align:middle;width:${Math.max(2, Math.round((Math.abs(v) / max) * 90))}px;background:${v >= 0 ? "var(--up)" : "var(--down)"}"></span>`;
+  const qmax = Math.max(...t.quintiles.map(Math.abs), 1), wmax = Math.max(...m.weights.map((w) => Math.abs(w.w)), 0.01);
+  return `<section class="card"><h2>🤖 ML slot ranker <small><span class="pill ${m.on ? "BUY" : "WAIT"}">${m.on ? "ON" : "OFF"}</span></small></h2>
+    <div class="note" style="font-size:14px;color:var(--text)">The rule gives far more buy signals than 15 slots can hold. On a day with more buys than free slots,
+      ${m.on ? "the ranker decides who goes first: highest ML rank (0–100) first." : "the fixed order (mid, large, small caps) decides; the ranker is shown for information."}
+      It never adds or skips a trade.<br><br>
+      It is switched on only while it beats the fixed order on years it never saw, in both halves of the test, without a deeper fall.
+      Retrained every Saturday on ${m.trained_on.toLocaleString("en-IN")} closed trades (${fmtYear(m.from)} – ${fmtYear(m.to)}); last ${fmtDate(m.trained_at.slice(0, 10))}.</div></section>
+  <section class="card"><h2>Walk-forward test</h2><div class="note">Each year scored by a model trained only on earlier years.</div>
+    <table class="tight"><tr><th>₹10L, 15 slots</th><th class="n">Fixed order</th><th class="n">ML order</th></tr>
+      <tr><td>Per year</td><td class="n">${f.cagr}%</td><td class="n ${ml.cagr > f.cagr ? "up" : "down"}">${ml.cagr}%</td></tr>
+      ${t.halves.map((h, i) => `<tr><td>${esc(h)}</td><td class="n">${f.halves[i]}%</td><td class="n ${ml.halves[i] > f.halves[i] ? "up" : "down"}">${ml.halves[i]}%</td></tr>`).join("")}
+      <tr><td>Worst fall</td><td class="n down">${f.max_dd}%</td><td class="n down">${ml.max_dd}%</td></tr></table>
+    <div class="note" style="padding-top:8px">${t.checks ? Object.entries(t.checks).map(([k, v]) => `${v ? "✓" : "✗"} ${esc(k)}`).join("<br>") : ""}</div>
+    <h2>Average trade by ML score <small>${t.trades.toLocaleString("en-IN")} trades</small></h2>
+    <table class="tight">${t.quintiles.map((q, i) => `<tr><td>${["Lowest fifth", "2nd", "3rd", "4th", "Highest fifth"][i]}</td><td>${bar(q, qmax)}</td><td class="n ${cls(q)}">${pct(q)}</td></tr>`).join("")}</table>
+    <h2>Each year <small>top vs bottom half of scores</small></h2>
+    <table class="tight"><tr><th>Year</th><th class="n">Trades</th><th class="n">Top half</th><th class="n">Bottom half</th></tr>
+      ${t.years.map((y) => `<tr><td>${y.year}</td><td class="n">${y.trades}</td><td class="n ${y.top > y.bottom ? "up" : "down"}">${pct(y.top)}</td><td class="n">${pct(y.bottom)}</td></tr>`).join("")}</table>
+    <div class="note" style="padding-top:8px">AUC ${t.auc} (0.5 = a coin toss): the edge per trade is small. It helps mainly by putting more of the big winners into the slots.
+      With 60 random orders the same trades made 21–30% a year, so a couple of points either way can be luck; that is why it must keep passing every week.</div></section>
+  <section class="card"><h2>What it looks at <small>+ more likely to work · − less</small></h2>
+    <table class="tight">${m.weights.map((w) => `<tr><td>${esc(w.feature)}</td><td>${bar(w.w, wmax)}</td><td class="n ${cls(w.w)}">${w.w > 0 ? "+" : ""}${w.w.toFixed(2)}</td></tr>`).join("")}</table>
+    <div class="note" style="padding-top:8px">Logistic regression on facts known at the signal close. Gradient-boosted trees were tested and did worse on unseen years.</div></section>`;
+}
+
 function renderRule(d) {
   const r = d.dip && d.dip.rule;
   if (!r) return "";
@@ -433,7 +507,7 @@ function renderRule(d) {
     <b>Buy</b>: when a stock appears on a scanner, place a buy-stop at its <b>trigger</b> (the signal day's high; the week's high for Weekly)
     for ${r.entry_days} sessions after the signal (${r.entry_days_weekly} for Weekly); if the price hasn't crossed by then, cancel it. Filled at the trigger, or at the open on a gap-up.<br><br>
     <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day EMA, or at the ${r.stop}% stop-loss, or after a year.<br><br>
-    <b>Slots</b>: 15 positions of about 6.7% each, one per stock. If short of slots, mid caps first, then large, then small.<br><br>
+    <b>Slots</b>: 15 positions of about 6.7% each, one per stock. If short of slots on a day, ${r.ml_on ? "the <b>ML ranker</b> decides who goes first (highest ML rank first; More → ML)" : "mid caps first, then large, then small (the ML ranker is off: More → ML)"}.<br><br>
     <b>Filters</b>: Weekly only takes calmer stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.<br><br>
     Paper trades of ₹1L each; returns are after 0.25% costs. Not advice.`)
   + sec("Scans and alerts", `
@@ -458,7 +532,9 @@ function renderRule(d) {
     from the companies' exchange filings (read daily). Prices can jump either way on results day.`)
   + sec("Using the app", `
     Swipe left or right to move between Today and the More pages. Pull down or tap ↻ to refresh.
-    Upload (More) takes a new Chartink backtest export (replaces it and retrains) or a Screener export (replaces the Fundamentals list).`);
+    Upload (More) takes a new Chartink backtest export (replaces it and retrains) or a Screener export (replaces the Fundamentals list).<br><br>
+    <b>Journal</b> (More): every paper trade with why it was bought and sold, on a small price chart.
+    <b>ML</b> (More): the slot ranker, how it scored on years it never saw, and whether it is switched on. Retrained every Saturday.`);
 }
 
 // ---------------------------------------------------------------- upload (straight to GitHub)
@@ -638,12 +714,13 @@ function renderMore(d) {
   if (!tabs[state.more]) state.more = "breakouts";
   const chips = `<div class="sub2 filters">${Object.entries(tabs).map(([k, v]) => `<button data-more="${k}" class="${state.more === k ? "on" : ""}">${v}</button>`).join("")}</div>`;
   const body = { holdings: (x) => renderToday(x, "holdings"), market: (x) => renderToday(x, "market"), rule: renderRule, backtest: (x) => renderPerformance(x.performance) || `<div class="empty">No backtest yet.</div>`,
-                 fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors }[state.more](d);
+                 fund: renderFundScan, upload: renderUpload, breakouts: renderBreakouts, sectors: renderSectors,
+                 journal: renderJournal, ml: renderML }[state.more](d);
   return chips + body;
 }
 
-const MORE_TABS = { breakouts: "Breakouts", holdings: "Holdings", market: "Market", sectors: "Sectors", backtest: "Backtest",
-                    fund: "Fundamentals", upload: "Upload", rule: "How it works" };
+const MORE_TABS = { breakouts: "Breakouts", holdings: "Holdings", journal: "Journal", market: "Market", sectors: "Sectors",
+                    backtest: "Backtest", ml: "ML", fund: "Fundamentals", upload: "Upload", rule: "How it works" };
 
 function render() {
   const d = state.data;
