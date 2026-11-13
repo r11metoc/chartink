@@ -74,6 +74,10 @@ def _view():
     return dipzone.dashboard_view(_states())
 
 
+def _dt(iso) -> str:
+    return datetime.fromisoformat(str(iso)[:10]).strftime("%d %b") if iso else "–"
+
+
 def _m(v) -> str:
     return "–" if v is None else f"{v:,.2f}"
 
@@ -86,12 +90,11 @@ def today_msg() -> str:
     bought = [h for h in v["holding"] if h["entry_date"] >= cutoff and not h.get("sell_signal")]
     lines = ["📋 <b>To do now</b>"]
     for h in sells:
-        lines.append(f"🔻 Sell <b>{h['symbol']}</b> at the next open (closed below its 50-day average {_m(h['ma'])}; {h['ret']:+.1f}%)")
+        lines.append(f"🔻 Sell <b>{h['symbol']}</b> at next open · {h['ret']:+.1f}%")
     for b in stops:
-        until = f" until {b['valid_until']}" if b.get("valid_until") else ""
-        lines.append(f"🟡 Buy-stop <b>{b['symbol']}</b> above {_m(b['level'])}{until} · stop {_m(b['stop'])}")
+        lines.append(f"🟡 <b>{b['symbol']}</b> above {_m(b['level'])} · SL {_m(b['stop'])} · signal {_dt(b['signal'])}")
     for h in bought:
-        lines.append(f"🟢 Bought <b>{h['symbol']}</b> {h['entry_date']} at {_m(h['entry'])} · stop {_m(h['stop'])}")
+        lines.append(f"🟢 Bought <b>{h['symbol']}</b> {_m(h['entry'])} on {_dt(h['entry_date'])} · SL {_m(h['stop'])}")
     if len(lines) == 1:
         lines.append("Nothing to do.")
     return "\n".join(lines)

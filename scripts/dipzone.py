@@ -350,62 +350,45 @@ def new_events(conn, states: list[dict], now: datetime) -> list[tuple[str, dict,
     return fresh
 
 
-def _tags(s: dict) -> str:
-    import fundamentals
-    t = ""
-    if s.get("confirmed_by"):
-        t += " ⭐ also on " + ", ".join(s["confirmed_by"])
-    if s.get("dist_52w_high") is not None:
-        t += f" · {-s['dist_52w_high']:.0f}% off 52w high"
-    if s.get("symbol") and (f := fundamentals.label(fundamentals.check(s["symbol"]))):
-        t += f" · {f}"
-    return t
+SHORT = {"63_30_daily": "63/30", "Bullish_Scanner": "Bullish", "Wkly_upswing": "Weekly"}
 
 
 def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
+    """Today's actions as a short list: what to do, at what price."""
     if not fresh:
         return None
+    sc = lambda s: SHORT.get(s["scanner"], s["scanner"])  # noqa: E731
     lines = ["📋 <b>Today's actions</b>"]
     setups = sorted((s for _, s, k in fresh if k == "setup"), key=lambda s: s.get("priority", 3))
     if setups:
-        lines += ["", "<b>SET A BUY-STOP</b> (buy only if the price trades above the trigger; "
-                      "if slots are short, take mid caps first, then large, then small):"]
+        lines += ["", "<b>Place buy-stop</b>"]
         for s in setups:
             stp = s["trigger"] * (1 - stop_for(s["scanner"]) / 100)
-            until = f" until {_d(s['valid_until'])}" if s.get("valid_until") is not None else ""
-            choice = f" · {s['cap']} ({CHOICE[s['priority']]})" if s.get("priority", 3) in CHOICE else ""
-            lines.append(f"🟡 <b>{s['symbol']}</b> ({s['scanner']}{choice}){_tags(s)}: buy above {s['trigger']:.2f}{until}. "
-                         f"Stop ~{stp:.2f} (-{stop_for(s['scanner']):g}%), then hold while it closes above its {EXIT_MA}-day average")
+            lines.append(f"🟡 <b>{s['symbol']}</b> above {s['trigger']:.2f} · SL {stp:.2f} · signal {_d(s['date'])} · {sc(s)}")
     bought = [s for _, s, k in fresh if k == "bought"]
     if bought:
-        lines += ["", "<b>BOUGHT</b> (crossed the trigger):"]
+        lines += ["", "<b>Bought</b>"]
         for s in bought:
-            gap = " on a gap-up open" if s.get("gap") else ""
-            lines.append(f"🟢 <b>{s['symbol']}</b> ({s['scanner']}){_tags(s)} bought {_d(s['entry_date'])} at {s['entry']:.2f}{gap}. "
-                         f"Stop {s['stop']:.2f} (-{stop_for(s['scanner']):g}%), sell on a close below the {EXIT_MA}-day average")
+            lines.append(f"🟢 <b>{s['symbol']}</b> {s['entry']:.2f} on {_d(s['entry_date'])} · SL {s['stop']:.2f} · {sc(s)}")
     buys = [s for _, s, k in fresh if k == "buy"]
     if buys:
-        lines += ["", "<b>BUY ZONE</b> (buy at the next open):"]
+        lines += ["", "<b>Buy at next open</b>"]
         for s in buys:
             ref = s.get("entry", s["dip_close"])
-            lines.append(f"🟢 <b>{s['symbol']}</b> ({s['scanner']}){_tags(s)} dipped {s['dip_pct']:g}% to {s['dip_close']:.2f} "
-                         f"(trigger {s['trigger']:.2f}). Buy ~{ref:.2f}, stop {ref * (1 - stop_for(s['scanner']) / 100):.2f} "
-                         f"(-{stop_for(s['scanner']):g}%), then hold while it closes above its {EXIT_MA}-day average")
+            lines.append(f"🟢 <b>{s['symbol']}</b> ~{ref:.2f} · SL {ref * (1 - stop_for(s['scanner']) / 100):.2f} · {sc(s)}")
     sells = [s for _, s, k in fresh if k == "sell"]
     if sells:
-        lines += ["", f"<b>SELL</b> (closed below the {EXIT_MA}-day average, sell at the next open):"]
+        lines += ["", "<b>Sell at next open</b>"]
         for s in sells:
-            lines.append(f"🔻 <b>{s['symbol']}</b> ({s['scanner']}) closed {s['now']:.2f} below its {EXIT_MA}-day average "
-                         f"{s['ma']:.2f} on {_d(s['sell_signal'])}. Bought {s['entry']:.2f} ({s['ret']:+.1f}%)")
+            lines.append(f"🔻 <b>{s['symbol']}</b> closed {s['now']:.2f} < {EXIT_MA}-day avg {s['ma']:.2f} · {s['ret']:+.1f}%")
     icon = {"target": "✅", "stop": "🛑", "time": "⏱", "average": "📉"}
-    label = {"target": "target hit", "stop": "stopped", "time": "a year up, sold", "average": f"sold below the {EXIT_MA}-day average"}
+    why = {"target": "target", "stop": "stop-loss", "time": "1 year", "average": f"below {EXIT_MA}-day avg"}
     exits = [(s, k) for _, s, k in fresh if k in icon]
     if exits:
-        lines += ["", "<b>CLOSED</b>:"]
+        lines += ["", "<b>Closed</b>"]
         for s, k in exits:
-            lines.append(f"{icon[k]} <b>{s['symbol']}</b> ({s['scanner']}) {label[k]} {_d(s['exit_date'])}: "
-                         f"{s['entry']:.2f} → {s['exit']:.2f} ({s['ret']:+.1f}%)")
-    lines += ["", "<i>Paper trades from your scanners, not advice. Send /help for holdings, scanners and more.</i>"]
+            lines.append(f"{icon[k]} <b>{s['symbol']}</b> {s['entry']:.2f} → {s['exit']:.2f} ({s['ret']:+.1f}%) · {why[k]}")
+    lines += ["", "<i>Paper trades, not advice · /help for more</i>"]
     return "\n".join(lines)
 
 

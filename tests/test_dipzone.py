@@ -62,7 +62,7 @@ def test_alerts_only_once():
     rows = BREAKOUT + [(104, 104, 101, 101.5)]
     s = {"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-02", **dz.simulate(frame(rows), 100.0, "63_30_daily")}
     first = dz.new_events(conn, [s], now)
-    assert [k for _, _, k in first] == ["buy"] and "BUY ZONE" in dz.format_alerts(first)
+    assert [k for _, _, k in first] == ["buy"] and "Buy at next open" in dz.format_alerts(first)
     assert dz.new_events(conn, [s], now) == []
 
 
@@ -77,11 +77,6 @@ def test_52_week_high_filter():
     assert dz.passes_filter("Bullish_Scanner", -50.0)          # no filter on other scanners
     assert dz.passes_filter("63_30_daily", None)               # not enough history: keep
     assert dz.dist_52w_high(df, 50) is None
-
-
-def test_tags_in_alert_text():
-    s = {"confirmed_by": ["Bullish_Scanner"], "dist_52w_high": -4.2}
-    assert "⭐ also on Bullish_Scanner" in dz._tags(s) and "4% off 52w high" in dz._tags(s)
 
 
 def test_summary_ignores_duplicates():

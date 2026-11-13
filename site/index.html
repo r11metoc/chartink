@@ -352,20 +352,20 @@ function renderToday(d, part) {
   const waiting = Object.fromEntries(z.buy_list.map((b) => [b.symbol, b]));
   const actions = [
     ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
-        <div class="meta">At the next open · closed below its 50-day average ${money(h.ma)}</div></div>
+        <div class="meta">At next open · closed below 50-day avg ${money(h.ma)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
     ...stops.map((b) => `<details class="row fs" style="display:block"><summary style="list-style:none;cursor:pointer">
         <div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}${evTag(b.symbol)}</div>
-        <div class="meta">Until ${b.valid_until ? fmtDate(b.valid_until) : "–"} · stop ${money(b.stop)} if bought · now ${money(b.now)}${CHOICE[b.priority] ? " · " + CHOICE[b.priority] : ""}</div></summary>
+        <div class="meta">Signal ${fmtDate(b.signal)} · SL ${money(b.stop)} · now ${money(b.now)}</div></summary>
         ${b.fund ? `<div class="meta" style="padding-top:6px">Fundamentals${fundLine(b.fund)}</div>` : ""}</details>`),
   ];
   const ev = d.events || {};
   const evRows = Object.entries(ev).filter(([sym]) => held[sym] || waiting[sym]).sort((a, b) => a[1].date.localeCompare(b[1].date));
   if (evRows.length) actions.push(`<div class="row"><div><div class="sym">📅 Results coming</div>
-      <div class="meta">${evRows.map(([sym, e]) => `<b>${esc(sym)}</b> ${fmtDate(e.date)}${e.what !== "results" ? " (" + esc(e.what) + ")" : ""} · ${held[sym] ? "holding" : "buy-stop"}`).join(" · ")} · prices can jump either way on results day</div></div><div></div></div>`);
+      <div class="meta">${evRows.map(([sym, e]) => `<b>${esc(sym)}</b> ${fmtDate(e.date)}${e.what !== "results" ? " (" + esc(e.what) + ")" : ""} · ${held[sym] ? "holding" : "buy-stop"}`).join(" · ")}</div></div><div></div></div>`);
   const done = [
     ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
-        <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · stop ${money(h.stop)}</div></div>
+        <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · SL ${money(h.stop)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
     ...soldNow.map((c) => `<div class="row"><div><div class="sym">${c.ret >= 0 ? "✅" : "🛑"} Sold ${esc(c.symbol)}${scanTag(c.scanner)}</div>
         <div class="meta">${fmtDate(c.exit_date)} at ${money(c.exit)} · ${SELL[c.reason] || esc(c.reason)}</div></div>
@@ -382,12 +382,12 @@ function renderToday(d, part) {
     const newOn = r.scanners.filter((sc) => pending[sc + "|" + r.symbol]);
     const reason = r.scanners.map((sc) => why[sc + "|" + r.symbol]).find(Boolean);
     let chip, note;
-    if (h) { chip = `<span class="pill BUY">Holding ${pct(h.ret)}</span>`; note = `bought ${fmtDate(h.entry_date)} at ${money(h.entry)}`; }
-    else if (b) { chip = `<span class="pill HOLD">Buy-stop</span>`; note = `buy above ${money(b.level)} until ${b.valid_until ? fmtDate(b.valid_until) : "–"}`; }
+    if (h) { chip = `<span class="pill BUY">Holding ${pct(h.ret)}</span>`; note = `bought ${money(h.entry)} · ${fmtDate(h.entry_date)}`; }
+    else if (b) { chip = `<span class="pill HOLD">Buy-stop</span>`; note = `above ${money(b.level)} · signal ${fmtDate(b.signal)}`; }
     else if (newOn.length) {
       const wk = newOn.every((sc) => SHORT[sc] === "Weekly");
       chip = `<span class="pill WAIT">${wk ? "New this week" : "New today"}</span>`;
-      note = `buy-stop at the ${wk ? "week's" : "day's"} high, set after the ${wk ? "week's" : ""} close${hold.length >= slots ? " if a slot is free" : ""}`.replace("the  close", "the close");
+      note = `buy-stop set after the ${wk ? "week's " : ""}close`;
     } else { chip = `<span class="pill WAIT">${esc(reason || "not taken")}</span>`;
              note = r.trigger != null ? `trigger ${money(r.trigger)} (${r.chg >= 0 ? "above" : "below"}, ${pct(r.chg)})` : ""; }
     return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${r.scanners.map(scanTag).join("")}${evTag(r.symbol)}</div>
