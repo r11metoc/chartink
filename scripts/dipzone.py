@@ -36,8 +36,8 @@ ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
 TARGET_PCT = 8.0
 # 13 Nov 2026: exit on a close below the 30-day EMA (was the 50-day simple
 # average) and a 15% stop for every scanner (was 12%, 15% weekly). Backtest
-# 2019-26 (reports/rule_compare.md): 26.9% a year, worst fall -9.2%, vs 24.3%
-# and -14.1% before; better in both 2019-22 and 2023-26. The 3/5-session
+# 2019-26 (performance.json): 26.6% a year, worst fall -9.2%, vs 24.0% and
+# -14.1% before; better in both 2019-22 and 2023-26. The 3/5-session
 # buy-stop and the weekly volatility filter stay: longer windows (25.9%) and
 # no filter (25.2%) both did worse.
 STOP_PCT = 15.0
@@ -560,7 +560,8 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], d: pd.
          f"Buy when the price trades above the trigger (the signal candle's high) within "
          f"{bs.entry_window_for('63_30_daily')} sessions ({bs.entry_window_for('Wkly_upswing')} after a weekly signal), "
          f"filled at the trigger or the open on a gap-up. Sell at the next open after a close below the {EXIT_LABEL}, "
-         f"a {STOP_PCT:g}% stop ({', '.join(f'{k} {v:g}%' for k, v in STOP_BY_SCANNER.items())}), or after {RIDE_MAX_HOLD} sessions. "
+         f"a {STOP_PCT:g}% stop" + (f" ({', '.join(f'{k} {v:g}%' for k, v in STOP_BY_SCANNER.items())})" if STOP_BY_SCANNER else "")
+         + f", or after {RIDE_MAX_HOLD} sessions. "
          f"Wkly_upswing only when daily ATR(14) is under {ATR_MAX_PCT.get('Wkly_upswing', 0):g}% of the close. "
          f"Filter: {', '.join(f'{k} only within {v:g}% of the 52-week high' for k, v in NEAR_HIGH_PCT.items())}. "
          f"{bs.COST_PCT}% costs.", "",

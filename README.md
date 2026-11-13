@@ -24,15 +24,15 @@ phone app and in Telegram.
 - **Filters**: `Wkly_upswing` only when ATR(14) < 4% of price; `63_30_daily`
   only within 10% of the 52-week high.
 - Changed on 13 Nov 2026 from a 50-day simple average exit and a 12% stop (15%
-  weekly): 26.9% a year and a −9.2% worst fall in the 2019-26 backtest, vs
-  24.3% and −14.1% (`reports/rule_compare.md`). Longer buy-stop windows and
+  weekly): better in both 2019-22 and 2023-26 with a smaller worst fall
+  (`reports/rule_compare.md`). Longer buy-stop windows and
   dropping the volatility filter were tested and did worse.
 - Returns are after 0.25% round-trip costs.
 
-Backtest Feb 2019 to Nov 2026 (`reports/rule_compare.md`): +4.2% a trade,
-43% wins (average win +17.1%, average loss −5.8%), held about 30 days; ₹10L in
-15 slots became about ₹63L, 26.9% a year, worst fall −9.2%, against the Nifty
-500's 13% a year and −38%. Tested and rejected: Nifty trend filter, skipping small caps, volume or
+Backtest Feb 2019 to Nov 2026 (`reports/stock_outcomes.md`, the app's Backtest
+page; refreshed every Saturday): 6,487 trades, +4.2% a trade, 43% wins, held
+about 31 days; ₹10L in 15 slots became about ₹62L, 26.6% a year, worst fall
+−9.2%, against the Nifty 500's 13.2% a year and −38%. Tested and rejected: Nifty trend filter, skipping small caps, volume or
 sector ranking, buying pullbacks, +8% targets, trailing stops, a 20-day exit,
 longer buy-stop windows (`reports/entry_window_test.md`).
 
