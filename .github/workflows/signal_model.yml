@@ -14,9 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "train, predict, window_test, or rule_compare (old vs new rule)"
+        description: "train, predict, window_test, rule_compare or weekly_test"
         type: choice
-        options: [predict, train, window_test, rule_compare]
+        options: [predict, train, window_test, rule_compare, weekly_test]
         default: predict
       symbols:
         description: "predict: comma-separated symbols (blank = latest dashboard scan)"
@@ -120,6 +120,19 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add reports/rule_compare.md
           git commit -m "Rule compare $(date -u +%Y-%m-%dT%H:%M:%SZ)" || exit 0
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Weekly entry test (reports/weekly_test.md)
+        if: inputs.mode == 'weekly_test'
+        working-directory: scripts
+        run: |
+          python weekly_test.py
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/weekly_test.md
+          git commit -m "Weekly test $(date -u +%Y-%m-%dT%H:%M:%SZ)" || exit 0
           git pull --rebase origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 
