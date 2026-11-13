@@ -5,8 +5,8 @@ week's high for Wkly_upswing):
 1. buy-stop : from the next session, buy when the price trades above the
               trigger, within 3 sessions (5 after a weekly signal). Filled at
               the trigger, or at the open on a gap-up.
-2. exit     : sell at the next open after a close below the 50-day average,
-              a 12% stop below the buy price (15% Wkly_upswing), or after 250
+2. exit     : sell at the next open after a close below the 30-day EMA,
+              a 15% stop below the buy price, or after 250
               sessions (~1 year).
 Backtest 2021-26, same signals: +5.8% a trade and 46% wins vs +4.2% / 41%
 for waiting for a pullback, worst portfolio fall -10% vs -18%.
@@ -34,11 +34,16 @@ DEFAULT_DIP = 3.0
 FLOOR_PCT = 5.0       # the dip close must stay within 5% below the trigger
 ZONE_DAYS = 20        # sessions after the breakout to wait for the dip
 TARGET_PCT = 8.0
-STOP_PCT = 12.0
-STOP_BY_SCANNER = {"Wkly_upswing": 15.0}  # weekly picks swing more (backtest: 70% wins vs 68% at 12%)
-ATR_MAX_PCT = {"Wkly_upswing": 4.0}       # daily ATR(14) under 4% of the close (2023-26: 74% wins vs 68%)
+# 13 Nov 2026, the user's rule: 15% stop for every scanner (was 12%, 15% weekly),
+# no volatility filter (was: Wkly_upswing only under 4% daily ATR), exit on a
+# close below the 30-day EMA (was the 50-day simple average), buy-stop valid
+# 10 sessions (20 weekly; was 3 / 5, breakout_sim.py).
+STOP_PCT = 15.0
+STOP_BY_SCANNER: dict[str, float] = {}
+ATR_MAX_PCT: dict[str, float] = {}
 MAX_HOLD = 40         # sessions (8 weeks) - the old +8% target rule (kept for comparison)
-EXIT_MA = 50          # live exit: sell at the next open after a close below this daily average
+EXIT_MA = 30          # live exit: sell at the next open after a close below this daily EMA
+EXIT_LABEL = f"{EXIT_MA}-day EMA"
 RIDE_MAX_HOLD = 250   # sessions (~1 year) before a riding position is sold anyway
 CLOSED = ("target", "stop", "time", "average")
 NEAR_HIGH_PCT = {"63_30_daily": 10.0}  # only take signals within this % of the 52-week high
@@ -199,9 +204,14 @@ def _ride_ma(out, o, l, c, dates, e, ep, stp, ma) -> dict:
             "sessions_left": e + RIDE_MAX_HOLD - (n - 1)} | _ret(ep, c[-1])
 
 
+def exit_line(close: pd.Series) -> np.ndarray:
+    """The live exit line: EXIT_MA-day exponential average of the close."""
+    return close.ewm(span=EXIT_MA, adjust=False, min_periods=EXIT_MA).mean().to_numpy()
+
+
 def exit_ma(df: pd.DataFrame, start: int) -> np.ndarray:
-    """EXIT_MA-day average of the close, from bar `start` on (aligned to df.iloc[start:])."""
-    return df["Close"].rolling(EXIT_MA, min_periods=EXIT_MA).mean().to_numpy()[start:]
+    """The exit line from bar `start` on (aligned to df.iloc[start:])."""
+    return exit_line(df["Close"])[start:]
 
 
 def _ret(entry: float, exit_: float) -> dict:
@@ -380,9 +390,9 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
     if sells:
         lines += ["", "<b>Sell at next open</b>"]
         for s in sells:
-            lines.append(f"🔻 <b>{s['symbol']}</b> closed {s['now']:.2f} < {EXIT_MA}-day avg {s['ma']:.2f} · {s['ret']:+.1f}%")
+            lines.append(f"🔻 <b>{s['symbol']}</b> closed {s['now']:.2f} < {EXIT_LABEL} {s['ma']:.2f} · {s['ret']:+.1f}%")
     icon = {"target": "✅", "stop": "🛑", "time": "⏱", "average": "📉"}
-    why = {"target": "target", "stop": "stop-loss", "time": "1 year", "average": f"below {EXIT_MA}-day avg"}
+    why = {"target": "target", "stop": "stop-loss", "time": "1 year", "average": f"below {EXIT_LABEL}"}
     exits = [(s, k) for _, s, k in fresh if k in icon]
     if exits:
         lines += ["", "<b>Closed</b>"]
@@ -547,7 +557,7 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], d: pd.
     L = ["", "## Breakout rule (the live alert rule)", "",
          f"Buy when the price trades above the trigger (the signal candle's high) within "
          f"{bs.entry_window_for('63_30_daily')} sessions ({bs.entry_window_for('Wkly_upswing')} after a weekly signal), "
-         f"filled at the trigger or the open on a gap-up. Sell at the next open after a close below the {EXIT_MA}-day average, "
+         f"filled at the trigger or the open on a gap-up. Sell at the next open after a close below the {EXIT_LABEL}, "
          f"a {STOP_PCT:g}% stop ({', '.join(f'{k} {v:g}%' for k, v in STOP_BY_SCANNER.items())}), or after {RIDE_MAX_HOLD} sessions. "
          f"Wkly_upswing only when daily ATR(14) is under {ATR_MAX_PCT.get('Wkly_upswing', 0):g}% of the close. "
          f"Filter: {', '.join(f'{k} only within {v:g}% of the 52-week high' for k, v in NEAR_HIGH_PCT.items())}. "
@@ -619,21 +629,23 @@ EXIT_RULES = {
     "half8_ma20": "half at +8%, rest on close below 20-day average",
     "lock8_ma20": "after +8%: stop at cost, sell on close below 20-day average",
     "lock8_ma50": "after +8%: stop at cost, sell on close below 50-day average",
-    "bo_ma50": "buy at the breakout, close below 50-day average (now)",
+    "bo_ma50": "buy at the breakout, close below the 30-day EMA (now)",
 }
 BO_ALL = "bo_ma50_all"  # breakout buys of every signal, not only those that later dipped
 
 
 def ride(df: pd.DataFrame, e: int, scanner: str, rule: str, ep: float | None = None) -> dict | None:
     """Exit for a position bought at the open of bar e. Every riding rule keeps
-    the fixed starting stop (12%, 15% Wkly_upswing) and exits after
+    the fixed starting stop (STOP_PCT) and exits after
     EXIT_MAX_HOLD sessions. None while the trade would still be open. `ep`
     overrides the buy price (a breakout buy fills at the trigger on bar e)."""
     o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
     n, ep = len(c), float(o[e]) if ep is None else float(ep)
     stop = ep * (1 - stop_for(scanner) / 100)
     ma = None
-    if rule.startswith(("ma", "half", "lock")):
+    if rule == "live":  # the live exit line (30-day EMA)
+        ma = exit_line(pd.Series(c))
+    elif rule.startswith(("ma", "half", "lock")):
         w = 50 if rule.endswith("ma50") else 20
         ma = pd.Series(c).rolling(w, min_periods=w).mean().to_numpy()
     trail = {"trail10": 0.10, "trail15": 0.15}.get(rule)
@@ -695,7 +707,7 @@ def exit_trades(hits: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> pd.DataF
         bo = None
         if b is not None:
             px = max(op[b], trig)
-            x = ride(df, b, h["scanner_name"], "ma50", ep=px)
+            x = ride(df, b, h["scanner_name"], "live", ep=px)
             if x:
                 bo = {**info, "entry_date": df.index[b], "entry": px, **x}
                 rows.append({**bo, "rule": BO_ALL})
@@ -835,7 +847,7 @@ def performance_section(perf: dict | None) -> list[str]:
     L += ["", "Open positions are counted at cost until sold. The current year is year-to-date."]
     if perf.get("exits"):
         L += ["", "### Exit rules compared (same dip buys)", "",
-              "Every rule keeps the starting stop (12%, 15% for Wkly_upswing); the riding rules sell after a year at the latest. "
+              f"Every rule keeps the starting {STOP_PCT:g}% stop; the riding rules sell after a year at the latest. "
               "Only buys that every rule has closed are counted.", "",
               "| Exit | Trades | Win rate | Avg | Avg win / loss | Avg days | ₹10L became | Per year | Worst fall |",
               "|---|---|---|---|---|---|---|---|---|"]

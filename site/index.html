@@ -173,7 +173,7 @@ const STAGE = {
   breakout: ["BUY", "BUY-STOP"],
 };
 const CHOICE = { 0: "1st choice", 1: "2nd choice", 2: "3rd choice" };
-const SELL = { target: "target", stop: "stop", time: "time limit", average: "below 50-day avg" };
+const SELL = { target: "target", stop: "stop", time: "time limit", average: "below 30-day EMA" };
 const tags = (x) => (x.confirmed_by && x.confirmed_by.length ? ` · <b class="up">⭐ also on ${x.confirmed_by.map(esc).join(", ")}</b>` : "")
   + (x.off_high != null ? ` · ${Math.abs(x.off_high).toFixed(0)}% off 52w high` : "");
 
@@ -215,7 +215,7 @@ function renderPerformance(f) {
       <table class="tight"><tr><th>Sell when</th><th class="n">Won</th><th class="n">Avg</th><th class="n">Held</th><th class="n">Per year</th><th class="n">Worst</th></tr>
       ${f.exits.map((x) => `<tr><td>${esc(x.label)}</td><td class="n">${x.win}%</td><td class="n ${cls(x.avg)}">${pct(x.avg)}</td>
         <td class="n">${x.days}d</td><td class="n ${cls(x.cagr)}">${x.cagr}%</td><td class="n down">${x.max_dd}%</td></tr>`).join("")}</table>
-      <div class="note" style="padding-top:6px">All keep the starting 12% stop (15% Wkly_upswing); riding exits sell after a year at the latest.</div>` : ""}
+      <div class="note" style="padding-top:6px">All keep the starting 15% stop; riding exits sell after a year at the latest.</div>` : ""}
     <div class="note" style="padding-top:8px">${p.taken} trades taken, ${p.skipped} skipped for want of a free slot (${p.win}% of those taken won).
       Open positions counted at cost; this year is year-to-date. Past results, not a promise.</div></section>`;
 }
@@ -352,7 +352,7 @@ function renderToday(d, part) {
   const waiting = Object.fromEntries(z.buy_list.map((b) => [b.symbol, b]));
   const actions = [
     ...sells.map((h) => `<div class="row"><div><div class="sym">🔻 Sell ${esc(h.symbol)}${scanTag(h.scanner)}</div>
-        <div class="meta">At next open · closed below 50-day avg ${money(h.ma)}</div></div>
+        <div class="meta">At next open · closed below 30-day EMA ${money(h.ma)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
     ...stops.map((b) => `<details class="row fs" style="display:block"><summary style="list-style:none;cursor:pointer">
         <div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}${evTag(b.symbol)}</div>
@@ -425,10 +425,10 @@ function renderRule(d) {
   const sec = (t, body) => `<section class="card"><h2>${t}</h2><div class="note" style="font-size:14px;color:var(--text)">${body}</div></section>`;
   return sec("The rule", `
     <b>Buy</b>: when a stock appears on a scanner, place a buy-stop at its <b>trigger</b> (the signal day's high; the week's high for Weekly)
-    for ${r.entry_days} sessions (${r.entry_days_weekly} for Weekly). Filled at the trigger, or at the open on a gap-up.<br><br>
-    <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day average, or at the ${r.stop}% stop (${Object.values(r.stop_by || {})[0] || r.stop}% for Weekly), or after a year.<br><br>
+    for ${r.entry_days} sessions after the signal (${r.entry_days_weekly} for Weekly); if the price hasn't crossed by then, cancel it. Filled at the trigger, or at the open on a gap-up.<br><br>
+    <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day EMA, or at the ${r.stop}% stop-loss, or after a year.<br><br>
     <b>Slots</b>: 15 positions of about 6.7% each, one per stock. If short of slots, mid caps first, then large, then small.<br><br>
-    <b>Filters</b>: Weekly only takes calm stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.<br><br>
+    <b>Filter</b>: 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high. No volatility filter: the entry and exit rules handle it.<br><br>
     Paper trades of ₹1L each; returns are after 0.25% costs. Not advice.`)
   + sec("Scans and alerts", `
     Scans at 10:00, 13:00 and 15:00 IST (within about 15 minutes), Monday to Friday; the header shows the next one.

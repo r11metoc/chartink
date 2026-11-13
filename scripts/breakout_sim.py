@@ -31,8 +31,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-DAILY_ENTRY_WINDOW = 3
-WEEKLY_ENTRY_WINDOW = 5
+DAILY_ENTRY_WINDOW = 10   # sessions a buy-stop stays open after a daily signal (13 Nov 2026; was 3)
+WEEKLY_ENTRY_WINDOW = 20  # after a weekly signal (was 5)
 FORWARD_DAYS = 70          # sessions stored after the signal bar (12 weeks after a late entry)
 COST_PCT = 0.25            # round-trip brokerage + taxes + slippage, in %
 

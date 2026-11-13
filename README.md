@@ -14,14 +14,17 @@ phone app and in Telegram.
 
 - **Trigger** = high of the signal candle (the day's high; the week's high for
   `Wkly_upswing`).
-- **Buy**: buy-stop at the trigger for 3 sessions after the signal (5 for
-  weekly). Filled at the trigger, or at the open on a gap-up.
-- **Sell**: at the next open after a close below the 50-day average; 12% stop
-  (15% weekly); at most 250 sessions.
+- **Buy**: buy-stop at the trigger for 10 sessions after the signal (20 for
+  weekly); cancelled if the price hasn't crossed by then. Filled at the
+  trigger, or at the open on a gap-up.
+- **Sell**: at the next open after a close below the 30-day EMA; 15% stop-loss
+  for every scanner; at most 250 sessions.
 - **Slots**: 15 positions, one per stock. When short of slots: mid caps first,
   then large, then small.
-- **Filters**: `Wkly_upswing` only when ATR(14) < 4% of price; `63_30_daily`
-  only within 10% of the 52-week high.
+- **Filter**: `63_30_daily` only within 10% of the 52-week high. No volatility
+  filter. (Rule changed on 13 Nov 2026 from: 3/5-session buy-stops, 50-day
+  simple average exit, 12% stop (15% weekly), weekly ATR < 4% filter. See
+  `reports/rule_compare.md`.)
 - Returns are after 0.25% round-trip costs.
 
 Backtest Feb 2019 to Nov 2026 (`reports/stock_outcomes.md`): +5.4% a trade,
