@@ -6,6 +6,9 @@ on:
     # scripts/slot_gate.py decides by the actual time: one scan per slot at
     # 10:00, 13:00 and 15:00 IST, Mon-Fri. Every other run stops in seconds.
     - cron: "*/15 * * * *"
+  workflow_run:
+    workflows: ["Weekly retrain (backtest + ML ranker)"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       auto:
@@ -92,7 +95,7 @@ jobs:
 
   scan:
     needs: gate
-    if: (github.event_name != 'schedule' && !inputs.auto) || needs.gate.outputs.slot != ''
+    if: (github.event_name != 'schedule' && github.event_name != 'workflow_run' && inputs.auto != true) || github.event_name == 'workflow_run' || needs.gate.outputs.slot != ''
     # On the job, not the workflow, so the frequent gate runs never queue
     # behind (or cancel) a real scan.
     concurrency:
