@@ -1,6 +1,6 @@
 # Scanner signal model report
 
-Generated 2026-11-08 13:05 UTC by `scripts/signal_model.py train`.
+Generated 2026-11-13 11:24 UTC by `scripts/signal_model.py train`.
 
 ## The rule being tested
 
@@ -14,18 +14,18 @@ Generated 2026-11-08 13:05 UTC by `scripts/signal_model.py train`.
 
 | Scanner | Hits | With prices | Triggered & closed | Not triggered | Still open / pending |
 |---|---|---|---|---|---|
-| 63_30_daily | 2048 | 2036 | 1589 | 444 | 3 |
-| Bullish_Scanner | 5747 | 5701 | 4716 | 965 | 20 |
-| Wkly_upswing | 616 | 616 | 412 | 200 | 4 |
+| 63_30_daily | 2061 | 2048 | 1592 | 444 | 12 |
+| Bullish_Scanner | 5771 | 5719 | 4719 | 966 | 34 |
+| Wkly_upswing | 621 | 621 | 412 | 200 | 9 |
 
 ## 1. Does buying every trigger make money?
 
 | Group | Trades | Win rate | Avg return | Avg win / loss | Profit factor | Avg R | Avg hold (d) | t-stat | vs index |
 |---|---|---|---|---|---|---|---|---|---|
-| 63_30_daily | 1589 | 34% | -0.21% | +6.76% / -3.80% | 0.92 | -0.02 | 4.7 | -1.5 | -0.59% (t -4.5) |
-| Bullish_Scanner | 4716 | 42% | +0.68% | +7.72% / -4.44% | 1.26 | +0.18 | 6.8 | +6.8 | +0.16% (t +1.7) |
+| 63_30_daily | 1592 | 34% | -0.21% | +6.76% / -3.80% | 0.92 | -0.02 | 4.7 | -1.5 | -0.60% (t -4.6) |
+| Bullish_Scanner | 4719 | 42% | +0.68% | +7.72% / -4.44% | 1.26 | +0.18 | 6.9 | +6.8 | +0.16% (t +1.7) |
 | Wkly_upswing | 412 | 41% | +0.17% | +10.75% / -7.19% | 1.04 | +0.06 | 10.5 | +0.3 | -0.26% (t -0.6) |
-| **All scanners** | 6717 | 40% | +0.44% | +7.72% / -4.44% | 1.16 | +0.12 | 6.6 | +5.3 | -0.04% (t -0.5) |
+| **All scanners** | 6723 | 40% | +0.44% | +7.72% / -4.44% | 1.16 | +0.12 | 6.6 | +5.3 | -0.04% (t -0.6) |
 
 t-stat: average return divided by its standard error; below ~2 the average could easily be noise. **vs index**: average return minus what the Nifty 500 did over the same days. A scanner that only matches the index adds nothing over buying an index fund.
 
@@ -33,11 +33,11 @@ t-stat: average return divided by its standard error; below ~2 the average could
 
 | Group | Trades | Win rate | Avg return | Avg win / loss | Profit factor | Avg R | Avg hold (d) | t-stat | vs index |
 |---|---|---|---|---|---|---|---|---|---|
-| 63_30_daily · Largecap | 773 | 33% | -0.40% | +5.42% / -3.32% | 0.82 | -0.04 | 5.2 | -2.5 | -0.83% (t -5.5) |
-| 63_30_daily · Midcap | 423 | 33% | -0.12% | +7.85% / -4.06% | 0.96 | -0.04 | 4.1 | -0.4 | -0.36% (t -1.3) |
+| 63_30_daily · Largecap | 775 | 33% | -0.41% | +5.42% / -3.32% | 0.81 | -0.05 | 5.2 | -2.6 | -0.85% (t -5.5) |
+| 63_30_daily · Midcap | 424 | 33% | -0.13% | +7.85% / -4.06% | 0.95 | -0.04 | 4.1 | -0.4 | -0.36% (t -1.3) |
 | 63_30_daily · Smallcap | 392 | 36% | +0.10% | +8.13% / -4.50% | 1.04 | +0.04 | 4.4 | +0.3 | -0.36% (t -1.1) |
-| Bullish_Scanner · Largecap | 2398 | 42% | +0.44% | +6.26% / -3.72% | 1.20 | +0.16 | 7.2 | +3.9 | -0.08% (t -0.8) |
-| Bullish_Scanner · Midcap | 1226 | 43% | +0.82% | +8.43% / -4.97% | 1.29 | +0.19 | 6.8 | +3.9 | +0.37% (t +1.8) |
+| Bullish_Scanner · Largecap | 2399 | 42% | +0.44% | +6.25% / -3.72% | 1.20 | +0.16 | 7.2 | +3.9 | -0.09% (t -0.9) |
+| Bullish_Scanner · Midcap | 1228 | 43% | +0.85% | +8.45% / -4.97% | 1.30 | +0.19 | 6.9 | +4.0 | +0.38% (t +1.8) |
 | Bullish_Scanner · Smallcap | 1089 | 42% | +1.00% | +10.09% / -5.45% | 1.31 | +0.20 | 6.1 | +3.9 | +0.45% (t +1.8) |
 | Wkly_upswing · Largecap | 163 | 52% | +1.76% | +9.27% / -6.22% | 1.59 | +0.26 | 13.8 | +2.5 | +1.05% (t +1.5) |
 | Wkly_upswing · Midcap | 89 | 40% | +0.16% | +11.12% / -7.29% | 1.04 | +0.06 | 10.0 | +0.2 | -0.11% (t -0.1) |
@@ -47,10 +47,10 @@ t-stat: average return divided by its standard error; below ~2 the average could
 
 | Group | Trades | Win rate | Avg return | Avg win / loss | Profit factor | Avg R | Avg hold (d) | t-stat | vs index |
 |---|---|---|---|---|---|---|---|---|---|
-| 63_30_daily · Nifty above 50DMA | 1376 | 33% | -0.34% | +6.62% / -3.77% | 0.86 | -0.05 | 4.6 | -2.4 | -0.72% (t -5.2) |
+| 63_30_daily · Nifty above 50DMA | 1379 | 33% | -0.35% | +6.62% / -3.77% | 0.86 | -0.05 | 4.6 | -2.4 | -0.72% (t -5.2) |
 | 63_30_daily · Nifty below 50DMA | 213 | 41% | +0.67% | +7.51% / -4.05% | 1.28 | +0.16 | 5.2 | +1.6 | +0.18% (t +0.4) |
-| Bullish_Scanner · Nifty above 50DMA | 4032 | 42% | +0.68% | +7.68% / -4.44% | 1.27 | +0.19 | 6.8 | +6.4 | +0.18% (t +1.8) |
-| Bullish_Scanner · Nifty below 50DMA | 684 | 41% | +0.66% | +8.00% / -4.46% | 1.25 | +0.12 | 7.2 | +2.5 | +0.04% (t +0.2) |
+| Bullish_Scanner · Nifty above 50DMA | 4033 | 42% | +0.68% | +7.67% / -4.44% | 1.26 | +0.19 | 6.8 | +6.3 | +0.18% (t +1.8) |
+| Bullish_Scanner · Nifty below 50DMA | 686 | 41% | +0.70% | +8.05% / -4.46% | 1.27 | +0.13 | 7.2 | +2.6 | +0.06% (t +0.2) |
 | Wkly_upswing · Nifty above 50DMA | 338 | 43% | +0.47% | +10.86% / -7.24% | 1.11 | +0.09 | 10.5 | +0.9 | -0.07% (t -0.1) |
 | Wkly_upswing · Nifty below 50DMA | 74 | 34% | -1.20% | +10.13% / -6.98% | 0.74 | -0.10 | 10.9 | -1.1 | -1.14% (t -1.1) |
 
@@ -68,27 +68,27 @@ Fixed set of alternatives, not optimized. Cells: trades · avg return · vs inde
 
 | Exit rule | 63_30_daily | Bullish_Scanner | Wkly_upswing |
 |---|---|---|---|
-| Candle-low stop, 2R target, 20d | 1589 · -0.21% · -0.59% (t -4.5) | 4716 · +0.68% · +0.16% (t +1.7) | 412 · +0.17% · -0.26% (t -0.6) |
-| Candle-low stop, no target, 20d | 1589 · +0.50% · -0.23% (t -1.1) | 4706 · +1.37% · +0.58% (t +4.1) | 412 · +1.10% · +0.44% (t +0.7) |
-| Wide stop (≤15%), no target, 20d | 1589 · +0.52% · -0.23% (t -1.0) | 4706 · +1.41% · +0.60% (t +4.2) | 412 · +1.23% · +0.56% (t +0.8) |
-| No stop, exit after 10d | 1588 · +1.27% · +0.47% (t +2.2) | 4708 · +1.83% · +1.05% (t +8.1) | 413 · +0.69% · +0.16% (t +0.3) |
-| No stop, exit after 20d | 1586 · +2.39% · +0.95% (t +3.2) | 4701 · +3.09% · +1.64% (t +9.7) | 409 · +1.62% · +0.81% (t +1.1) |
+| Candle-low stop, 2R target, 20d | 1592 · -0.21% · -0.60% (t -4.6) | 4719 · +0.68% · +0.16% (t +1.7) | 412 · +0.17% · -0.26% (t -0.6) |
+| Candle-low stop, no target, 20d | 1592 · +0.49% · -0.24% (t -1.1) | 4707 · +1.37% · +0.58% (t +4.1) | 412 · +1.10% · +0.44% (t +0.7) |
+| Wide stop (≤15%), no target, 20d | 1592 · +0.51% · -0.23% (t -1.1) | 4707 · +1.41% · +0.60% (t +4.2) | 412 · +1.23% · +0.56% (t +0.8) |
+| No stop, exit after 10d | 1588 · +1.27% · +0.47% (t +2.2) | 4710 · +1.84% · +1.05% (t +8.1) | 413 · +0.69% · +0.16% (t +0.3) |
+| No stop, exit after 20d | 1586 · +2.39% · +0.95% (t +3.2) | 4702 · +3.09% · +1.63% (t +9.7) | 411 · +1.57% · +0.71% (t +0.9) |
 
 ## 2. Model: which triggers to take
 
-Model: `logreg` predicting P(trade ends in profit) from price/volume features at the signal candle, market regime, repeat/confluence counts, scanner and market-cap tier. Validated **walk-forward**: each month is scored by a model trained only on trades that had closed before that month, so these are honest out-of-sample numbers (6538 scored trades from Jun 2019).
+Model: `logreg` predicting P(trade ends in profit) from price/volume features at the signal candle, market regime, repeat/confluence counts, scanner and market-cap tier. Validated **walk-forward**: each month is scored by a model trained only on trades that had closed before that month, so these are honest out-of-sample numbers (6544 scored trades from Jun 2019).
 
-- Walk-forward ROC-AUC: logistic regression 0.56, gradient boosting 0.55 (0.50 = coin flip; the filter is only switched on at ≥ 0.55).
+- Walk-forward ROC-AUC: logistic regression 0.55, gradient boosting 0.55 (0.50 = coin flip; the filter is only switched on at ≥ 0.55).
 - **Validated.** BUY threshold: P(profit) ≥ 0.300
 
 | Group | Trades | Win rate | Avg return | Avg win / loss | Profit factor | Avg R | Avg hold (d) | t-stat | vs index |
 |---|---|---|---|---|---|---|---|---|---|
-| All scored trades (no filter) | 6538 | 40% | +0.47% | +7.76% / -4.45% | 1.18 | +0.13 | 6.5 | +5.6 | -0.01% (t -0.1) |
-| Model says BUY | 5345 | 42% | +0.67% | +7.90% / -4.57% | 1.25 | +0.17 | 6.8 | +7.0 | +0.20% (t +2.2) |
-| Model says SKIP | 1193 | 32% | -0.46% | +6.93% / -3.98% | 0.83 | -0.07 | 5.1 | -2.8 | -0.93% (t -6.0) |
-| 63_30_daily · BUY | 1126 | 35% | -0.07% | +6.88% / -3.89% | 0.97 | +0.01 | 4.9 | -0.4 | -0.40% (t -2.5) |
-| 63_30_daily · SKIP | 443 | 32% | -0.43% | +6.42% / -3.63% | 0.83 | -0.06 | 4.3 | -1.8 | -0.96% (t -4.1) |
-| Bullish_Scanner · BUY | 3924 | 44% | +0.91% | +7.94% / -4.59% | 1.36 | +0.23 | 7.1 | +8.1 | +0.39% (t +3.6) |
+| All scored trades (no filter) | 6544 | 40% | +0.47% | +7.76% / -4.45% | 1.18 | +0.13 | 6.5 | +5.6 | -0.01% (t -0.1) |
+| Model says BUY | 5350 | 42% | +0.67% | +7.90% / -4.57% | 1.25 | +0.17 | 6.8 | +7.0 | +0.20% (t +2.1) |
+| Model says SKIP | 1194 | 32% | -0.46% | +6.93% / -3.98% | 0.83 | -0.07 | 5.1 | -2.8 | -0.93% (t -6.0) |
+| 63_30_daily · BUY | 1128 | 35% | -0.08% | +6.88% / -3.89% | 0.97 | +0.01 | 4.9 | -0.5 | -0.41% (t -2.5) |
+| 63_30_daily · SKIP | 444 | 32% | -0.44% | +6.42% / -3.62% | 0.82 | -0.06 | 4.3 | -1.8 | -0.97% (t -4.1) |
+| Bullish_Scanner · BUY | 3927 | 44% | +0.92% | +7.94% / -4.59% | 1.36 | +0.23 | 7.1 | +8.1 | +0.39% (t +3.6) |
 | Bullish_Scanner · SKIP | 685 | 32% | -0.58% | +6.50% / -3.88% | 0.78 | -0.10 | 5.3 | -2.9 | -0.99% (t -5.2) |
 | Wkly_upswing · BUY | 295 | 42% | +0.32% | +10.61% / -7.25% | 1.08 | +0.08 | 10.9 | +0.6 | -0.11% (t -0.2) |
 | Wkly_upswing · SKIP | 65 | 40% | +0.60% | +13.31% / -7.87% | 1.13 | +0.11 | 8.1 | +0.4 | -0.13% (t -0.1) |
@@ -97,11 +97,11 @@ Model: `logreg` predicting P(trade ends in profit) from price/volume features at
 
 | Quintile | P(profit) range | Trades | Win rate | Avg return |
 |---|---|---|---|---|
-| Q1 | 0.00–0.31 | 1308 | 33% | -0.38% |
-| Q2 | 0.31–0.36 | 1307 | 38% | +0.13% |
-| Q3 | 0.36–0.41 | 1308 | 42% | +0.50% |
-| Q4 | 0.41–0.48 | 1307 | 41% | +0.46% |
-| Q5 | 0.48–0.99 | 1308 | 48% | +1.63% |
+| Q1 | 0.00–0.31 | 1309 | 33% | -0.39% |
+| Q2 | 0.31–0.36 | 1309 | 38% | +0.13% |
+| Q3 | 0.36–0.41 | 1308 | 42% | +0.51% |
+| Q4 | 0.41–0.48 | 1309 | 41% | +0.47% |
+| Q5 | 0.48–0.99 | 1309 | 48% | +1.60% |
 
 Returns should rise steadily from Q1 to Q5 if the model has found something real. When validated, the threshold is picked on these same predictions, so the BUY row is slightly optimistic; the quintiles are the fairer check.
 
