@@ -1,6 +1,6 @@
 # ML signal ranker
 
-Trained 2026-11-13 on 6,516 closed trades (2017-09-18 to 2026-11-06) by `scripts/ranker.py`.
+Trained 2026-11-14 on 6,516 closed trades (2017-09-18 to 2026-11-06) by `scripts/ranker.py`.
 
 **Status: ON**: it decides which signals get a free slot first.
 
