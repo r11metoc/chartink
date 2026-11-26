@@ -2,7 +2,7 @@
 
 The bot pushes only today's actions on its own. Everything else is on request:
 
-  /today         what to do now (sells, buy-stops to place, recent buys)
+  /today         what to do now (sells, buys at the next open, recent buys)
   /holdings      open positions with P&L, plus booked P&L
   /scanners      every stock on each scanner in the latest scan
   /breakouts     recent scanner entries and sector focus (last 30 days)
@@ -93,7 +93,7 @@ def today_msg() -> str:
         lines.append(f"🔻 Sell <b>{h['symbol']}</b> at next open · {h['ret']:+.1f}%")
     for b in stops:
         ml = f" · ML {b['ml']}" if b.get("ml") is not None else ""
-        lines.append(f"🟡 <b>{b['symbol']}</b> above {_m(b['level'])} · SL {_m(b['stop'])} · signal {_dt(b['signal'])}{ml}")
+        lines.append(f"🟡 Buy <b>{b['symbol']}</b> at next open · last {_m(b['level'])} · SL 15% below the buy · signal {_dt(b['signal'])}{ml}")
     for h in bought:
         lines.append(f"🟢 Bought <b>{h['symbol']}</b> {_m(h['entry'])} on {_dt(h['entry_date'])} · SL {_m(h['stop'])}")
     if len(lines) == 1:

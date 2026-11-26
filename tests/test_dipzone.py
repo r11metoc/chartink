@@ -16,7 +16,7 @@ def frame(rows):
     return pd.DataFrame(rows, columns=["Open", "High", "Low", "Close"], index=idx)
 
 
-BUY = (99, 101, 98, 100.5)  # first bar after the signal crosses the 100 trigger: bought at 100
+BUY = (100, 101, 98, 100.5)  # first bar after the signal: bought at its open, 100
 
 
 def _bo(rows, scanner="63_30_daily", ma=50.0):
@@ -36,7 +36,7 @@ def test_alerts_only_once():
     s = {"scanner": "63_30_daily", "symbol": "AAA", "date": "2026-01-08", "status": "waiting for breakout",
          "trigger": 100.0, "ml": 80}
     first = dz.new_events(conn, [s], now)
-    assert [k for _, _, k in first] == ["setup"] and "Place buy-stop" in dz.format_alerts(first)
+    assert [k for _, _, k in first] == ["setup"] and "Buy at the next open" in dz.format_alerts(first)
     assert "ML 80" in dz.format_alerts(first)
     assert dz.new_events(conn, [s], now) == []
 
@@ -48,7 +48,7 @@ def test_52_week_high_filter():
     dist = dz.dist_52w_high(df, 259)               # peak 259 sessions back: just outside 252
     assert dist == round((100 / 110 - 1) * 100, 2)
     assert dz.passes_filter("63_30_daily", dist)               # 9% off -> kept
-    assert not dz.passes_filter("63_30_daily", dz.dist_52w_high(df, 200))   # 50% off the 200 peak
+    assert dz.passes_filter("63_30_daily", dz.dist_52w_high(df, 200))   # near-high filter dropped 27 Nov 2026
     assert dz.passes_filter("Bullish_Scanner", -50.0)          # no filter on other scanners
     assert dz.passes_filter("63_30_daily", None)               # not enough history: keep
     assert dz.dist_52w_high(df, 50) is None
@@ -65,7 +65,7 @@ def test_same_stop_for_all_and_weekly_volatility_filter():
     assert dz.stop_for("Wkly_upswing") == dz.stop_for("63_30_daily") == 15.0
     assert not dz.passes_filter("Wkly_upswing", -2.0, 5.5) and dz.passes_filter("Wkly_upswing", -2.0, 3.0)
     assert dz.passes_filter("Bullish_Scanner", None, 9.0)
-    assert not dz.passes_filter("63_30_daily", -12.0, 1.0)
+    assert dz.passes_filter("63_30_daily", -12.0, 1.0)        # no near-high filter since 27 Nov 2026
     rows = [BUY, (100, 100, 86, 87)]   # bought 100; 12% would stop, 15% (85) not
     assert _bo(rows, "Wkly_upswing")["status"] == "holding"
 
@@ -93,19 +93,20 @@ def test_live_rule_sell_signal_on_last_close():
 
 def test_breakout_buy_fills_at_trigger_then_rides():
     import numpy as np
-    rows = [(99, 101, 98, 100.5), (101, 106, 100, 105), (105, 110, 104, 109),   # crosses 100 on day 1
+    rows = [(99, 101, 98, 100.5), (101, 106, 100, 105), (105, 110, 104, 109),   # bought at the first open, 99
             (109, 109, 103, 104), (104, 104, 102, 103)]                        # closes below 105 -> sell next open
     s = dz.simulate_breakout(frame(rows), 100.0, "Bullish_Scanner", np.full(len(rows), 105.0))
-    assert s["entry"] == 100.0 and s["entry_date"] == frame(rows).index[0]
+    assert s["entry"] == 99.0 and s["entry_date"] == frame(rows).index[0]
     assert s["status"] == "average" and s["exit"] == 104
 
 
-def test_breakout_gap_up_fills_at_open_and_waits_otherwise():
+def test_buys_at_next_open_whatever_the_trigger():
     import numpy as np
-    s = dz.simulate_breakout(frame([(103, 104, 102, 103.5)]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
-    assert s["entry"] == 103 and s["gap"] and s["status"] == "holding"
-    w = dz.simulate_breakout(frame([(98, 99, 97, 98)]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
-    assert w["status"] == "waiting for breakout" and w["sessions_left"] == 2   # 3-session buy-stop
+    for bar in [(103, 104, 102, 103.5), (98, 99, 97, 98)]:   # above or below the 100 trigger
+        s = dz.simulate_breakout(frame([bar]), 100.0, "Bullish_Scanner", np.full(1, 90.0))
+        assert s["entry"] == bar[0] and s["status"] == "holding"
+    w = dz.simulate_breakout(frame([])[["Open", "High", "Low", "Close"]], 100.0, "Bullish_Scanner", np.full(0, 90.0))
+    assert w["status"] == "waiting for breakout" and w["sessions_left"] == 1   # buy at the next open
 
 
 def test_apply_slots_limits_and_prefers_midcaps():
@@ -152,3 +153,17 @@ def test_no_slot_stock_can_be_bought_on_a_later_signal():
     b2 = st("B", "2026-11-05", "2026-11-06")                        # later signal: slot free again
     out = dz.apply_slots([a, b1, b2], slots=1)
     assert [x["status"] for x in out] == ["stop", "no slot", "holding"]
+
+
+def test_time_out_sells_slow_trade_after_15_sessions():
+    import numpy as np
+    rows = [(100, 101, 99, 100)] + [(100, 101.5, 99.5, 101)] * 15 + [(100.5, 101, 100, 100.5)] * 2
+    s = dz.simulate_breakout(frame(rows), 100.0, "Bullish_Scanner", np.full(len(rows), 90.0))
+    assert s["status"] == "slow" and s["exit"] == 100.5 and s["exit_date"] == frame(rows).index[16]
+
+
+def test_time_out_keeps_trade_up_3pct():
+    import numpy as np
+    rows = [(100, 101, 99, 100)] + [(104, 105, 103.5, 104)] * 20
+    s = dz.simulate_breakout(frame(rows), 100.0, "Bullish_Scanner", np.full(len(rows), 90.0))
+    assert s["status"] == "holding"

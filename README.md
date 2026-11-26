@@ -12,18 +12,29 @@ phone app and in Telegram.
 
 ## The rule
 
-- **Trigger** = high of the signal candle (the day's high; the week's high for
-  `Wkly_upswing`).
-- **Buy**: buy-stop at the trigger for 3 sessions after the signal (5 for
-  weekly); cancelled if the price hasn't crossed by then. Filled at the
-  trigger, or at the open on a gap-up.
-- **Sell**: at the next open after a close below the 30-day EMA; 15% stop-loss
-  for every scanner; at most 250 sessions.
+- **Buy** at the next open after the signal candle closes (Monday's open after a
+  `Wkly_upswing` week). Since 15 Nov 2026; before that a buy-stop at the signal
+  candle's high for 3 sessions (5 weekly). Rule lab (`scripts/rule_lab.py`,
+  `reports/rule_lab_backtest.md`; 4 buy x 8 sell rules, ₹10L, 15 shared slots,
+  2019-26): next open + 30-day EMA exit 31.0% a year, worst fall −9.5%, vs
+  24.5% / −9.4% for the buy-stop; better in 2019-22 (36.2% vs 28.7%) and
+  2023-26 (26.0% vs 20.5%). +5% target with a 15% stop won 80% of trades
+  (32.6% a year) but fell −15.1% and was weaker in 2019-22.
+- **Sell**: at the next open after a close below the 30-day EMA; **time-out**:
+  at the next open if the close 15 sessions after the buy is not at least +3%
+  (since 27 Nov 2026); 15% stop-loss for every scanner; at most 250 sessions.
+  Rule lab 2019-26 with the 27 Nov exports (Bullish_Scanner + 63_30_daily with
+  the 4-7% day-gain rule + Wkly_upswing, ₹10L, 15 slots): 27.3% a year, worst
+  fall −10.5%, 46% won, vs 25.6% / −10.8% / 41% without the time-out; better in
+  both 2019-22 (27.4% vs 25.3%) and 2023-26 (27.3% vs 26.0%).
 - **Slots**: 15 positions, one per stock. When short of slots on a day: the
   **ML ranker**'s order while it passes its walk-forward test (below), else mid
   caps first, then large, then small.
-- **Filters**: `Wkly_upswing` only when ATR(14) < 4% of price; `63_30_daily`
-  only within 10% of the 52-week high.
+- **Filters**: `Wkly_upswing` only when ATR(14) < 4% of price. (The
+  `63_30_daily` 10%-of-the-52-week-high filter was dropped on 27 Nov 2026.)
+- **Backtest files** (`data/backtest/`, 27 Nov 2026): the user's Chartink exports
+  with the weekly/monthly look-ahead removed (`honest_filter2.py`,
+  `honest_monthly_high.py 0.85`).
 - Changed on 13 Nov 2026 from a 50-day simple average exit and a 12% stop (15%
   weekly): better in both 2019-22 and 2023-26 with a smaller worst fall
   (2019-26, ₹10L, 15 slots: 26.9% a year and −9.2% worst fall vs 24.3% and
@@ -64,8 +75,7 @@ are likelier to work. It never adds or skips a trade; it only orders them.
 
 ## The app
 
-**Today**: the holding count and P&L, **To do** (sells at the next open and the
-buy-stops to place; tap a buy-stop for its fundamentals) and **On the scanners
+**Today**: the holding count and P&L, **To do** (sells and buys at the next open; tap a buy-stop for its fundamentals) and **On the scanners
 now** (every stock in the latest scan and what the rule did with it).
 
 **More** (swipe left/right between pages on a phone):

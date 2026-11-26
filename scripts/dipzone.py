@@ -1,15 +1,16 @@
-"""Live rule: buy at the breakout above the trigger, ride the trend.
+"""Live rule: buy at the next open after the signal, ride the trend.
 
-For every signal (the scanner's trigger = the signal candle's high, the
-week's high for Wkly_upswing):
-1. buy-stop : from the next session, buy when the price trades above the
-              trigger, within 3 sessions (5 after a weekly signal). Filled at
-              the trigger, or at the open on a gap-up.
-2. exit     : sell at the next open after a close below the 30-day EMA,
-              a 15% stop below the buy price, or after 250
-              sessions (~1 year).
-Backtest 2021-26, same signals: +5.8% a trade and 46% wins vs +4.2% / 41%
-for waiting for a pullback, worst portfolio fall -10% vs -18%.
+For every signal (the signal candle = the scanner's day; the whole week for
+Wkly_upswing):
+1. buy  : at the open of the next session after the signal candle closes
+          (Monday's open after a weekly signal). Changed 15 Nov 2026 from a
+          buy-stop at the candle's high for 3 sessions (5 weekly): rule lab
+          (reports/rule_lab_backtest.md, ₹10L, 15 shared slots, 2019-26)
+          31.0% a year vs 24.5%, worst fall -9.5% vs -9.4%, better in both
+          2019-22 (36.2% vs 28.7%) and 2023-26 (26.0% vs 20.5%).
+2. exit : sell at the next open after a close below the 30-day EMA,
+          a 15% stop below the buy price, or after 250 sessions (~1 year).
+The trigger (the candle's high) is kept for display only.
 Filters: Wkly_upswing only when daily ATR(14) < 4% of the close;
 63_30_daily only within 10% of the 52-week high. Signals another scanner
 also flagged in the 10 days before are tagged "confirmed".
@@ -42,8 +43,18 @@ ATR_MAX_PCT = {"Wkly_upswing": 4.0}       # daily ATR(14) under 4% of the close
 EXIT_MA = 30          # live exit: sell at the next open after a close below this daily EMA
 EXIT_LABEL = f"{EXIT_MA}-day EMA"
 RIDE_MAX_HOLD = 250   # sessions (~1 year) before a riding position is sold anyway
-CLOSED = ("target", "stop", "time", "average")
-NEAR_HIGH_PCT = {"63_30_daily": 10.0}  # only take signals within this % of the 52-week high
+# 27 Nov 2026: time-out added. Sell at the next open if, 15 sessions after the
+# buy, the close is not at least +3% above the buy price. Backtest 2019-26
+# (Bullish_Scanner_ + 63_30_daily_ + Wkly_upswing, rule_lab): 27.3% a year,
+# worst fall -10.5%, 46% won, vs 25.6% / -10.8% / 41% without; better in both
+# 2019-22 (27.4% vs 25.3%) and 2023-26 (27.3% vs 26.0%).
+SLOW_DAYS = 15
+SLOW_MIN_PCT = 3.0
+CLOSED = ("target", "stop", "time", "average", "slow")
+# 27 Nov 2026: the 63_30_daily near-high filter is dropped. The scan now has its
+# own rules (monthly close >= 0.85 x prior 63-month high, day gain 4-7%), and its
+# signals 10-20% below the 52-week high did best (46% won, +8.3%/trade).
+NEAR_HIGH_PCT: dict[str, float] = {}  # scanner -> only take signals within this % of the 52-week high
 CONFIRM_DAYS = 10     # another scanner within this many days before = confirmed
 HISTORY_DAYS = 400    # calendar days of prices needed for the 52-week high
 START = "2026-09-25"  # live signals from this date are tracked
@@ -125,24 +136,21 @@ def skip_reason(scanner: str, dist: float | None, atr: float | None) -> str:
 
 
 def simulate_breakout(fwd: pd.DataFrame, trigger: float, scanner: str, ma: np.ndarray) -> dict:
-    """The live rule over the daily bars after the signal bar: buy when the
-    price trades above the trigger within the entry window (filled at the
-    trigger, or the open on a gap-up), then ride until a close below the
-    EXIT_MA-day average (`ma` aligned to `fwd`)."""
+    """The live rule over the daily bars after the signal bar: buy at the
+    first open, then ride until a close below the EXIT_MA-day average (`ma`
+    aligned to `fwd`). Status 'waiting for breakout' = the buy at the next
+    open is still to come (name kept for compatibility)."""
     o, h, l, c = (fwd[k].to_numpy(dtype=float) for k in ("Open", "High", "Low", "Close"))
     dates = fwd.index
-    n = len(c)
-    window = bs.entry_window_for(scanner)
-    out = {"trigger": trigger, "mode": "breakout"}
-    b = next((i for i in range(min(window, n)) if h[i] > trigger), None)
-    if b is None:
-        out["status"] = "waiting for breakout" if n < window else "no breakout"
-        out["sessions_left"] = max(window - n, 0)
+    out = {"trigger": trigger, "mode": "open"}
+    if len(c) == 0:
+        out["status"] = "waiting for breakout"
+        out["sessions_left"] = 1
         return out
-    ep = max(float(o[b]), float(trigger))
+    ep = float(o[0])
     stp = ep * (1 - stop_for(scanner) / 100)
-    out.update(breakout_date=dates[b], entry_date=dates[b], entry=ep, stop=stp, target=None, gap=bool(o[b] > trigger))
-    return _ride_ma(out, o, l, c, dates, b, ep, stp, ma)
+    out.update(breakout_date=dates[0], entry_date=dates[0], entry=ep, stop=stp, target=None, gap=False)
+    return _ride_ma(out, o, l, c, dates, 0, ep, stp, ma)
 
 
 def _ride_ma(out, o, l, c, dates, e, ep, stp, ma) -> dict:
@@ -154,12 +162,15 @@ def _ride_ma(out, o, l, c, dates, e, ep, stp, ma) -> dict:
             return {**out, "status": "stop", "exit_date": dates[i], "exit": float(o[i])} | _ret(ep, o[i])
         if l[i] <= stp:
             return {**out, "status": "stop", "exit_date": dates[i], "exit": stp} | _ret(ep, stp)
-        if i > e and not np.isnan(ma[i]) and c[i] < ma[i]:
+        below = i > e and not np.isnan(ma[i]) and c[i] < ma[i]
+        slow = not below and i - e == SLOW_DAYS and c[i] < ep * (1 + SLOW_MIN_PCT / 100)
+        if below or slow:
+            st = "average" if below else "slow"
             if i + 1 <= n - 1:
-                return {**out, "status": "average", "exit_date": dates[i + 1], "exit": float(o[i + 1]),
-                        "signal_date": dates[i], "ma": float(ma[i])} | _ret(ep, o[i + 1])
-            return {**out, "status": "holding", "sell_signal": dates[i], "now": float(c[i]), "ma": float(ma[i]),
-                    "sessions_left": 1} | _ret(ep, c[i])
+                return {**out, "status": st, "exit_date": dates[i + 1], "exit": float(o[i + 1]),
+                        "signal_date": dates[i], "ma": float(ma[i]) if not np.isnan(ma[i]) else None} | _ret(ep, o[i + 1])
+            return {**out, "status": "holding", "sell_signal": dates[i], "sell_why": st, "now": float(c[i]),
+                    "ma": float(ma[i]) if not np.isnan(ma[i]) else None, "sessions_left": 1} | _ret(ep, c[i])
     if e + RIDE_MAX_HOLD <= n - 1:
         return {**out, "status": "time", "exit_date": dates[last], "exit": float(c[last])} | _ret(ep, c[last])
     return {**out, "status": "holding", "now": float(c[-1]), "ma": float(ma[n - 1]) if not np.isnan(ma[n - 1]) else None,
@@ -204,7 +215,7 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
     nifty = paper._frame(conn, "^NSEI", lookback)
     model = _ranker()
     out = []
-    # One open buy-stop per scanner + stock. Holdings don't block a new signal
+    # One pending buy per scanner + stock. Holdings don't block a new signal
     # here: apply_slots() decides (one position per stock, 15 slots), as in the
     # backtest, so a stock that got no slot can be bought on a later signal.
     active: set[tuple[str, str]] = set()
@@ -212,11 +223,12 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
         t = pd.Timestamp(day)
         if (scanner, symbol) in active:
             out.append({"scanner": scanner, "symbol": symbol, "date": day, "source": source,
-                        "status": "duplicate", "why": "a buy-stop from an earlier signal is still open"})
+                        "status": "duplicate", "why": "a buy from an earlier signal is still pending"})
             continue
         others = sorted({sc for d0, sc in seen.get(symbol, [])
                          if sc != scanner and t - pd.Timedelta(days=CONFIRM_DAYS) <= d0 <= t})
-        df = _completed(paper._frame(conn, symbol, lookback), now)
+        raw = paper._frame(conn, symbol, lookback)
+        df = _completed(raw, now)
         hit = pd.Timestamp(day)
         if not bs.is_weekly(scanner) and not df.empty and hit not in df.index and df.index[-1] > hit:
             earlier = df.index[df.index <= hit]
@@ -238,9 +250,12 @@ def live_states(conn, now: datetime | None = None) -> list[dict]:
                         "why": skip_reason(scanner, base["dist_52w_high"], base["atr_pct"])})
             continue
         st = live_sim(df, sig, scanner)
+        if st["status"] == "waiting for breakout" and len(raw) > len(df):
+            # today's session has opened: the buy at its open has happened
+            df = raw
+            st = live_sim(df, sig, scanner)
         if st["status"] == "waiting for breakout":
-            st["valid_until"] = df.index[sig["end_pos"]] + pd.offsets.BDay(bs.entry_window_for(scanner))
-        if st["status"] == "waiting for breakout":
+            st["valid_until"] = df.index[sig["end_pos"]] + pd.offsets.BDay(1)
             active.add((scanner, symbol))
         if "entry_date" in st:
             st["path"] = trade_path(df, sig["end_pos"], st.get("exit_date"))
@@ -262,7 +277,7 @@ def apply_slots(states: list[dict], slots: int | None = None) -> list[dict]:
     """Trade the paper portfolio like the backtest: at most PF_MAX_POS open
     positions, one per stock, and on a day with more buys than free slots,
     mid caps first, then large, then small. Buys that don't fit become
-    'no slot' (the buy-stop alert still went out; the paper book skips it).
+    'no slot' (the buy alert still went out; the paper book skips it).
     Same-day order: slot_order (ML rank when switched on, else market cap)."""
     slots = slots or PF_MAX_POS
     bought = sorted((s for s in states if "entry_date" in s),
@@ -279,7 +294,7 @@ def apply_slots(states: list[dict], slots: int | None = None) -> list[dict]:
             open_.append(s)
             continue
         for k in ("entry_date", "entry", "stop", "target", "exit_date", "exit", "ret", "now", "ma",
-                  "sell_signal", "sessions_left", "signal_date", "gap", "path"):
+                  "sell_signal", "sell_why", "sessions_left", "signal_date", "gap", "path"):
             s.pop(k, None)
         s["status"], s["why"] = "no slot", why
     return states
@@ -316,7 +331,8 @@ def events(states: list[dict], now: datetime) -> list[tuple[str, dict, str]]:
     ev = []
     held = {s["symbol"] for s in states if s.get("status") == "holding"}
     for s in states:
-        if s.get("status") == "waiting for breakout" and s["symbol"] not in held:
+        if s.get("status") in ("waiting for breakout", "no prices yet") and s["symbol"] not in held \
+                and pd.Timestamp(s["date"]) >= since:
             ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|setup", s, "setup"))
         if "entry_date" in s and s["entry_date"] >= since:
             ev.append((f"{s['scanner']}|{s['symbol']}|{s['date']}|bought", s, "bought"))
@@ -350,11 +366,14 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
     lines = ["📋 <b>Today's actions</b>"]
     setups = sorted((s for _, s, k in fresh if k == "setup"), key=slot_order)
     if setups:
-        lines += ["", "<b>Place buy-stop</b>"]
+        lines += ["", "<b>Buy at the next open</b>"]
         for s in setups:
-            stp = s["trigger"] * (1 - stop_for(s["scanner"]) / 100)
             ml = f" · ML {s['ml']}" if s.get("ml") is not None else ""
-            lines.append(f"🟡 <b>{s['symbol']}</b> above {s['trigger']:.2f} · SL {stp:.2f} · signal {_d(s['date'])} · {sc(s)}{ml}")
+            ref = f" · last {s['last_close']:.2f}" if s.get("last_close") else ""
+            when = (f" · if still on the scanner at the {'week' + chr(39) + 's ' if bs.is_weekly(s['scanner']) else ''}close"
+                    if s.get("status") == "no prices yet" else "")
+            lines.append(f"🟡 <b>{s['symbol']}</b>{ref} · SL {stop_for(s['scanner']):g}% below the buy · "
+                         f"signal {_d(s['date'])} · {sc(s)}{ml}{when}")
     bought = [s for _, s, k in fresh if k == "bought"]
     if bought:
         lines += ["", "<b>Bought</b>"]
@@ -364,9 +383,13 @@ def format_alerts(fresh: list[tuple[str, dict, str]]) -> str | None:
     if sells:
         lines += ["", "<b>Sell at next open</b>"]
         for s in sells:
-            lines.append(f"🔻 <b>{s['symbol']}</b> closed {s['now']:.2f} < {EXIT_LABEL} {s['ma']:.2f} · {s['ret']:+.1f}%")
-    icon = {"target": "✅", "stop": "🛑", "time": "⏱", "average": "📉"}
-    why = {"target": "target", "stop": "stop-loss", "time": "1 year", "average": f"below {EXIT_LABEL}"}
+            if s.get("sell_why") == "slow":
+                lines.append(f"🔻 <b>{s['symbol']}</b> not +{SLOW_MIN_PCT:g}% after {SLOW_DAYS} sessions · {s['ret']:+.1f}%")
+            else:
+                lines.append(f"🔻 <b>{s['symbol']}</b> closed {s['now']:.2f} < {EXIT_LABEL} {s['ma']:.2f} · {s['ret']:+.1f}%")
+    icon = {"target": "✅", "stop": "🛑", "time": "⏱", "average": "📉", "slow": "⌛"}
+    why = {"target": "target", "stop": "stop-loss", "time": "1 year", "average": f"below {EXIT_LABEL}",
+           "slow": f"not +{SLOW_MIN_PCT:g}% after {SLOW_DAYS} sessions"}
     exits = [(s, k) for _, s, k in fresh if k in icon]
     if exits:
         lines += ["", "<b>Closed</b>"]
@@ -438,13 +461,13 @@ def dashboard_view(states: list[dict]) -> dict:
                 "cap": s.get("cap"), "priority": s.get("priority", 3), "ml": s.get("ml")}
         st = s.get("status")
         if st == "waiting for breakout":
-            buy_list.append({**base, "stage": "breakout", "level": _r(s["trigger"]),
-                             "stop": _r(s["trigger"] * (1 - stop_for(s["scanner"]) / 100)),
+            buy_list.append({**base, "stage": "breakout", "level": _r(s.get("last_close")),
+                             "stop": _r(s.get("last_close", 0) * (1 - stop_for(s["scanner"]) / 100)),
                              "valid_until": _iso(s.get("valid_until"))})
         if "entry_date" in s:
             trade = {**base, "entry_date": _iso(s["entry_date"]), "entry": _r(s["entry"]),
                      "target": _r(s.get("target")), "stop": _r(s["stop"]), "ma": _r(s.get("ma")),
-                     "sell_signal": _iso(s.get("sell_signal")), "gap": s.get("gap"), "path": s.get("path"),
+                     "sell_signal": _iso(s.get("sell_signal")), "sell_why": s.get("sell_why"), "gap": s.get("gap"), "path": s.get("path"),
                      "status": st, "exit_date": _iso(s.get("exit_date")), "exit": _r(s.get("exit")), "exit_by": _iso(
                          pd.Timestamp(s["entry_date"]) + pd.offsets.BDay(RIDE_MAX_HOLD)), "ret": s.get("ret")}
             if st == "holding":
@@ -471,7 +494,7 @@ def dashboard_view(states: list[dict]) -> dict:
     held = {x["symbol"] for x in holding}
     seen_bl: set[str] = set()
     keep = []
-    for x in sorted(buy_list, key=lambda x: x["signal"], reverse=True):  # newest buy-stop per stock
+    for x in sorted(buy_list, key=lambda x: x["signal"], reverse=True):  # newest pending buy per stock
         if x["symbol"] in held or x["symbol"] in seen_bl:
             continue
         seen_bl.add(x["symbol"])
@@ -481,8 +504,8 @@ def dashboard_view(states: list[dict]) -> dict:
     holding.sort(key=lambda x: x["entry_date"], reverse=True)
     closed.sort(key=lambda x: x["exit_date"], reverse=True)
     skipped = sum(s.get("status") == "skipped" for s in states)
-    return {"rule": {"mode": "breakout", "entry_days": bs.entry_window_for("63_30_daily"),
-                     "entry_days_weekly": bs.entry_window_for("Wkly_upswing"), "target": None, "exit_ma": EXIT_MA,
+    return {"rule": {"mode": "open", "entry_days": bs.entry_window_for("63_30_daily"),
+                     "entry_days_weekly": bs.entry_window_for("Wkly_upswing"), "target": None, "exit_ma": EXIT_MA, "slow_days": SLOW_DAYS, "slow_min": SLOW_MIN_PCT,
                      "ml_on": bool(_ranker() and _ranker().get("on")),
                      "stop": STOP_PCT, "stop_by": STOP_BY_SCANNER, "atr_max": ATR_MAX_PCT, "max_hold": RIDE_MAX_HOLD, "stake": STAKE,
                      "near_high": NEAR_HIGH_PCT},
@@ -533,11 +556,10 @@ def backtest_section(hits: pd.DataFrame, prices: dict[str, pd.DataFrame], d: pd.
     if d.empty:
         return []
     L = ["", "## Breakout rule (the live alert rule)", "",
-         f"Buy when the price trades above the trigger (the signal candle's high) within "
-         f"{bs.entry_window_for('63_30_daily')} sessions ({bs.entry_window_for('Wkly_upswing')} after a weekly signal), "
-         f"filled at the trigger or the open on a gap-up. Sell at the next open after a close below the {EXIT_LABEL}, "
+         f"Buy at the next open after the signal candle (Monday's open after a weekly signal). "
+         f"Sell at the next open after a close below the {EXIT_LABEL}, "
          f"a {STOP_PCT:g}% stop" + (f" ({', '.join(f'{k} {v:g}%' for k, v in STOP_BY_SCANNER.items())})" if STOP_BY_SCANNER else "")
-         + f", or after {RIDE_MAX_HOLD} sessions. "
+         + f", at the next open if not +{SLOW_MIN_PCT:g}% after {SLOW_DAYS} sessions, or after {RIDE_MAX_HOLD} sessions. "
          f"Wkly_upswing only when daily ATR(14) is under {ATR_MAX_PCT.get('Wkly_upswing', 0):g}% of the close. "
          f"Filter: {', '.join(f'{k} only within {v:g}% of the 52-week high' for k, v in NEAR_HIGH_PCT.items())}. "
          f"{bs.COST_PCT}% costs.", "",

@@ -6,7 +6,8 @@
   condition is evaluated on the completed weekly candle, so the signal is
   only known after that week's last session (using the Monday would peek at
   the rest of the week).
-- **Trigger**: the high of the signal bar. The buy-stop stays open for the
+- **Trigger**: the high of the signal bar (display only since 15 Nov 2026: the bot
+  now buys at the next open). It was a buy-stop open for the
   next 3 sessions (5 after a weekly signal); filled at the trigger, or at
   the open on a gap-up.
 - **Features** (for the ML ranker): only bars up to and including the

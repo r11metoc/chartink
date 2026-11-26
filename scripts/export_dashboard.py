@@ -263,17 +263,17 @@ def rule_outcome(states: list[dict]) -> dict[tuple[str, str], str]:
             h = held[s["symbol"]]
             txt = f"holding {h['ret']:+.1f}%" if h["scanner"] == s["scanner"] else f"holding (from {h['scanner']})"
         elif st in dipzone.CLOSED:
-            txt = f"bought, sold {s['ret']:+.1f}% ({'stop-loss' if st == 'stop' else 'below ' + dipzone.EXIT_LABEL if st == 'average' else st})"
+            txt = f"bought, sold {s['ret']:+.1f}% ({'stop-loss' if st == 'stop' else 'below ' + dipzone.EXIT_LABEL if st == 'average' else f'not +{dipzone.SLOW_MIN_PCT:g}% after {dipzone.SLOW_DAYS} sessions' if st == 'slow' else st})"
         elif st == "no slot":
             txt = "crossed, but " + ("already holding" if "holding" in s.get("why", "") else "no free slot")
         elif st == "skipped":
             txt = "skipped: " + s.get("why", "").split(":")[0]
         elif st == "waiting for breakout":
-            txt = "buy-stop open"
+            txt = "buy at the next open"
         elif st == "no breakout":
             txt = "didn't cross in time"
         elif st == "no prices yet":
-            txt = "new: buy-stop after the close"
+            txt = "new: buy at the next open after the close"
         else:
             continue
         out[(s["scanner"], s["symbol"])] = txt  # latest signal wins for the plain key

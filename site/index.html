@@ -349,14 +349,14 @@ function renderToday(d, part) {
         <div class="meta">At next open · closed below 30-day EMA ${money(h.ma)}</div></div>
         <div class="num chg ${cls(h.ret)}">${pct(h.ret)}</div></div>`),
     ...stops.map((b) => `<details class="row fs" style="display:block"><summary style="list-style:none;cursor:pointer">
-        <div class="sym">🟡 Buy ${esc(b.symbol)} above ${money(b.level)}${scanTag(b.scanner)}${fundTag(b.fund)}${evTag(b.symbol)}</div>
-        <div class="meta">Signal ${fmtDate(b.signal)} · SL ${money(b.stop)} · now ${money(b.now)}${mlTag(d, b)}</div></summary>
+        <div class="sym">🟡 Buy ${esc(b.symbol)} at next open${scanTag(b.scanner)}${fundTag(b.fund)}${evTag(b.symbol)}</div>
+        <div class="meta">Signal ${fmtDate(b.signal)} · last ${money(b.level)} · SL 15% below the buy (≈ ${money(b.stop)})${mlTag(d, b)}</div></summary>
         ${b.fund ? `<div class="meta" style="padding-top:6px">Fundamentals${fundLine(b.fund)}</div>` : ""}</details>`),
   ];
   const ev = d.events || {};
   const evRows = Object.entries(ev).filter(([sym]) => held[sym] || waiting[sym]).sort((a, b) => a[1].date.localeCompare(b[1].date));
   const resultsCard = !evRows.length ? "" : (`<section class="card"><h2>📅 Results coming <small>${evRows.length}</small></h2><div class="row"><div>
-      <div class="meta">${evRows.map(([sym, e]) => `<b>${esc(sym)}</b> ${fmtDate(e.date)}${e.what !== "results" ? " (" + esc(e.what) + ")" : ""} · ${held[sym] ? "holding" : "buy-stop"}`).join(" · ")}</div></div><div></div></div></section>`);
+      <div class="meta">${evRows.map(([sym, e]) => `<b>${esc(sym)}</b> ${fmtDate(e.date)}${e.what !== "results" ? " (" + esc(e.what) + ")" : ""} · ${held[sym] ? "holding" : "to buy"}`).join(" · ")}</div></div><div></div></div></section>`);
   const done = [
     ...bought.map((h) => `<div class="row"><div><div class="sym">🟢 Bought ${esc(h.symbol)}${scanTag(h.scanner)}${fundTag(h.fund)}</div>
         <div class="meta">${fmtDate(h.entry_date)} at ${money(h.entry)} · SL ${money(h.stop)}</div></div>
@@ -377,11 +377,11 @@ function renderToday(d, part) {
     const reason = r.scanners.map((sc) => why[sc + "|" + r.symbol]).find(Boolean);
     let chip, note;
     if (h) { chip = `<span class="pill BUY">Holding ${pct(h.ret)}</span>`; note = `bought ${money(h.entry)} · ${fmtDate(h.entry_date)}`; }
-    else if (b) { chip = `<span class="pill HOLD">Buy-stop</span>`; note = `above ${money(b.level)} · signal ${fmtDate(b.signal)}`; }
+    else if (b) { chip = `<span class="pill HOLD">Buy at open</span>`; note = `signal ${fmtDate(b.signal)} · last ${money(b.level)}`; }
     else if (newOn.length) {
       const wk = newOn.every((sc) => SHORT[sc] === "Weekly");
       chip = `<span class="pill WAIT">${wk ? "New this week" : "New today"}</span>`;
-      note = `buy-stop set after the ${wk ? "week's " : ""}close`;
+      note = `buy at the next open after the ${wk ? "week's " : ""}close`;
     } else { chip = `<span class="pill WAIT">${esc(reason || "not taken")}</span>`;
              note = r.trigger != null ? `trigger ${money(r.trigger)} (${r.chg >= 0 ? "above" : "below"}, ${pct(r.chg)})` : ""; }
     return `<div class="row hrow"><div><div class="sym">${esc(r.symbol)}${r.scanners.map(scanTag).join("")}${evTag(r.symbol)}</div>
@@ -390,7 +390,7 @@ function renderToday(d, part) {
   const scanCard = `<section class="card"><h2>On the scanners now <small>${onScan.length}</small></h2>
     ${scanRows || `<div class="empty">No stocks on the scanners in the latest scan.</div>`}</section>`;
   const full = hold.length >= slots && stops.length
-    ? `<div class="note" style="padding-top:2px">All ${slots} slots are full: a buy-stop becomes a buy only if a holding is sold first.</div>` : "";
+    ? `<div class="note" style="padding-top:2px">All ${slots} slots are full: a new buy happens only if a holding is sold first.</div>` : "";
   const todo = `<section class="card todo"><h2>To do <small>${actions.length || ""}</small></h2>${full}
     ${actions.join("") || `<div class="empty">Nothing to do today.</div>`}
     </section>`;
@@ -448,14 +448,15 @@ function renderJournal(d) {
   const wins = closed.filter((c) => c.ret > 0).length;
   const avg = closed.length ? closed.reduce((a, c) => a + c.ret, 0) / closed.length : null;
   const why = (t) => t.reason === "average" ? `closed below the ${z.rule.exit_ma}-day EMA${t.ma ? " (" + money(t.ma) + ")" : ""}, sold at the next open`
+    : t.reason === "slow" ? `not up ${z.rule.slow_min || 3}% after ${z.rule.slow_days || 15} sessions (time-out), sold at the next open`
     : t.reason === "stop" ? `hit the ${z.rule.stop}% stop-loss` : t.reason === "time" ? "held a year (time limit)" : esc(t.reason || "");
   const cards = trades.map((t) => `<section class="card"><h2><span>${esc(t.symbol)}${scanTag(t.scanner)}</span>
       <small class="chg ${cls(t.ret)}">${pct(t.ret)} · ${rupees(t.pnl)}</small></h2>
     <div class="note" style="color:var(--text)">
       <b>Bought</b> ${fmtDate(t.entry_date)} at ${money(t.entry)}: signal ${fmtDate(t.signal)} on ${esc(SHORT[t.scanner] || t.scanner)},
-      ${t.gap ? "gapped above the trigger " + money(t.trigger) + ", filled at the open" : "crossed the trigger " + money(t.trigger)}${t.ml != null ? ` · ML rank ${t.ml}` : ""}${t.cap ? " · " + esc(t.cap.toLowerCase()) : ""}.<br>
+      ${t.trigger != null && Math.abs(t.entry - t.trigger) < 0.01 ? "crossed the trigger " + money(t.trigger) : t.gap ? "gapped above the trigger " + money(t.trigger) + ", filled at the open" : "bought at the open after the signal (signal-day high " + money(t.trigger) + ")"}${t.ml != null ? ` · ML rank ${t.ml}` : ""}${t.cap ? " · " + esc(t.cap.toLowerCase()) : ""}.<br>
       ${t.open
-        ? `<b>Open</b> ${t.days} days · now ${money(t.now)} · sells after a close below the EMA (${money(t.ma)}) or at ${money(t.stop)}${t.sell_signal ? ` · <b class="down">sell signal: next open</b>` : ""}`
+        ? `<b>Open</b> ${t.days} days · now ${money(t.now)} · sells after a close below the EMA (${money(t.ma)}), if not +${z.rule.slow_min || 3}% after ${z.rule.slow_days || 15} sessions, or at ${money(t.stop)}${t.sell_signal ? ` · <b class="down">sell signal: next open</b>` : ""}`
         : `<b>Sold</b> ${fmtDate(t.exit_date)} at ${money(t.exit)} after ${t.days} days: ${why(t)}.`}
       ${miniChart(t)}
       <span class="meta"><span style="color:var(--accent)">━</span> close &nbsp;<span style="color:var(--hold)">┅</span> ${z.rule.exit_ma}-day EMA &nbsp;── trigger &nbsp;● signal / <span class="up">buy</span> / <span class="down">sell</span></span>
@@ -504,15 +505,15 @@ function renderRule(d) {
   if (!r) return "";
   const sec = (t, body) => `<section class="card"><h2>${t}</h2><div class="note" style="font-size:14px;color:var(--text)">${body}</div></section>`;
   return sec("The rule", `
-    <b>Buy</b>: when a stock appears on a scanner, place a buy-stop at its <b>trigger</b> (the signal day's high; the week's high for Weekly)
-    for ${r.entry_days} sessions after the signal (${r.entry_days_weekly} for Weekly); if the price hasn't crossed by then, cancel it. Filled at the trigger, or at the open on a gap-up.<br><br>
-    <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day EMA, or at the ${r.stop}% stop-loss, or after a year.<br><br>
+    <b>Buy</b>: at the <b>next open</b> after the signal day closes (Monday's open after a Weekly signal). Since 15 Nov 2026; before that, a buy-stop at the signal day's high.
+    In the 2019–26 test (₹10L, 15 shared slots) buying at the next open made 31.0% a year vs 24.5% for the buy-stop, with the same worst fall (−9.5%).<br><br>
+    <b>Sell</b>: at the next open after a close below the ${r.exit_ma}-day EMA, or if not +${r.slow_min || 3}% after ${r.slow_days || 15} sessions (time-out), or at the ${r.stop}% stop-loss, or after a year.<br><br>
     <b>Slots</b>: 15 positions of about 6.7% each, one per stock. If short of slots on a day, ${r.ml_on ? "the <b>ML ranker</b> decides who goes first (highest ML rank first; More → ML)" : "mid caps first, then large, then small (the ML ranker is off: More → ML)"}.<br><br>
-    <b>Filters</b>: Weekly only takes calmer stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); 63/30 only within ${Object.values(r.near_high || {})[0] || 10}% of the 52-week high.<br><br>
+    <b>Filters</b>: Weekly only takes calmer stocks (daily range under ${Object.values(r.atr_max || {})[0] || 4}%); ${Object.keys(r.near_high || {}).length ? `63/30 only within ${Object.values(r.near_high)[0]}% of the 52-week high.` : ""}<br><br>
     Paper trades of ₹1L each; returns are after 0.25% costs. Not advice.`)
   + sec("Scans and alerts", `
     Scans at 10:00, 13:00 and 15:00 IST (within about 15 minutes), Monday to Friday; the header shows the next one.
-    Telegram sends only today's actions (set a buy-stop, bought, sell, closed). Ask the bot for more:
+    Telegram sends only today's actions (buy at the next open, bought, sell, closed). Ask the bot for more:
     /today, /holdings, /scanners, /breakouts, /fundamentals, /help (replies within about 15 minutes).<br><br>
     <b>Data check</b> (More → Market) re-checks every scan: scan freshness, prices, every paper trade against the daily prices, and fundamentals.`)
   + sec("Fundamentals (information only)", `
@@ -528,7 +529,7 @@ function renderRule(d) {
     <b>Market</b> (More → Market): Nifty 50 and Nifty 500 against their 50- and 200-day averages, India VIX,
     how many tracked stocks are above their 50-day average, and the sectors gaining or losing picks.
     Context only: a market-trend filter didn't improve the backtest.<br><br>
-    <b>📅 Results</b>: holdings, buy-stops and scanner stocks with results or a board meeting in the next 7 days,
+    <b>📅 Results</b>: holdings, stocks to buy and scanner stocks with results or a board meeting in the next 7 days,
     from the companies' exchange filings (read daily). Prices can jump either way on results day.`)
   + sec("Using the app", `
     Swipe left or right to move between Today and the More pages. Pull down or tap ↻ to refresh.
